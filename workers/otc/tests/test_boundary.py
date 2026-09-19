@@ -54,15 +54,16 @@ def test_unknown_location_cannot_be_zero_zero():
         validate_schema("OtcResult", result)
 
 
-def test_real_process_does_not_fake_a_decode(tmp_path):
+def test_real_process_rejects_placeholder_video_paths(tmp_path):
     output = tmp_path / "result.json"
     process = subprocess.run(
         [sys.executable, "-m", "otc", "process", "--manifest",
-         str(ROOT / "fixtures/otc/clean-30/manifest.json"), "--output", str(output)],
+         str(ROOT / "fixtures/otc/clean-30/manifest.json"), "--output", str(output),
+         "--evidence", "synthetic"],
         capture_output=True, text=True, check=False,
     )
     assert process.returncode == 2
-    assert "not implemented" in process.stderr
+    assert "Video file does not exist" in process.stderr
     assert not output.exists()
 
 
@@ -76,3 +77,19 @@ def test_replay_is_explicit_and_preserves_synthetic_evidence(tmp_path):
     )
     assert process.returncode == 0, process.stderr
     assert json.loads(output.read_text())["evidence"] == "synthetic"
+
+
+@pytest.mark.parametrize("mutation,error", [
+    (lambda r: r["locations"].pop(), "each participant"),
+    (lambda r: r["cameras"].pop(), "camera diagnostics"),
+    (lambda r: r["observations"].append(copy.deepcopy(r["observations"][0])), "Duplicate"),
+    (lambda r: r["observations"][0].update(lastPtsMs=0, firstPtsMs=1), "reversed"),
+    (lambda r: r["observations"][0]["centerPx"].update(x=1e9), "outside rotated"),
+    (lambda r: r["locations"][0].update(sourceCameraIds=[]), "lacks accepted"),
+    (lambda r: r.update(processingMs=float("nan")), "Out of range"),
+])
+def test_result_semantics_are_checked_beyond_json_shape(mutation, error):
+    result = fixture("otc/clean-30/result.json")
+    mutation(result)
+    with pytest.raises(ValueError, match=error):
+        validate_result(fixture("otc/clean-30/manifest.json"), result)

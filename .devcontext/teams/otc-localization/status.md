@@ -1,16 +1,10 @@
 # otc-localization checkpoint
 
-Status: not started (foundation available).
-Owner: Team 3 human lead, to be named.
-Branch: feat/otc-localization. Base: foundation-v1; record resolved SHA in first journal.
+Status: ready for integration (first software slice; stage remains in progress). Owner: Team 3 human lead (user). Branch: feat/otc-localization. Baseline: foundation-v1, ab59c27105627977ee52dc2bcd4276b4532b9e2a.
 
-- Owned files: workers/otc/, tools/otc-fixtures/
-- Implemented foundation: Python schema/identity validation, explicit synthetic replay and complete codebook.
-- Assigned feature work: MP4 fixtures, video dependencies, real process decoder, tracking and registration.
-- Independent command: `bun run otc:validate; bun run otc:replay`.
-- Gate: `bun run gate:otc` after `bun run setup:python`.
-- Foundation evidence: [verification](../../evidence/foundation/verification.md). No feature/hardware gate has passed yet.
-- Next action: Implement an independent bounded-error codeword decoder and tests, while obtaining an actual near/back-row camera sample.
-- Dependencies: Team 1 consumes CLI/results; Team 4 consumes review evidence; Team 2 supplies physical packet clips. Frozen fixtures permit work now.
-
-Update this checkpoint at each handoff. Append experiment history in agent-owned journals.
+- Implemented: actual MP4 decoding, conservative identity/tracking, manual/validated-overlap mapping, diagnostics and review artifacts. Generated clips permit independent work without phone flashing.
+- Dense synthetic: 1,500/1,500 correctly positioned IDs under benchmark checks; 96.19 seconds, 328.66 MiB. Initial 90-second target remains unmet.
+- Final gate passes: 64 Python tests plus shared checks. Separately verified 14 unique shared contract tests and fixture-tool lint. See [evidence](../../evidence/otc-localization/20260919-pipeline.md).
+- No physical footage yet: Team 2 renderer is the next physical-test dependency. Software work is not blocked; physical optics/codec/geometry/venue performance remain unverified.
+- Existing wire schemas unchanged. CLI adds required --evidence and optional --job-id/--debug-dir. Captain reviews Python dependency pins before merge.
+- Next consumer action: Team 1 runs generated clips through worker lifecycle; Team 4 inspects results/review artifacts. See [handoff](handoff.md).

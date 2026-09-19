@@ -1,17 +1,42 @@
-# otc-localization handoff
+# Team 3 integration handoff
 
-Read [stage brief](../../stages/03-otc-localization.md), root rules/masterplan and shared schema notes before changing code.
+Branch: feat/otc-localization; baseline foundation-v1 (ab59c27105627977ee52dc2bcd4276b4532b9e2a). Feature commit: the commit containing this handoff; resolve with `git log -1 --format=%H -- workers/otc/src/otc/pipeline.py`. Stage remains in progress pending physical validation and runtime target. Check Git for publication status; a local commit is not a push.
 
-1. Use feat/otc-localization in an isolated checkout, install frozen dependencies and run `bun run gate:otc` after Python setup.
-2. Start a dated journal with baseline SHA, assumptions, owned files and success check.
-3. Implement an independent bounded-error codeword decoder and tests, while obtaining an actual near/back-row camera sample.
-4. Extend meaningful tests, run the gate, update this handoff/status and pass the producer example to its consumer.
+## Run independently
 
-Available: Python schema/identity validation, explicit synthetic replay and complete codebook.
-Pending: MP4 fixtures, video dependencies, real process decoder, tracking and registration.
-Run independently: `bun run otc:validate; bun run otc:replay`.
-Cross-team boundary: Team 1 consumes CLI/results; Team 4 consumes review evidence; Team 2 supplies physical packet clips.
+From repository root after installing Bun 1.3.14 and Python 3.13:
 
-No unresolved software dependency prevents the first slice. Coordinate shared schema/testkit/root/lock changes with the captain. Hardware, real media/codec/network and deadline inputs are documented in masterplan section 12.
+```powershell
+bun run setup:python
+.\.venv\Scripts\python.exe tools/otc-fixtures/generate.py --output-dir runtime/otc-handoff --count 30 --seed 7
+bun scripts/python.ts process --manifest runtime/otc-handoff/manifest.json --output runtime/otc-handoff/result.json --evidence synthetic --job-id handoff-job --debug-dir runtime/otc-handoff/debug
+bun run gate:otc
+.\.venv\Scripts\python.exe -m ruff check workers/otc tools/otc-fixtures
+```
 
-At handoff replace this starter checkpoint with exact implemented behavior, commit, commands/results, changed interfaces, blockers and next consumer action. Passing the scaffold is not feature completion.
+Use fresh output/debug paths for each attempt. POSIX Python: .venv/bin/python. The generator supplies original H.264 scenes, independent truth and manifest hashes. Expected clean result: all 30 IDs localized, correct columns, canonical distance error below 0.015; static light rejected. This is synthetic evidence.
+
+## Team 1: worker lifecycle
+
+- Spawn the repo environment with argument arrays: python -m otc process --manifest ... --output ... --evidence ... --job-id ... . No shell interpolation of upload filenames.
+- Required new option: --evidence synthetic|physical. Optional --job-id defaults to runId; --debug-dir emits review files. No shared schemas/codebook changed.
+- Stdout is schema-valid JobProgress NDJSON. Progress is stage based; frame messages need not increase its fraction. Stderr has JSON diagnostics for handled failures. Treat every nonzero exit/crash as failure; no failed progress event is promised.
+- Exit 0 and complete event follow validated atomic output. Existing output files are refused. Keep each attempt isolated; backend owns timeout/cancellation. Partial debug files are not success.
+- Recheck current sessionId/serverEpoch/runId/runTag/input hashes before authoritative map publication. Never silently use synthetic results as physical audience observations.
+- All declared inputs must exist and match hashes. Omit unavailable cameras from the submitted manifest; relative paths resolve against its directory.
+- Captain reviews worker Python manifest/lock pins before merge: PyAV 18.1.0, NumPy 2.4.6, OpenCV headless 4.13.0.92. No root/JS dependency edits.
+
+## Team 4: mapping and review
+
+- Use frozen result.locations. Only localized has coordinates; coarse/ambiguous/unseen have null x/y. Show status, evidence and mappingMode; decodeScore is not a probability.
+- Anchors are audience front-left/front-right/back-right/back-left in image pixels after declared clockwise rotation. They map the primary column into its canonical third. x is audience left-to-right, y front-to-back; exclusions use the same rotated image space.
+- debug/index.json links camera IDs to camera-N.png / camera-N.json and supplies final observations, matrices, support hulls and held-out residuals. Track files contain sampled symbols/counts, pilot colors, trajectories, status and reasons. These are worker diagnostics, not a frozen wire extension; coordinate backend artifact access.
+- Duplicate optical IDs in one view remain ambiguous globally. Conflicting camera positions are not silently averaged. Automatic mapping is limited to validated overlap support, retaining manual/coarse fallback elsewhere.
+
+## Evidence and remaining work
+
+See [evidence](../../evidence/otc-localization/20260919-pipeline.md) and [journal](journal/20260919-otc-pipeline.md). Dense synthetic: 1,500 correct locations, 96.19 seconds, 328.66 MiB. Initial 90-second target unmet. No physical clips exist yet; HEVC/HDR, rolling shutter/exposure, tiny screens, crowd motion and parallax remain unverified.
+
+Captain follow-ups: after accepting this branch, update root masterplan/README and shared context statements describing the worker as pending. The pre-existing root test:contracts substring filter discovers two ignored runtime/isolation copies on this machine: 42 reported tests are three copies of 14 unique tests. Proposed captain fix: `bun test ./packages/contracts/tests`. Root files remain unchanged.
+
+Next Team 3 action: integrate Team 2's exact renderer, film a known-ID group near/far, inspect annotated tracks, and change thresholds only with evidence; then evaluate original three-camera 4K recordings. Do not shorten the packet or loosen identity acceptance to make the demo appear successful.

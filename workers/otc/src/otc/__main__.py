@@ -1,13 +1,35 @@
-"""Explicit validation/fixture harness. The process subcommand is reserved for Team 3."""
+"""Validate, explicitly replay fixtures, or process original calibration videos."""
 
 import argparse
 import json
-import sys
+import os
 from pathlib import Path
+import sys
+import tempfile
 
+import av
+import cv2
 from jsonschema.exceptions import ValidationError
 
+from .pipeline import process_manifest
 from .validation import validate_manifest, validate_result
+
+
+def write_result(output, result):
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=output.parent,
+                                         suffix=".tmp", delete=False) as target:
+            temporary = Path(target.name)
+            json.dump(result, target, indent=2, allow_nan=False)
+            target.write("\n")
+            target.flush()
+            os.fsync(target.fileno())
+        temporary.replace(output)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def main() -> int:
@@ -20,24 +42,40 @@ def main() -> int:
             command.add_argument("--output", type=Path, required=True)
         if name == "replay-fixture":
             command.add_argument("--fixture", type=Path, required=True)
+        if name == "process":
+            command.add_argument("--evidence", choices=("physical", "synthetic"), required=True,
+                                 help="Explicit input provenance; the decoder cannot infer it")
+            command.add_argument("--job-id", help="Backend job ID; defaults to run ID for direct CLI")
+            command.add_argument("--debug-dir", type=Path)
     args = parser.parse_args()
     try:
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
         validate_manifest(manifest)
-        if args.command == "process":
-            raise ValueError("Video decoder not implemented. Team 3 owns process; no locations produced.")
         if args.command == "validate-manifest":
             print(json.dumps({"valid": True, "runId": manifest["runId"], "videoFilesChecked": False}))
             return 0
-        result = json.loads(args.fixture.read_text(encoding="utf-8"))
-        validate_result(manifest, result)
-        if result["evidence"] != "synthetic":
-            raise ValueError("Fixture replay requires evidence=synthetic")
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-        print(json.dumps({"replayed": True, "synthetic": True, "output": str(args.output)}))
+        if args.command == "process":
+            if args.output.exists():
+                raise ValueError("Output already exists; use a new path for each processing attempt")
+            def report(event):
+                print(json.dumps(event, allow_nan=False), flush=True)
+            result = process_manifest(
+                manifest, args.manifest.resolve().parent, args.evidence,
+                job_id=args.job_id, debug_dir=args.debug_dir, progress=report,
+            )
+            write_result(args.output, result)
+            report({"protocolVersion": 1, "jobId": args.job_id or manifest["runId"],
+                    "runId": manifest["runId"], "stage": "complete", "progress": 1,
+                    "message": f"Validated result written to {args.output}"})
+        else:
+            result = json.loads(args.fixture.read_text(encoding="utf-8"))
+            validate_result(manifest, result)
+            if result["evidence"] != "synthetic":
+                raise ValueError("Fixture replay requires evidence=synthetic")
+            write_result(args.output, result)
+            print(json.dumps({"replayed": True, "synthetic": True, "output": str(args.output)}))
         return 0
-    except (OSError, ValueError, ValidationError) as error:
+    except (OSError, ValueError, ValidationError, av.FFmpegError, cv2.error) as error:
         print(json.dumps({"error": str(error)}), file=sys.stderr)
         return 2
 
