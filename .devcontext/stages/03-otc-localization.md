@@ -15,7 +15,7 @@ No physical footage exists because Team 2's renderer is not built. Generated vid
 - Geometry: ordered anchors/orientation, invalid anchors, distributed overlap, held-out false match rejection, support hull and conflicting positions.
 - Dense synthetic: same 1,500/1,500 correct positions in serial/parallel modes, maximum error 0.00058544. Fresh three-clip 4K comparison: 97.80 seconds serial vs 32.19 parallel; sampled aggregate resident memory 292.90 vs 801.14 MiB. Initial 90-second target met on synthetic inputs.
 - Perspective review: 90/90 localized across front/middle/back; largest front screen 37x59 and smallest rear 12x18 pixels. Automated smaller-image scenarios include six-pixel rear screens and safe rejection of deliberate 1x2-pixel phones.
-- Final gate: 74 Python tests pass plus shared schema/fixture/boundary/typecheck/lint/contracts. See [latest evidence](../evidence/otc-localization/20260919-parallel-perspective.md) for commands/hashes and limitations, [initial evidence](../evidence/otc-localization/20260919-pipeline.md) for prior checks.
+- Final gate: 76 Python tests pass plus shared schema/fixture/boundary/typecheck/lint/contracts. A new 1,500-phone curved/tiered viewing fixture adds geometry/media checks, without claiming full localization: [scene evidence](../evidence/otc-localization/20260919-auditorium-sweep.md). See [parallel/perspective evidence](../evidence/otc-localization/20260919-parallel-perspective.md) and [initial evidence](../evidence/otc-localization/20260919-pipeline.md) for prior checks.
 
 ## Run and integrate
 

@@ -45,6 +45,20 @@ The synthetic scenes do not model all sensor effects. Dense clean scenes test co
 
 ## Reproducible scale measurement
 
+For the separate 1,500-phone curved/tiered auditorium scene inspired by the reference image:
+
+```powershell
+.\.venv\Scripts\python.exe tools/otc-fixtures/auditorium.py --output-dir runtime/otc-fixtures/auditorium-1500
+```
+
+Open `overview.mp4` for the entire crowd, or `camera-left.mp4`, `camera-center.mp4`, `camera-right.mp4` for closer overlapping views. Each is 3840x2160, 30 fps, 13.5 seconds and renders the frozen OTC packet with original scene geometry. All 1,500 phones fit in the overview; label-raster checks confirm each has visible pixels before video compression. Preview PNGs, `scene.json`, independent `ground-truth.json` and a three-camera `manifest.json` are included.
+
+This scene uses 30 curved rows, with seats increasing from 22 to 78 per row, three blocks, 0.58 m seat pitch and an additional 1.2 m gap at each aisle. Row radii run from 10 to 36.1 m; an increasing tier rise preserves sightlines in this stylized bowl. Every screen is 8x16 cm, projected as a quadrilateral facing the stage. Horizontal and vertical spacing therefore follow the row geometry and viewing perspective. Neutral seat backs and terrace edges make the sweep visible without transmitting IDs. The overview uses a 94-degree horizontal field of view; the three close views use 54 degrees from a common fixed stage origin, aimed at -27/0/+27 degrees.
+
+These are explicit synthetic assumptions, not measurements extracted from the photograph. Balcony seating, people/body occlusion, hand movement, sensor effects and translated-camera parallax are omitted. The three-camera manifest intentionally has null anchors: the curved, raked bowl does not define a single planar audience homography. It can exercise ID decoding/coarse outcomes, but do not use the old full-coordinate benchmark to claim 1,500 localized seats from this scene. The overview is a viewing artifact, not a fourth manifest camera. Large media stays in ignored runtime; the generator is reproducible from Git.
+
+The original constant-size grid remains useful for comparing processing performance:
+
 ```powershell
 .\.venv\Scripts\python.exe tools/otc-fixtures/generate.py --output-dir runtime/otc-density --count 1500 --width 3840 --height 2160 --fps 30 --seed 7
 .\.venv\Scripts\python.exe tools/otc-fixtures/benchmark.py --manifest runtime/otc-density/manifest.json --truth runtime/otc-density/ground-truth.json --output-dir runtime/otc-density/benchmark --workers 3
