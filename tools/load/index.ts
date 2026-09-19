@@ -29,17 +29,30 @@ const diagnostics = async () => (await fetch(`${baseUrl}/api/foundation`)).json(
 const jobView = async (jobId: string) =>
   (await fetch(`${baseUrl}/api/jobs/${jobId}`, { headers: { "x-operator-secret": secret } })).json();
 
+// The operator prepares first, waits for readiness, then chooses a future deadline.
+// A fixed sleep can commit while legitimate clocks are still converging after a join storm.
+const waitPrepared = async (domain: string, expected: number) => {
+  const deadline = performance.now() + 15000;
+  while (performance.now() < deadline) {
+    const current = await snapshot();
+    const barrier = current.preparations.find((item: { domain: string }) => item.domain === domain);
+    if (barrier?.readyIds.length === expected) return current;
+    await Bun.sleep(100);
+  }
+  return snapshot(); // The report and strict exit criteria retain any exclusions.
+};
+
 const show = {
   showId: "load-show", showRevision: 0, label: "Load run",
   tracks: [{
     trackId: "track-1", label: "Melody", url: "/api/assets/track-1", sha256: "a".repeat(64),
-    byteSize: 1024, durationMs: 300_000, sampleRateHz: 48_000, channels: 2,
+    byteSize: 1024, durationMs: 120_000, sampleRateHz: 48_000, channels: 2,
   }],
   channels: [
     { channelId: "melody", label: "Melody", color: "#3b82f6", gain: 1, mute: false, solo: false },
     { channelId: "bass", label: "Bass", color: "#ef4444", gain: 1, mute: false, solo: false },
   ],
-  clips: [{ clipId: "clip-1", channelId: "melody", trackId: "track-1", timelineStartMs: 0, sourceOffsetMs: 0, durationMs: 300_000, gain: 1 }],
+  clips: [{ clipId: "clip-1", channelId: "melody", trackId: "track-1", timelineStartMs: 0, sourceOffsetMs: 0, durationMs: 120_000, gain: 1 }],
 };
 
 console.log(`Load run: ${clients} clients for ${durationSeconds}s against ${baseUrl}`);
@@ -108,20 +121,21 @@ const camera = await cameraResponse.json();
 if (!cameraResponse.ok) throw new Error(`Camera upload failed: ${JSON.stringify(camera)}`);
 
 const job = await operator(`/api/calibrations/${runId}/jobs`, {
-  commandId: "load-job", expectedRevision: 0, runId, uploadIds: [camera.uploadId],
+  commandId: "load-job", expectedRevision: 0, runId, uploadIds: [camera.uploadId], evidence: "synthetic",
 });
 if (job.status !== 200) throw new Error(`Job creation failed: ${JSON.stringify(job.body)}`);
 const jobId = job.body.jobId as string;
 
-await operator("/api/show", { commandId: "load-show", expectedRevision: 0, show }, "PUT");
+const saved = await operator("/api/show", { commandId: "load-show", expectedRevision: 0, show }, "PUT");
+if (saved.status !== 200) throw new Error(`Show save failed: ${JSON.stringify(saved.body)}`);
 const afterShow = await snapshot();
 await operator("/api/transport", {
   commandId: "load-prepare", expectedRevision: afterShow.transport.transportRevision,
   action: "prepare", showRevision: afterShow.show.showRevision, positionMs: 0, effectiveServerMs: 0,
 });
 
-await Bun.sleep(2000);
-const beforeCue = await snapshot();
+const beforeCue = await waitPrepared("transport", clients);
+console.log(`Prepared cue: ${beforeCue.preparations.find((item: { domain: string }) => item.domain === "transport")?.readyIds.length}/${clients} ready`);
 const effectiveServerMs = beforeCue.serverMs + 5000;
 for (const client of simulated) client.noteCueDeadline(effectiveServerMs);
 const workerStageAtCue = (await jobView(jobId)).progress.stage as string;
@@ -139,11 +153,19 @@ const assignmentIds = simulated
   .map(client => client.result.deviceId)
   .filter(deviceId => deviceId >= 0)
   .slice(0, 1000);
-await operator("/api/assignments", {
-  commandId: "load-assign", expectedRevision: 0, mapRevision: 0,
-  deviceIds: assignmentIds,
-  channelId: "bass", effectiveServerMs: effectiveServerMs + 2000,
+const assignmentPrepare = await operator("/api/assignments/prepare", {
+  commandId: "load-assign-prepare", expectedRevision: 0, mapRevision: 0,
+  deviceIds: assignmentIds, channelId: "bass", effectiveServerMs: beforeCue.serverMs + 30000,
 });
+if (assignmentPrepare.status !== 200) throw new Error(`Assignment preparation failed: ${JSON.stringify(assignmentPrepare.body)}`);
+const beforeAssignment = await waitPrepared("assignment", assignmentIds.length);
+const assigned = await operator("/api/assignments", {
+  commandId: "load-assign", expectedRevision: 0, mapRevision: 0,
+  preparationId: assignmentPrepare.body.preparationId,
+  deviceIds: assignmentIds,
+  channelId: "bass", effectiveServerMs: beforeAssignment.serverMs + 4000,
+});
+if (assigned.status !== 200) throw new Error(`Assignment failed: ${JSON.stringify(assigned.body)}`);
 const assetResponse = await uploading;
 if (!assetResponse.ok) throw new Error(`Asset upload failed with ${assetResponse.status}`);
 
@@ -226,4 +248,7 @@ await mkdir(dirname(reportPath), { recursive: true });
 await writeFile(reportPath, report, "utf8");
 console.log(report.split("## What this does not show")[0]);
 console.log(`Report written to ${reportPath}`);
-process.exit(0);
+const passed = joined.length === clients && beforeDeadline.length / clients >= 0.99 && knewAboutCue.length === clients
+  && errors.length === 0 && finalJob.progress.stage === "complete" && committedAssignments === assignmentIds.length
+  && finalDiagnostics.diagnostics.connectedDevices === clients;
+process.exit(passed ? 0 : 1);

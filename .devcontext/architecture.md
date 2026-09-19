@@ -1,6 +1,17 @@
 # Architecture checkpoint
 
-Status: foundation implemented; concert behavior pending. Baseline: foundation-v1.
+Status: integrated local software on main; physical acceptance pending. Baseline: four feature branches merged through 5eb08ab plus captain integration.
+
+## Implemented integration
+
+- Bun/Hono owns identity, domain revisions, prepared future cues, per-device routing, streamed media, job isolation and durable checkpoints. Operator HTTP and WebSocket credentials are separate from participant resume tokens.
+- Both Next browsers use the shared ClockSync/ClockEstimator; snapshots are state, never a clock estimator. Audio unlock/hash verification and foreground readiness gate prepared playback. Effective mix and pending actions recover on reconnect; routine snapshots do not restart sources.
+- The operator edits prepared clips/cues, views waveforms, runs calibration, specifies camera geometry, reviews actual worker artifacts, commits maps and assigns explicit ID sets. Manual columns are coarse/null-coordinate locations.
+- Python OTC receives an immutable manifest and produces candidate results. Job identity, input hashes and unchanged geometry are checked before commit. Worker cancellation stops the process tree. Generated recordings remain synthetic evidence.
+- Restart preserves ID allocation, hashed resume credentials, saved show/map/routing and next calibration tag. It creates a new clock epoch and stops playback. Pending runtime jobs/runs are not resumed; operators repeat capture after a restart.
+- Local dev defaults and tests are documented in root README. Railway deployment is explicitly deferred by the user.
+
+## Historical foundation inventory
 
 | Boundary | Implemented now | Assigned next |
 | --- | --- | --- |

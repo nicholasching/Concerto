@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join as joinPath } from "node:path";
+import { join as joinPath, resolve } from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
@@ -9,7 +9,7 @@ import {
   PanicRequest, PROTOCOL_VERSION,
   SaveShowRequest, Track, TransportRequest,
 } from "@orchestra/contracts";
-import type { AssetStore } from "./assets";
+import { UploadTooLarge, type AssetStore } from "./assets";
 import { matchesOperatorSecret } from "./auth";
 import { Barrier } from "./barriers";
 import { MAX_CAMERAS, type CalibrationRuns } from "./calibration";
@@ -26,6 +26,7 @@ import type { DeviceRegistry } from "./registry";
 import type { RateLimiter } from "./rate-limit";
 import type { SessionState } from "./state";
 import { nextTransport, positionAt } from "./transport";
+import { validateShow } from "./show-validation";
 
 export const DEFAULT_LEAD_TIME_MS = 3000;
 
@@ -35,7 +36,7 @@ const CameraUploadQuery = z.object({
   cameraId: z.string().min(1).max(160),
   primaryColumn: z.enum(["left", "center", "right"]),
   rotationDegrees: z.coerce.number().int().refine(value => [0, 90, 180, 270].includes(value), "unsupported rotation"),
-  byteSize: numeric.int().positive(),
+  byteSize: numeric.int().positive().max(1024 * 1024 * 1024),
   label: z.string().min(1).max(200),
   anchors: z.string().optional(),
   exclusionRois: z.string().optional(),
@@ -55,7 +56,7 @@ const parseJson = <T>(schema: z.ZodType<T>, raw: string | undefined, fallback: T
 const AssetUpload = z.object({
   commandId: z.string().min(1).max(160),
   label: z.string().min(1).max(200),
-  byteSize: numeric.int().positive(),
+  byteSize: numeric.int().positive().max(128 * 1024 * 1024),
   durationMs: numeric.positive(),
   sampleRateHz: numeric.int().positive(),
   channels: numeric.int().min(1).max(2),
@@ -125,13 +126,37 @@ const leadTimeError = (deps: AppDeps, effectiveServerMs: number, nowServerMs: nu
 
 export function createApp(deps: AppDeps) {
   const app = new Hono();
+  app.onError((error, c) => {
+    if (error instanceof UploadTooLarge) return c.json(apiError("UPLOAD_TOO_LARGE", error.message), 413);
+    console.error("Request failed:", error.stack ?? error.message);
+    return c.json(apiError("INTERNAL_ERROR", "The operation failed. Check the server log before retrying.", true), 500);
+  });
+  deps.state.setAdminContext(() => ({ preparations: deps.preparations.snapshot(), calibration: deps.calibrations.resource() }));
   const persist = () =>
     deps.store.save(deps.registry.toCheckpoint(
       deps.clock.sessionId, deps.state.durableShow,
       deps.state.mapRevision > 0 ? deps.state.audienceMap : null,
       deps.state.lastCommittedRunTag,
+      deps.state.durableAssignments, deps.calibrations.nextTag,
     ));
-  app.use("/api/*", cors({ origin: ["http://localhost:3000", "http://localhost:3001"] }));
+  app.use("/api/*", cors({ origin: (origin, c) => {
+    const allowed = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001").split(",");
+    if (allowed.includes(origin)) return origin;
+    try { if (process.env.NODE_ENV !== "production" && new URL(origin).hostname === new URL(c.req.url).hostname) return origin; } catch { /* invalid origin */ }
+    return undefined;
+  } }));
+  app.get("/api/session", c => c.json({ protocolVersion: 1, sessionId: deps.clock.sessionId, serverEpoch: deps.clock.serverEpoch }));
+  let mutationQueue = Promise.resolve();
+  app.use("/api/*", async (c, next) => {
+    // Serialize short operator transactions across checkpoint awaits. Upload streams and joins
+    // retain their independent paths, so media cannot block clock probes or session admission.
+    if (!["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method) || /\/join$|\/uploads(?:\/|$)|\/assets$/.test(c.req.path)) return next();
+    const previous = mutationQueue;
+    let release!: () => void;
+    mutationQueue = new Promise<void>(resolve => { release = resolve; });
+    await previous;
+    try { await next(); } finally { release(); }
+  });
   app.get("/api/health", c => c.json({
     service: "audience-orchestra-control", protocolVersion: 1, implementation: "sync-control",
   }));
@@ -211,13 +236,17 @@ export function createApp(deps: AppDeps) {
     if (body.data.sessionId !== deps.clock.sessionId) {
       return c.json(apiError("WRONG_SESSION", "This server is not serving that concert session."), 404);
     }
+    const guard = guardCommand(deps, body.data);
+    if (guard) return c.json(guard.body, guard.status);
+    const showError = validateShow(body.data.show);
+    if (showError) return c.json(apiError("INVALID_SHOW", showError), 400);
 
     // Replay before validation: a retry of a command that already succeeded returns its original
     // result even though the revision it expected has since moved on.
     const replayed = deps.commands.get<unknown>(body.data.commandId);
     if (replayed) return c.json(replayed);
 
-    if (deps.state.transport.status !== "stopped") {
+    if (deps.state.transport.status !== "stopped" || deps.state.pendingActions.length > 0) {
       return c.json(apiError("TRANSPORT_NOT_STOPPED", "A show can only be saved while the transport is stopped."), 409);
     }
     if (body.data.expectedRevision !== deps.state.showRevision) {
@@ -229,6 +258,10 @@ export function createApp(deps: AppDeps) {
 
     const saved = deps.state.saveShow(body.data.show);
     await persist();
+    const barrier = new Barrier(crypto.randomUUID(), saved.showRevision, deps.state.transport.transportRevision, deps.state.connectedDeviceIds());
+    deps.preparations.start("assets", barrier);
+    deps.connections.sendToParticipants(barrier.expectedDevices(), JSON.stringify({ ...envelope(deps.clock), type: "assets.prepare", revision: deps.state.revision,
+      payload: { preparationId: barrier.preparationId, show: saved } }));
     const ack = accepted(deps.clock, body.data.commandId, saved.showRevision);
     deps.commands.remember(body.data.commandId, ack);
     return c.json(ack);
@@ -249,7 +282,7 @@ export function createApp(deps: AppDeps) {
 
     const now = deps.clock.nowServerMs();
     deps.state.applyDue(now);
-    if (request.expectedRevision !== deps.state.transport.transportRevision) {
+    if (request.expectedRevision !== deps.state.transportRevision) {
       return c.json(apiError(
         "REVISION_CONFLICT",
         `Transport is at revision ${deps.state.transport.transportRevision}; reload before commanding.`,
@@ -261,7 +294,7 @@ export function createApp(deps: AppDeps) {
 
     if (request.action === "prepare") {
       const barrier = new Barrier(
-        crypto.randomUUID(), deps.state.showRevision, deps.state.transport.transportRevision,
+        crypto.randomUUID(), deps.state.showRevision, deps.state.transportRevision,
         deps.state.connectedDeviceIds(),
       );
       deps.preparations.start("transport", barrier);
@@ -285,7 +318,7 @@ export function createApp(deps: AppDeps) {
     const barrier = deps.preparations.current("transport");
     if (request.action === "play") {
       if (!barrier || barrier.showRevision !== deps.state.showRevision
-        || barrier.transportRevision !== deps.state.transport.transportRevision) {
+        || barrier.transportRevision !== deps.state.transportRevision) {
         return c.json(apiError("NOT_PREPARED", "Prepare this show and transport revision before starting playback."), 409);
       }
       if (barrier.readyDevices().length === 0) {
@@ -293,28 +326,30 @@ export function createApp(deps: AppDeps) {
       }
     }
 
-    const transport = nextTransport({
+    const transport = { ...nextTransport({
       current: deps.state.transport, action: request.action, showRevision: deps.state.showRevision,
       positionMs: request.action === "play" || request.action === "seek"
         ? request.positionMs
         : positionAt(deps.state.transport, request.effectiveServerMs),
       effectiveServerMs: request.effectiveServerMs,
-    });
+    }), transportRevision: deps.state.transportRevision + 1 };
 
     // A deliberate transport command is how an operator comes back from a panic.
     deps.lease.resume();
+    const recipients = request.action === "play" && barrier ? barrier.readyDevices()
+      : transport.status === "playing" ? deps.state.playbackDeviceIds() : deps.state.connectedDeviceIds();
     const superseded = deps.state.scheduleTransport({
       domain: "transport", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
       supersedesCommandId: null, transport,
-    });
-    const recipients = request.action === "play" && barrier ? barrier.readyDevices() : deps.state.connectedDeviceIds();
+    }, recipients);
     deps.connections.sendToParticipants(recipients, JSON.stringify({
       ...envelope(deps.clock), type: "transport.commit", revision: deps.state.revision,
       effectiveServerMs: request.effectiveServerMs,
       payload: { domain: "transport", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs, supersedesCommandId: superseded, transport },
     }));
     if (request.action !== "play") deps.preparations.clear("transport");
-    const ack = accepted(deps.clock, request.commandId, transport.transportRevision);
+    const ack = { ...accepted(deps.clock, request.commandId, transport.transportRevision), effectiveServerMs: request.effectiveServerMs,
+      ready: recipients.length, excluded: request.action === "play" && barrier ? barrier.expectedDevices().filter(id => !recipients.includes(id)).map(deviceId => ({ deviceId, reason: barrier.excludedDevices().find(item => item.deviceId === deviceId)?.reason ?? "not acknowledged" })) : [] };
     deps.commands.remember(request.commandId, ack);
     return c.json(ack);
   });
@@ -336,7 +371,7 @@ export function createApp(deps: AppDeps) {
     if (!body) return c.json(apiError("INVALID_REQUEST", "Asset upload had no body."), 400);
 
     const trackId = crypto.randomUUID();
-    const written = await deps.assets.write(trackId, body);
+    const written = await deps.assets.write(trackId, body, query.data.byteSize);
     // A short read means the connection dropped mid-upload. Registering it would put a hash in a
     // show that no phone can ever match.
     if (written.byteSize !== query.data.byteSize) {
@@ -402,7 +437,9 @@ export function createApp(deps: AppDeps) {
     }
 
     const barrier = new Barrier(crypto.randomUUID(), deps.state.showRevision, deps.state.transport.transportRevision, participantIds);
+    outcome.run.preparationId = barrier.preparationId;
     deps.preparations.start("calibration", barrier);
+    await persist();
     deps.connections.sendToParticipants(participantIds, JSON.stringify({
       ...envelope(deps.clock), type: "calibration.prepare", revision: deps.state.revision,
       payload: { preparationId: barrier.preparationId, plan: outcome.run.plan },
@@ -457,8 +494,9 @@ export function createApp(deps: AppDeps) {
     }));
 
     const ack = accepted(deps.clock, request.commandId, deps.state.revision);
-    deps.commands.remember(request.commandId, ack);
-    return c.json({ ...ack, excluded: barrier.excludedDevices(), ready: barrier.readyDevices().length });
+    const result = { ...ack, effectiveServerMs: request.effectiveServerMs, excluded: barrier.excludedDevices(), ready: barrier.readyDevices().length };
+    deps.commands.remember(request.commandId, result);
+    return c.json(result);
   });
 
   // The submitted label is recorded for the operator and never used as a path: the file lands
@@ -501,7 +539,7 @@ export function createApp(deps: AppDeps) {
     if (!body) return c.json(apiError("INVALID_REQUEST", "Upload had no body."), 400);
 
     const uploadId = crypto.randomUUID();
-    const written = await deps.uploads.write(uploadId, body);
+    const written = await deps.uploads.write(uploadId, body, query.data.byteSize);
     if (written.byteSize !== query.data.byteSize) {
       await deps.uploads.discard(uploadId);
       return c.json(apiError(
@@ -509,6 +547,12 @@ export function createApp(deps: AppDeps) {
       ), 400);
     }
 
+    // Another request may finish while this recording streams. Recheck before registering it.
+    if (["committed", "discarded"].includes(run.status) || run.uploads.size >= MAX_CAMERAS
+      || [...run.uploads.values()].some(upload => upload.cameraId === query.data.cameraId)) {
+      await deps.uploads.discard(uploadId);
+      return c.json(apiError("UPLOAD_CONFLICT", "The run or camera changed during upload. Refresh before retrying."), 409);
+    }
     const upload = {
       uploadId, runId: run.plan.runId, cameraId: query.data.cameraId,
       primaryColumn: query.data.primaryColumn,
@@ -518,6 +562,20 @@ export function createApp(deps: AppDeps) {
     };
     deps.calibrations.addUpload(upload);
     deps.commands.remember(query.data.commandId, upload);
+    return c.json(upload);
+  });
+
+  app.patch("/api/calibrations/:runId/uploads/:uploadId", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) return c.json(apiError("UNAUTHORIZED", "Operator access required."), 401);
+    const run = deps.calibrations.get(c.req.param("runId"));
+    const upload = run?.uploads.get(c.req.param("uploadId"));
+    if (!run || !upload) return c.json(apiError("UNKNOWN_UPLOAD", "No such recording in this run."), 404);
+    if (run.status === "committed" || run.status === "discarded") return c.json(apiError("RUN_CLOSED", "This run is closed."), 409);
+    const parsed = z.strictObject({ primaryColumn: z.enum(["left", "center", "right"]),
+      rotationDegrees: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
+      anchors: Anchors.nullable(), exclusionRois: ExclusionRois }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json(apiError("INVALID_GEOMETRY", "Use four anchors, valid exclusion polygons, and a supported rotation."), 400);
+    Object.assign(upload, parsed.data);
     return c.json(upload);
   });
 
@@ -538,6 +596,8 @@ export function createApp(deps: AppDeps) {
     if (!run || run.plan.runId !== request.runId) {
       return c.json(apiError("UNKNOWN_RUN", "No such calibration run in this session."), 404);
     }
+    if (run.status === "committed" || run.status === "discarded") return c.json(apiError("RUN_CLOSED", "This run is closed."), 409);
+    if (new Set(request.uploadIds).size !== request.uploadIds.length) return c.json(apiError("DUPLICATE_CAMERA", "Choose each recording once."), 400);
     // Without a start time there is no packet timing to decode against.
     if (run.startServerMs === null) {
       return c.json(apiError("RUN_NOT_ARMED", "Arm this run before processing its recordings."), 409);
@@ -549,11 +609,13 @@ export function createApp(deps: AppDeps) {
 
     const cameras = uploads.map(upload => ({
       cameraId: upload!.cameraId, primaryColumn: upload!.primaryColumn,
-      videoPath: deps.uploads.path(upload!.uploadId)!, sha256: upload!.sha256,
+      videoPath: resolve(deps.uploads.path(upload!.uploadId)!), sha256: upload!.sha256,
       rotationDegrees: upload!.rotationDegrees,
       exclusionRois: upload!.exclusionRois, anchors: upload!.anchors,
     }));
-    const manifest = CalibrationManifest.parse({ ...run.plan, startServerMs: run.startServerMs, cameras });
+    const participantIds = run.plan.participantIds.filter(id => run.reports.get(id)?.completed !== false);
+    if (!participantIds.length) return c.json(apiError("NO_CAPTURED_PHONES", "Every participating phone reported an interrupted pattern. Capture a new run."), 409);
+    const manifest = CalibrationManifest.parse({ ...run.plan, participantIds, startServerMs: run.startServerMs, cameras });
 
     const jobId = crypto.randomUUID();
     const manifestPath = joinPath(deps.jobWorkspace, `${jobId}.manifest.json`);
@@ -562,7 +624,7 @@ export function createApp(deps: AppDeps) {
     await writeFile(manifestPath, JSON.stringify(manifest), "utf8");
 
     deps.calibrations.setStatus(run.plan.runId, "processing");
-    const record = deps.jobs.enqueue({ jobId, runId: run.plan.runId, manifestPath, outputPath, manifest });
+    const record = deps.jobs.enqueue({ jobId, runId: run.plan.runId, manifestPath: resolve(manifestPath), outputPath: resolve(outputPath), manifest, evidence: request.evidence });
     const progress = JobProgress.parse({
       protocolVersion: PROTOCOL_VERSION, jobId, runId: run.plan.runId,
       stage: record.stage, progress: record.progress, message: record.message,
@@ -585,6 +647,22 @@ export function createApp(deps: AppDeps) {
       diagnostics: record.diagnostics,
       result: record.result,
     });
+  });
+
+  app.get("/api/calibrations/:runId", c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) return c.json(apiError("UNAUTHORIZED", "Operator access required."), 401);
+    const run = deps.calibrations.get(c.req.param("runId"));
+    if (!run) return c.json(apiError("UNKNOWN_RUN", "No such calibration run."), 404);
+    return c.json(deps.calibrations.resource(run));
+  });
+  app.get("/api/jobs/:jobId/debug/:name", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) return c.json(apiError("UNAUTHORIZED", "Operator access required."), 401);
+    const job = deps.jobs.get(c.req.param("jobId"));
+    const name = c.req.param("name");
+    if (!job || job.stage !== "complete" || !/^(index\.json|camera-[0-2]\.(png|json))$/.test(name)) return c.json(apiError("UNKNOWN_ARTIFACT", "No such completed review artifact."), 404);
+    const file = Bun.file(joinPath(deps.jobWorkspace, `${job.jobId}.result.json.debug`, name));
+    if (!await file.exists()) return c.json(apiError("UNKNOWN_ARTIFACT", "Review artifact unavailable."), 404);
+    return new Response(file, { headers: { "cache-control": "no-store" } });
   });
 
   app.delete("/api/jobs/:jobId", c => {
@@ -637,16 +715,20 @@ export function createApp(deps: AppDeps) {
       return c.json(apiError("JOB_NOT_COMPLETE", `That job is ${job.stage}; only a complete job can be committed.`), 409);
     }
 
-    // Re-check identity at commit, not only when the job finished: this is the last point before
-    // the result changes where the operator believes every phone is sitting.
-    const cameras = [...run.uploads.values()].map(upload => ({ cameraId: upload.cameraId, sha256: upload.sha256 }));
-    const mismatch = identityMismatch(job.result, {
-      ...run.plan, startServerMs: run.startServerMs ?? 0,
-      cameras: cameras.map(camera => ({
-        ...camera, primaryColumn: "left" as const, videoPath: "", rotationDegrees: 0 as const,
-        exclusionRois: [], anchors: null,
-      })),
-    });
+    if (run.status === "discarded") return c.json(apiError("RUN_CLOSED", "This run was discarded."), 409);
+    if (job.manifest.participantIds.some(id => run.reports.get(id)?.completed === false)) {
+      return c.json(apiError("CAPTURE_CHANGED", "A phone reported an interrupted pattern after processing began. Process and review again."), 409);
+    }
+    // Validate the exact inputs used by this job, including any geometry edits made since it ran.
+    for (const camera of job.manifest.cameras) {
+      const current = [...run.uploads.values()].find(upload => upload.cameraId === camera.cameraId);
+      if (!current || current.sha256 !== camera.sha256 || current.primaryColumn !== camera.primaryColumn
+        || current.rotationDegrees !== camera.rotationDegrees || JSON.stringify(current.anchors) !== JSON.stringify(camera.anchors)
+        || JSON.stringify(current.exclusionRois) !== JSON.stringify(camera.exclusionRois)) {
+        return c.json(apiError("STALE_GEOMETRY", "Camera metadata changed. Process and review the recordings again."), 409);
+      }
+    }
+    const mismatch = identityMismatch(job.result, job.manifest);
     if (mismatch) return c.json(apiError("RESULT_IDENTITY_MISMATCH", mismatch), 409);
 
     // A run that started before the one already committed cannot overwrite newer locations,
@@ -709,12 +791,13 @@ export function createApp(deps: AppDeps) {
       ...envelope(deps.clock), type: "lease.renew", payload: { expiresServerMs: now },
     }));
 
+    await persist();
     const ack = accepted(deps.clock, body.data.commandId, deps.state.transport.transportRevision);
     deps.commands.remember(body.data.commandId, ack);
     return c.json(ack);
   });
 
-  app.post("/api/assignments", async c => {
+  app.on("POST", ["/api/assignments", "/api/assignments/prepare"], async c => {
     if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
       return c.json(apiError("UNAUTHORIZED", "Assigning devices requires the operator secret."), 401);
     }
@@ -750,17 +833,49 @@ export function createApp(deps: AppDeps) {
     if (leadTime) return c.json(leadTime.body, leadTime.status);
 
     const assignmentRevision = deps.state.assignmentRevision + 1;
-    const assignments = request.deviceIds.map(deviceId => ({
+    if (c.req.path.endsWith("/prepare")) {
+      const barrier = new Barrier(crypto.randomUUID(), deps.state.showRevision, deps.state.transportRevision, request.deviceIds);
+      deps.preparations.start("assignment", barrier);
+      deps.preparations.assignment = { preparationId: barrier.preparationId, assignmentRevision,
+        mapRevision: request.mapRevision, channelId: request.channelId, deviceIds: [...request.deviceIds].sort((a, b) => a - b) };
+      for (const id of request.deviceIds) if (!deps.state.readinessOf(id)?.connected) barrier.exclude(id, "disconnected");
+      await deps.connections.sendEachToParticipants(request.deviceIds, deviceId => JSON.stringify({
+        ...envelope(deps.clock), type: "assignment.prepare", revision: deps.state.revision,
+        payload: { preparationId: barrier.preparationId, assignment: { deviceId, channelId: request.channelId, assignmentRevision, mapRevision: request.mapRevision } },
+      }));
+      const ack = { ...accepted(deps.clock, request.commandId, deps.state.assignmentRevision), preparationId: barrier.preparationId };
+      deps.commands.remember(request.commandId, ack);
+      return c.json(ack);
+    }
+    const barrier = deps.preparations.current("assignment");
+    const preparation = deps.preparations.assignment;
+    const live = deps.state.transport.status === "playing" || deps.state.pendingActions.some(action => action.domain === "transport" && action.transport.status === "playing");
+    // Silent routing is durable even for offline phones. A live switch can only admit phones
+    // that explicitly verified the new channel for this exact selection and show revision.
+    if (request.preparationId || (live && request.channelId !== null)) {
+      if (!barrier || !preparation || request.preparationId !== barrier.preparationId
+        || preparation.assignmentRevision !== assignmentRevision || barrier.showRevision !== deps.state.showRevision
+        || preparation.mapRevision !== request.mapRevision || preparation.channelId !== request.channelId
+        || JSON.stringify(preparation.deviceIds) !== JSON.stringify([...request.deviceIds].sort((a, b) => a - b))) {
+        return c.json(apiError("NOT_PREPARED", "Prepare this selection and channel before a live assignment."), 409);
+      }
+    }
+    const recipients = live && request.channelId !== null ? request.deviceIds.filter(id => barrier!.readyDevices().includes(id)) : request.deviceIds;
+    const excluded = request.deviceIds.filter(id => !recipients.includes(id)).map(deviceId => ({ deviceId,
+      reason: barrier?.excludedDevices().find(item => item.deviceId === deviceId)?.reason ?? "not acknowledged" }));
+    if (!recipients.length) return c.json(apiError("NOBODY_READY", "No selected phone is ready for this channel."), 409);
+    const assignments = recipients.map(deviceId => ({
       deviceId, channelId: request.channelId, assignmentRevision, mapRevision: request.mapRevision,
     }));
     const superseded = deps.state.scheduleAssignments({
       commandId: request.commandId, effectiveServerMs: request.effectiveServerMs, assignments,
     });
+    await persist();
 
     // Each phone is told about its own assignment only, in chunks so a thousand-device selection
     // does not block the server while it serializes a thousand payloads.
     const byDevice = new Map(assignments.map(assignment => [assignment.deviceId, assignment]));
-    void deps.connections.sendEachToParticipants(request.deviceIds, deviceId => JSON.stringify({
+    void deps.connections.sendEachToParticipants(recipients, deviceId => JSON.stringify({
       ...envelope(deps.clock), type: "assignment.commit", revision: deps.state.revision,
       effectiveServerMs: request.effectiveServerMs,
       payload: {
@@ -770,9 +885,10 @@ export function createApp(deps: AppDeps) {
       },
     }));
 
-    const ack = accepted(deps.clock, request.commandId, assignmentRevision);
+    const ack = { ...accepted(deps.clock, request.commandId, assignmentRevision), effectiveServerMs: request.effectiveServerMs,
+      ready: recipients.length, excluded, supersededCommandIds: superseded };
     deps.commands.remember(request.commandId, ack);
-    return c.json({ ...ack, supersededCommandIds: superseded });
+    return c.json(ack);
   });
 
   app.post("/api/mix", async c => {
@@ -792,6 +908,11 @@ export function createApp(deps: AppDeps) {
     deps.state.applyDue(now);
     if (request.expectedRevision !== deps.state.mixRevision) {
       return c.json(apiError("REVISION_CONFLICT", `Mix is at revision ${deps.state.mixRevision}; reload before changing it.`), 409);
+    }
+    const channelIds = request.channels.map(channel => channel.channelId);
+    if (new Set(channelIds).size !== channelIds.length || channelIds.length !== deps.state.show.channels.length
+      || deps.state.show.channels.some(channel => !channelIds.includes(channel.channelId))) {
+      return c.json(apiError("INVALID_MIX", "A mix must contain each current show channel exactly once."), 400);
     }
     const leadTime = leadTimeError(deps, request.effectiveServerMs, now);
     if (leadTime) return c.json(leadTime.body, leadTime.status);

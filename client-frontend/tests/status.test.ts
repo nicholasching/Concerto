@@ -12,7 +12,7 @@ test("connection and clock do not imply audible readiness", () => {
   expect(participantStatus(snapshot)).toBe("Assets not ready");
   const track = snapshot.show.tracks[0];
   snapshot.readiness.decodedTrackHashes[track.trackId] = track.sha256;
-  expect(participantStatus(snapshot)).toBe("Prepared; playback implementation pending");
+  expect(participantStatus(snapshot)).toBe("Audio ready");
 });
 
 test("a hidden page is reported before later readiness steps", () => {

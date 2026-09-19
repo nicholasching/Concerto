@@ -1,12 +1,33 @@
 # Audience Orchestra
 
-Repository foundation for turning an audience into a synchronized, spatially assigned set of phone speakers.
+An integrated local concert app: audience phones preload audio, synchronize clocks, flash an optical identity, and play the channel assigned by the operator.
 
-Start with this README, `AGENTS.md`, `rules.md`, and the **team handoff** at the top of `masterplan.md`. The foundation supplies executable contracts, fixtures, application shells, and independent gates. Concert features and physical validation belong to the four teams; the shells do not claim to implement them.
+All four development branches are merged into `main`. Start with `AGENTS.md`, `rules.md`, `masterplan.md`, and `.devcontext/README.md` for ownership and evidence. Local software integration is implemented; physical phone/camera/acoustic and venue acceptance remain separate. Railway deployment is deferred until after local review.
+
+## Run the local concert
+
+After setup below, run these in separate terminals from the repository root:
+
+```sh
+bun run dev:all
+bun run demo:seed
+```
+
+Open [the operator console](http://localhost:3001) and enter `local-demo-only`, the development default. Open [the audience client](http://localhost:3000/?session=dev-session), tap **Enable sound**, and wait for clock and all four asset checks to pass. `demo:seed` uploads four original eight-second tones to the real backend and refuses to overwrite an existing show.
+
+1. Choose a manual column on the audience page. In **Assign**, select that column and assign a channel. The location remains explicitly coarse with no invented coordinates.
+2. In **Perform**, select **Prepare cue**, inspect ready/excluded counts, then **Play ready phones**. Stop, pause, seek, gain, mute/solo and panic use the real server. Live reassignment verifies readiness for the new channel before scheduling it.
+3. For optical localization, keep participating pages visible; open **Calibration**, prepare, start three camera recordings, then arm. Leave recording margin around the eleven-second pattern. Upload each original clip, specify column/rotation and four ordered seating anchors (or accept a coarse result), process, review annotated stills and unresolved IDs, then commit the map.
+4. Use rectangle/lasso selection for localized phones, or explicit IDs/manual columns for unresolved phones. Geometry corrections require processing and review again. A generated video must be labeled **synthetic**.
+5. Replace the tones through **Perform → Prepare show and stems**. Edit clip start/source offset/duration/gain while stopped; save the show before preparing playback. The 64 MiB decoded budget is per phone. Cue markers persist with the show; waveforms are computed only in the console.
+
+Local state and media live under ignored `runtime/local/`. Restart restores identities, show, map, run-tag allocation and routing, starts a fresh clock epoch, and stays stopped. An unfinished calibration must be repeated after restart. To start a separate concert, set a new `SESSION_ID` and separate `CHECKPOINT_PATH` rather than deleting the existing concert.
+
+The QR defaults to this computer's localhost URL. For actual phones, use reachable HTTPS/WSS endpoints and configure `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL`; each phone's localhost refers to itself. Railway setup and physical device rehearsal are the next milestone.
 
 ## Setup
 
-Prerequisites: **Bun 1.3.14** and **Python 3.13** (worker package supports Python 3.11+; the foundation is tested with 3.13). FFmpeg/OpenCV are not required for fixture validation; Team 3 adds and pins the actual video toolchain. Do not install dependencies inside `beatsync-source/`.
+Prerequisites: **Bun 1.3.14** and **Python 3.13** (worker supports Python 3.11+). The locked Python environment includes PyAV, OpenCV, NumPy and the actual decoder. Do not install dependencies inside `beatsync-source/`.
 
 Install Bun 1.3.14 using your version manager or `npm install -g bun@1.3.14`, then run from the repository root:
 
@@ -35,12 +56,14 @@ Shared `packages/contracts/`, `packages/testkit/`, root configuration/lockfiles,
 
 ## Local behavior
 
-- `dev:sync-demo`: backend health/foundation metadata at `http://localhost:8080/api/health`. Concert API routes return typed HTTP 501 responses until Team 1 implements them.
-- `dev:client-demo`: audience shell at `http://localhost:3000` plus a **synthetic** HTTP/WS harness on `18081`.
-- `dev:admin-demo`: admin shell at `http://localhost:3001` plus a **synthetic** 1,500-device harness on `18084`. This is not a 1,500-socket capacity test.
+- `dev:sync-demo`: real backend on 8080, with local demo credentials/data defaults.
+- `dev:client-demo`: independent participant development harness on 18081; explicitly synthetic, not the integrated concert.
+- `dev:admin-demo`: console on 3001, using the real backend on 8080.
 - `otc:validate`: validates the shared processing manifest shape and ID invariants. It does not check/decode video files.
-- `otc:replay`: explicitly replays a synthetic result into ignored `runtime/otc/result.json`. Real `python -m otc process` intentionally exits nonzero until Team 3 implements it.
-- `dev:all`: starts the three real application shells together; it does not substitute a mock backend.
+- `otc:replay`: explicitly replays a synthetic JSON result into ignored `runtime/otc/result.json`. The integrated server instead spawns the real `python -m otc process` decoder.
+- `dev:all`: starts the backend and both real frontends together.
+- `test:e2e`: isolated backend, four WebSocket participants, three generated MP4s processed by the real worker, map/selection/routing/transport/mix/panic/restart assertions. Audio output is a recording double; browser verification is separate.
+- `test:load`: isolated backend, 1,500 sockets for five minutes with streamed uploads and a synthetic CPU-contention worker. Fails on delivery, reconnect, worker or routing errors. Does not measure real phone or venue capacity.
 - `test:smoke`: starts the **built** backend/frontends on private test ports and verifies real HTTP responses; run after `bun run build` or `bun run gate`.
 - `check:isolation`: copies active sources to ignored `runtime/isolation/`, omits `beatsync-source`, installs frozen dependencies, and runs the complete foundation gate. It retains the isolated test output for inspection.
 
@@ -48,7 +71,7 @@ All servers bind to local development addresses by default. A phone needs a reac
 
 ## Shared interfaces
 
-`packages/contracts/src/` authors the v1 wire shapes. `packages/contracts/generated/schemas.json` is generated JSON Schema for Python; generated OTC files contain the complete 2,048-ID codebook and packet vectors. The only BeatSync extraction performed by the foundation is the small `epochNow()` function in `packages/sync/`; NTP lifecycle and the audio engine remain assigned work.
+`packages/contracts/src/` authors the v1 wire shapes. `packages/contracts/generated/schemas.json` is generated JSON Schema for Python; generated OTC files contain the complete 2,048-ID codebook and packet vectors. Clock estimation and audio scheduling are selectively extracted with MIT attribution; the reference tree remains unchanged and is unnecessary at runtime.
 
 ```sh
 bun run contracts:generate
@@ -56,7 +79,7 @@ bun run fixtures:generate
 bun run test:contracts
 ```
 
-Generators are captain-owned. They must not be used to redefine a protocol or rewrite expected outputs just to make a failing test pass. Read `.devcontext/schema/` for the HTTP/WS/worker boundaries and `.devcontext/beat-sync-extraction.md` for source provenance. Full concert integration/load/camera/audio tests are listed in the master plan and stage briefs; current gates verify the foundation only.
+Generators are captain-owned. Read `.devcontext/schema/` for boundaries and `.devcontext/beat-sync-extraction.md` for source provenance. `gate` runs all four software gates and builds; `test:e2e`, `test:load`, `test:smoke`, and `check:isolation` provide separate integration evidence. Physical acceptance is recorded separately.
 
 ## Branch handoff
 

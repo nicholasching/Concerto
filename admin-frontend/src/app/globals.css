@@ -39,15 +39,24 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .bar { height: 8px; background: #0f1626; border-radius: 4px; overflow: hidden; }
 .bar > div { height: 100%; background: #71d0b0; transition: width .2s; }
 .swatch { width: 18px; height: 18px; border-radius: 3px; display: inline-block; border: 1px solid #3b4d6b; }
-.timeline { margin: 14px 0; }
+.timeline { margin: 14px 0; overflow-x: auto; }
+.ruler-row, .lane-row { display: grid; grid-template-columns: 90px minmax(160px, 1fr) 184px; gap: 8px; padding: 4px 8px; border-left: 5px solid transparent; min-width: 520px; }
 .ruler { position: relative; height: 22px; background: #0f1626; border-radius: 6px 6px 0 0; border: 1px solid #2c3b52; }
-.playhead { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #f2c76d; box-shadow: 0 0 6px #f2c76d; }
-.lane-row { display: flex; align-items: center; gap: 8px; border-left: 5px solid; background: #16203a; border-top: 1px solid #2c3b52; padding: 4px 8px; }
+.playhead { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #f2c76d; box-shadow: 0 0 6px #f2c76d; pointer-events: none; z-index: 1; }
+.lane-row { align-items: center; background: #16203a; border-top: 1px solid #2c3b52; }
 .lane-row:last-child { border-radius: 0 0 6px 6px; }
-.lane-label { width: 70px; font-size: 13px; font-weight: 600; padding: 6px 8px; border-radius: 4px; color: #101724; }
+.lane-label { min-width: 0; font-size: 13px; font-weight: 600; padding: 6px 8px; border-radius: 4px; color: #101724; }
 .lane-track { position: relative; flex: 1; height: 34px; background: #0f1626; border-radius: 4px; }
 .clip { position: absolute; top: 4px; bottom: 4px; opacity: .75; border-radius: 3px; padding: 2px 6px; font-size: 11px; color: #101724; overflow: hidden; white-space: nowrap; }
 .lane-controls { display: flex; align-items: center; gap: 6px; }
 .lane-controls input[type=range] { width: 80px; }
 .pending { font-size: 13px; color: #a1b3cc; }
 .pending li { list-style: none; }
+.operator-bar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: #101724; border: 1px solid #3b4d6b; }
+fieldset { border: 1px solid #3b4d6b; border-radius: 8px; padding: 12px; }
+details { margin: 12px 0; } summary { cursor: pointer; padding: 8px 0; }
+label { margin: 6px; } input, select, textarea { max-width: 100%; }
+.clip-editor { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; }
+.clip-editor input { width: 90px; } .qr-box input { width: min(100%, 600px); }
+.waveform { display: block; width: 100%; height: 36px; color: #101724; }
+.lane-track { height: 76px; } .ruler { height: 30px; font-size: 12px; }

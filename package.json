@@ -11,7 +11,9 @@
     "contracts:check": "bun scripts/generate-contracts.ts --check",
     "fixtures:generate": "bun scripts/generate-fixtures.ts",
     "fixtures:check": "bun scripts/generate-fixtures.ts --check",
-    "test:contracts": "bun test packages/contracts/tests",
+    "test:contracts": "bun test ./packages/contracts/tests",
+    "test:e2e": "bun tools/e2e/index.ts",
+    "test:load": "bun scripts/load-test.ts",
     "test:otc": "bun scripts/python.ts test",
     "test:smoke": "bun scripts/smoke.ts",
     "test": "bun run gate",
@@ -29,10 +31,12 @@
     "dev:client-demo": "bun scripts/dev.ts client-demo",
     "dev:admin-demo": "bun scripts/dev.ts admin-demo",
     "dev:all": "bun scripts/dev.ts all",
+    "demo:seed": "bun scripts/seed-show.ts",
     "otc:validate": "bun scripts/python.ts validate-manifest --manifest fixtures/otc/clean-30/manifest.json",
     "otc:replay": "bun scripts/python.ts replay-fixture --manifest fixtures/otc/clean-30/manifest.json --fixture fixtures/otc/clean-30/result.json --output runtime/otc/result.json"
   },
   "devDependencies": {
+    "@types/qrcode": "1.5.6",
     "@orchestra/contracts": "workspace:*",
     "@orchestra/testkit": "workspace:*",
     "@eslint/js": "9.39.4",

@@ -4,6 +4,8 @@ import { ClockEstimator, PROBE_CONSTANTS } from "@orchestra/sync";
 import type { ServerClock } from "../src/clock";
 import { handleClientMessage } from "../src/messages";
 import { SessionState } from "../src/state";
+import { Barrier } from "../src/barriers";
+import { Preparations } from "../src/preparations";
 
 const SESSION = "session-under-test";
 const SERVER_SKEW_MS = 4_000_000;
@@ -33,6 +35,19 @@ const serverAt = (serverMs: number): ServerClock => ({
   sessionId: SESSION,
   serverEpoch: "epoch-a",
   nowServerMs: () => serverMs + RESIDENCE_MS,
+});
+
+test("loss of foreground revokes earlier readiness in every scheduled domain", () => {
+  const context = boundTo(0), preparations = new Preparations();
+  for (const domain of ["calibration", "transport", "assignment"] as const) {
+    const barrier = new Barrier(domain, 0, 0, [0]);
+    barrier.acknowledgePreparation({ deviceId: 0, preparationId: domain, ready: true, reason: null });
+    preparations.start(domain, barrier);
+  }
+  handleClientMessage({ ...context, preparations, clock: serverAt(5000), receivedServerMs: 5000,
+    raw: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: "epoch-a", messageId: "hidden", type: "device.status",
+      payload: { deviceId: 0, connected: true, foreground: false, clockReady: true, clockUncertaintyMs: 1, clockSampleAgeMs: 1, audioUnlocked: true, decodedTrackHashes: {} } }) });
+  expect(preparations.snapshot().every(barrier => barrier.readyIds.length === 0 && barrier.excluded.length === 1)).toBe(true);
 });
 
 describe("clock.probe handling", () => {
@@ -88,7 +103,7 @@ describe("clock.probe handling", () => {
     expect(codes).toEqual(["INVALID_JSON", "INVALID_MESSAGE", "INVALID_MESSAGE"]);
   });
 
-  test("names the owner for a message type this slice does not serve yet", () => {
+  test("rejects an asset acknowledgement with no active preparation", () => {
     const raw = JSON.stringify(
       ClientMessage.parse({
         protocolVersion: PROTOCOL_VERSION,
@@ -102,7 +117,7 @@ describe("clock.probe handling", () => {
     const reply = handleClientMessage({ raw, receivedServerMs: 5000, clock: serverAt(5000), ...boundTo(0) });
 
     if (reply.type !== "error") throw new Error("expected an error");
-    expect(reply.payload.error).toMatchObject({ code: "NOT_IMPLEMENTED", owner: "sync-control" });
+    expect(reply.payload.error).toMatchObject({ code: "STALE_PREPARATION", owner: "sync-control" });
   });
 });
 

@@ -2,6 +2,8 @@
 
 Handoff baseline: 2026-09-19, Git tag `foundation-v1`. The repository foundation is implemented and verified. Concert features and the performance targets below remain assigned implementation work; passing scaffold checks does not establish physical audio or camera performance.
 
+Integration update (2026-09-19): all four development branches are merged into main. Local software implementation and evidence are tracked in [.devcontext/stages/05-integration-rehearsal.md](.devcontext/stages/05-integration-rehearsal.md) and [README.md](README.md). The user deferred Railway deployment until after local review. The original foundation handoff below remains historical; physical acceptance targets in this plan are unchanged.
+
 ## Team handoff: start here
 
 Give each teammate this file, [rules.md](rules.md), and their stage brief from the table below. Work on the assigned branch in a separate clone/worktree; continue from the shared foundation.

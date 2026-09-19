@@ -6,13 +6,17 @@ import { MapPanel } from "../components/MapPanel";
 import { CalibrationPanel } from "../components/CalibrationPanel";
 import { AssignPanel } from "../components/AssignPanel";
 import { PerformPanel } from "../components/PerformPanel";
+import { JoinCode } from "../components/JoinCode";
+import { clockReady } from "../lib/clock";
 
 type Tab = "session" | "calibration" | "review" | "assign" | "perform";
 
 export default function Page() {
-  const { snapshot, error, loading, refresh } = useSnapshot(1000);
+  const { snapshot, error, loading, refresh, login } = useSnapshot(1000);
   const adapter = useAdapter();
   const [tab, setTab] = useState<Tab>("session");
+  const [secret, setSecret] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const summary = snapshot ? audienceSummary(snapshot) : null;
   const pending = adapter.pending();
@@ -21,15 +25,20 @@ export default function Page() {
 
   return (
     <main>
-      <p className="eyebrow">AUDIENCE ORCHESTRA / TEAM 4</p>
+      <p className="eyebrow">AUDIENCE ORCHESTRA</p>
       <h1>Admin console</h1>
       {disconnected && (
         <p role="alert" className="error">
-          Real server not detected at {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}.
-          The console is ready; start the real control server (Team 1, port 8080) to use these
-          features. Any action you take will retry the real server and show this until it is running.
+          {error}
         </p>
       )}
+      {!snapshot && <form onSubmit={event => { event.preventDefault(); setActionError(null); void login(secret).catch(cause => setActionError(String(cause))); }}>
+        <label>Operator secret <input type="password" autoComplete="current-password" value={secret} onChange={event => setSecret(event.target.value)} /></label>
+        <button type="submit">Connect operator</button>
+      </form>}
+      {actionError && <p role="alert" className="error">{actionError}</p>}
+      {snapshot && <div className="operator-bar"><span>{clockReady() ? "Operator clock synchronized" : "Synchronizing operator clock…"}</span>
+        <button className="panic" onClick={() => { setActionError(null); void adapter.panic().then(refresh).catch(cause => setActionError(String(cause))); }}>PANIC — MUTE ALL</button></div>}
 
       <nav className="tabs">
         {(["session", "calibration", "review", "assign", "perform"] as Tab[]).map(t => (
@@ -51,15 +60,9 @@ export default function Page() {
               <p><strong>{summary.localized}</strong><br />localized</p>
               <p><strong>{summary.unresolved}</strong><br />unresolved</p>
             </div>
-            <div className="qr-box">
-              <pre>{`  █▀▀▀▀█  █▀▀▀▀█
-  █ ███ █  █ ███ █
-  █ ▀▀▀ █  █ ▀▀▀ █
-  ▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀`}</pre>
-              <p className="muted">QR placeholder — phones scan this to join (Team 2 client).</p>
-            </div>
+            <p>{snapshot.show.channels.map(channel => `${channel.label}: ${snapshot.assignments.filter(item => item.channelId === channel.channelId).length} assigned`).join(" · ")}</p>
+            <JoinCode sessionId={snapshot.sessionId} />
             <p className="muted">Revision {snapshot.revision}. Pending commands: {pendingCount}. {pendingCount > 0 && "Shown as pending until the server confirms."}</p>
-            <button className="panic" onClick={() => { void adapter.panic(); refresh(); }}>PANIC</button>
           </section>
         ) : <NotDetectedSection label="Session" />
       )}
@@ -96,7 +99,7 @@ export default function Page() {
       {pending.length > 0 && (
         <section>
           <h2>Pending vs confirmed</h2>
-          <p className="muted">Every command starts pending and becomes confirmed once the server reports a newer revision. Nothing is shown as success early.</p>
+          <p className="muted">Accepted commands remain scheduled until the server reports their execution.</p>
           <ul className="pending">
             {pending.slice(-6).map(p => <li key={p.commandId}>{p.commandId.slice(0, 10)} — {p.domain} — {p.status}</li>)}
           </ul>
@@ -110,7 +113,7 @@ function NotDetectedSection({ label }: { label: string }) {
   return (
     <section>
       <h2>{label}</h2>
-      <p className="error">Real server not detected. Start the real control server (Team 1, port 8080) to use {label}.</p>
+      <p className="muted">Connect with the operator secret to use {label}. If the server is unavailable, start the local concert services.</p>
     </section>
   );
 }

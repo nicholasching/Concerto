@@ -60,7 +60,7 @@ const resultFor = (manifest: Record<string, never>, locations: unknown[]): OtcRe
   evidence: "synthetic", decoderVersion: "test-0.1",
   inputHashes: (manifest["cameras"] as unknown as { cameraId: string; sha256: string }[])
     .map(camera => ({ cameraId: camera.cameraId, sha256: camera.sha256 })),
-  observations: [], locations: locations as never, cameras: [], warnings: [], processingMs: 10,
+  observations: [], locations: locations.filter(location => (manifest["participantIds"] as unknown as number[]).includes((location as { deviceId: number }).deviceId)) as never, cameras: [], warnings: [], processingMs: 10,
 });
 
 const harness = (spawn: SpawnWorker) => {
@@ -124,7 +124,7 @@ const runThrough = async (context: Harness, options: { participantIds: number[];
   })).json();
 
   const job = await (await operator(context.app, `/api/calibrations/${runId}/jobs`, {
-    commandId: `${options.commandPrefix}-job`, expectedRevision: 0, runId, uploadIds: [upload.uploadId],
+    commandId: `${options.commandPrefix}-job`, expectedRevision: 0, runId, uploadIds: [upload.uploadId], evidence: "synthetic",
   })).json();
 
   for (let i = 0; i < 200; i++) {
@@ -144,6 +144,15 @@ const commitMap = (context: Harness, options: {
   });
 
 describe("committing a map", () => {
+  test("a late interrupted-pattern report invalidates a candidate that included that phone", async () => {
+    const context = harness(workerWriting(manifest => resultFor(manifest, [localized(0, 0.2, 0.6)])));
+    const { runId, jobId } = await runThrough(context, { participantIds: [0], commandPrefix: "late-report" });
+    context.calibrations.get(runId)!.reports.set(0, { deviceId: 0, completed: false, maxFrameLatenessMs: 500, reason: "hidden" });
+    const response = await commitMap(context, { runId, jobId, commandId: "late-report-commit" });
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("CAPTURE_CHANGED");
+    expect(context.state.mapRevision).toBe(0);
+  });
   test("places the devices the run could see and leaves the rest alone", async () => {
     const context = harness(workerWriting(manifest => resultFor(manifest, [localized(0, 0.2, 0.6)])));
     const { runId, jobId } = await runThrough(context, { participantIds: [0, 1], commandPrefix: "a" });

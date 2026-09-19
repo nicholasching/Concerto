@@ -63,6 +63,8 @@ export class Barrier {
     return [...this.readyIds].sort((a, b) => a - b);
   }
 
+  expectedDevices(): number[] { return [...this.expectedIds].sort((a, b) => a - b); }
+
   excludedDevices(): { deviceId: number; reason: string }[] {
     return [...this.excludedIds].map(([deviceId, reason]) => ({ deviceId, reason })).sort((a, b) => a.deviceId - b.deviceId);
   }

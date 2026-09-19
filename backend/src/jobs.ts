@@ -1,4 +1,6 @@
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { z } from "zod";
 import { OtcResult, type CalibrationManifestData, type OtcResultData } from "@orchestra/contracts";
 
@@ -23,6 +25,7 @@ export interface WorkerProcess {
 export type SpawnWorker = (args: string[]) => WorkerProcess;
 
 export interface JobRecord {
+  manifest: CalibrationManifestData;
   jobId: string;
   runId: string;
   stage: JobStage;
@@ -34,12 +37,25 @@ export interface JobRecord {
   finishedServerMs: number | null;
 }
 
-export const workerCommand = (): string[] =>
-  (process.env.OTC_COMMAND ?? "python -m otc process").split(" ").filter(Boolean);
+export const workerCommand = (): string[] => {
+  if (process.env.OTC_COMMAND_JSON) return z.array(z.string()).min(1).parse(JSON.parse(process.env.OTC_COMMAND_JSON));
+  if (process.env.OTC_COMMAND) return process.env.OTC_COMMAND.split(" ").filter(Boolean);
+  const python = resolve(process.platform === "win32" ? ".venv/Scripts/python.exe" : ".venv/bin/python");
+  return [process.env.PYTHON ?? (existsSync(python) ? python : "python"), "-m", "otc", "process"];
+};
 
 // The worker is always spawned with an argument array. A path or filename can therefore never be
 // interpreted as shell syntax, whatever an operator names a file.
-export const spawnWorker: SpawnWorker = args => Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
+export const spawnWorker: SpawnWorker = args => {
+  const child = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", detached: process.platform !== "win32" });
+  return { stdout: child.stdout, stderr: child.stderr, exited: child.exited, kill() {
+    if (process.platform === "win32") {
+      Bun.spawn(["taskkill", "/PID", String(child.pid), "/T", "/F"], { stdout: "ignore", stderr: "ignore" });
+    } else {
+      try { process.kill(-child.pid, "SIGKILL"); } catch { child.kill(); }
+    }
+  } };
+};
 
 const drain = async (stream: ReadableStream<Uint8Array> | null, onLine: (line: string) => void) => {
   if (!stream) return;
@@ -78,11 +94,11 @@ export class JobRunner {
 
   // Jobs run one at a time. Decoding three 4K clips saturates the machine, and two concurrent
   // decodes would make both slower and starve the control process that is holding the sockets.
-  enqueue(input: { jobId: string; runId: string; manifestPath: string; outputPath: string; manifest: CalibrationManifestData }): JobRecord {
+  enqueue(input: { jobId: string; runId: string; manifestPath: string; outputPath: string; manifest: CalibrationManifestData; evidence?: "synthetic" | "physical" }): JobRecord {
     const now = this.options.now ?? Date.now;
     const record: JobRecord = {
       jobId: input.jobId, runId: input.runId, stage: "queued", progress: 0, message: "queued",
-      diagnostics: [], result: null, startedServerMs: null, finishedServerMs: null,
+      diagnostics: [], result: null, startedServerMs: null, finishedServerMs: null, manifest: structuredClone(input.manifest),
     };
     this.jobs.set(input.jobId, record);
     const next = this.queue.catch(() => {}).then(() => this.run(input, record, now));
@@ -107,7 +123,7 @@ export class JobRunner {
   }
 
   private async run(
-    input: { jobId: string; runId: string; manifestPath: string; outputPath: string; manifest: CalibrationManifestData },
+    input: { jobId: string; runId: string; manifestPath: string; outputPath: string; manifest: CalibrationManifestData; evidence?: "synthetic" | "physical" },
     record: JobRecord,
     now: () => number,
   ): Promise<void> {
@@ -119,9 +135,13 @@ export class JobRunner {
     record.startedServerMs = now();
 
     const command = this.options.command ?? workerCommand();
-    const child = (this.options.spawn ?? spawnWorker)([
-      ...command, "--manifest", input.manifestPath, "--output", input.outputPath,
-    ]);
+    let child: WorkerProcess;
+    try {
+      child = (this.options.spawn ?? spawnWorker)([
+        ...command, "--manifest", input.manifestPath, "--output", input.outputPath,
+        "--job-id", input.jobId, "--evidence", input.evidence ?? "physical", "--debug-dir", `${input.outputPath}.debug`,
+      ]);
+    } catch (cause) { this.fail(record, `worker could not be started: ${(cause as Error).message}`, now); return; }
     this.running.set(input.jobId, child);
 
     const maxDiagnostics = this.options.maxDiagnostics ?? 200;
@@ -150,8 +170,10 @@ export class JobRunner {
           const parsed = ProgressLine.safeParse(decoded);
           if (!parsed.success) return note(line);
           if (cancelled()) return;
+          // Exit and result validation, not a stdout claim, determine completion.
+          if (parsed.data.stage === "complete") return;
           record.stage = parsed.data.stage;
-          record.progress = parsed.data.progress;
+          record.progress = Math.max(record.progress, parsed.data.progress);
           record.message = parsed.data.message;
         }),
         drain(child.stderr, note),
@@ -178,6 +200,7 @@ export class JobRunner {
       // A result that does not describe the run we asked about is never merged into anything.
       const mismatch = identityMismatch(parsed, input.manifest);
       if (mismatch) return this.fail(record, mismatch, now);
+      if (input.evidence && parsed.evidence !== input.evidence) return this.fail(record, "worker evidence does not match the declared recording source", now);
 
       record.result = parsed;
       record.stage = "complete";
@@ -195,13 +218,18 @@ export class JobRunner {
 
 export const identityMismatch = (result: OtcResultData, manifest: CalibrationManifestData): string | null => {
   if (result.sessionId !== manifest.sessionId) return "result belongs to a different session";
+  if (result.serverEpoch !== manifest.serverEpoch) return "result belongs to a different server epoch";
   if (result.runId !== manifest.runId) return "result belongs to a different calibration run";
   if (result.runTag !== manifest.runTag) return "result carries a different run tag";
 
   const expected = new Map(manifest.cameras.map(camera => [camera.cameraId, camera.sha256]));
+  if (new Set(result.inputHashes.map(input => input.cameraId)).size !== result.inputHashes.length) return "result repeats a camera hash";
   for (const input of result.inputHashes) {
     if (expected.get(input.cameraId) !== input.sha256) return `result was produced from different bytes for ${input.cameraId}`;
   }
   if (result.inputHashes.length !== expected.size) return "result does not account for every uploaded recording";
+  const participants = new Set(manifest.participantIds);
+  if (new Set(result.locations.map(item => item.deviceId)).size !== result.locations.length) return "result repeats a device location";
+  if (result.locations.some(item => !participants.has(item.deviceId)) || result.observations.some(item => item.deviceId !== null && !participants.has(item.deviceId))) return "result identifies a device outside this calibration";
   return null;
 };

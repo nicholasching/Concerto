@@ -139,6 +139,10 @@
         "startServerMs": null
       },
       "pendingActions": [],
+      "mix": {
+        "mixRevision": 0,
+        "masterGain": 1
+      },
       "role": "participant",
       "deviceId": 0,
       "readiness": {

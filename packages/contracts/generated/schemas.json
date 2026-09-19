@@ -120,6 +120,49 @@
         "type": "integer",
         "minimum": 0,
         "maximum": 9007199254740991
+      },
+      "effectiveServerMs": {
+        "type": "number",
+        "minimum": 0
+      },
+      "preparationId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      },
+      "supersededCommandIds": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        }
+      },
+      "ready": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "excluded": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "deviceId": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "deviceId",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
       }
     },
     "required": [
@@ -289,6 +332,35 @@
             "sourceOffsetMs",
             "durationMs",
             "gain"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "cueMarkers": {
+        "maxItems": 100,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "cueId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "positionMs": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "cueId",
+            "label",
+            "positionMs"
           ],
           "additionalProperties": false
         }
@@ -2507,6 +2579,35 @@
                   ],
                   "additionalProperties": false
                 }
+              },
+              "cueMarkers": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "cueId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "positionMs": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "cueId",
+                    "label",
+                    "positionMs"
+                  ],
+                  "additionalProperties": false
+                }
               }
             },
             "required": [
@@ -2947,6 +3048,30 @@
                 }
               ]
             }
+          },
+          "mix": {
+            "default": {
+              "mixRevision": 0,
+              "masterGain": 1
+            },
+            "type": "object",
+            "properties": {
+              "mixRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "masterGain": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "mixRevision",
+              "masterGain"
+            ],
+            "additionalProperties": false
           },
           "role": {
             "type": "string",
@@ -3438,6 +3563,456 @@
               ],
               "additionalProperties": false
             }
+          },
+          "assignmentRevision": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "preparations": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "preparationId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "domain": {
+                  "type": "string",
+                  "enum": [
+                    "transport",
+                    "assets",
+                    "assignment",
+                    "calibration"
+                  ]
+                },
+                "showRevision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "transportRevision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "expectedIds": {
+                  "maxItems": 2048,
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2047
+                  }
+                },
+                "readyIds": {
+                  "maxItems": 2048,
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2047
+                  }
+                },
+                "excluded": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "deviceId": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2047
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "deviceId",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "preparationId",
+                "domain",
+                "showRevision",
+                "transportRevision",
+                "expectedIds",
+                "readyIds",
+                "excluded"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "appliedCommandIds": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          "calibration": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "plan": {
+                    "type": "object",
+                    "properties": {
+                      "protocolVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "sessionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "serverEpoch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runTag": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "participantIds": {
+                        "maxItems": 2048,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        }
+                      },
+                      "packetVersion": {
+                        "type": "string",
+                        "const": "otc-v1"
+                      },
+                      "codebookVersion": {
+                        "type": "string",
+                        "const": "hamming16-11-v1"
+                      },
+                      "paletteVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "palette": {
+                        "type": "object",
+                        "properties": {
+                          "zero": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "one": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "neutral": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          }
+                        },
+                        "required": [
+                          "zero",
+                          "one",
+                          "neutral"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "symbolMs": {
+                        "type": "number",
+                        "const": 200
+                      }
+                    },
+                    "required": [
+                      "protocolVersion",
+                      "sessionId",
+                      "serverEpoch",
+                      "runId",
+                      "runTag",
+                      "participantIds",
+                      "packetVersion",
+                      "codebookVersion",
+                      "paletteVersion",
+                      "palette",
+                      "symbolMs"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "preparationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "created",
+                      "armed",
+                      "processing",
+                      "committed",
+                      "discarded"
+                    ]
+                  },
+                  "startServerMs": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "uploads": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "cameraId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "primaryColumn": {
+                          "type": "string",
+                          "enum": [
+                            "left",
+                            "center",
+                            "right"
+                          ]
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "rotationDegrees": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "const": 0
+                            },
+                            {
+                              "type": "number",
+                              "const": 90
+                            },
+                            {
+                              "type": "number",
+                              "const": 180
+                            },
+                            {
+                              "type": "number",
+                              "const": 270
+                            }
+                          ]
+                        },
+                        "exclusionRois": {
+                          "type": "array",
+                          "items": {
+                            "minItems": 3,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "anchors": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "uploadId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "runId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "byteSize": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "cameraId",
+                        "primaryColumn",
+                        "sha256",
+                        "rotationDegrees",
+                        "exclusionRois",
+                        "anchors",
+                        "uploadId",
+                        "runId",
+                        "byteSize",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "reports": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "deviceId": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        },
+                        "completed": {
+                          "type": "boolean"
+                        },
+                        "maxFrameLatenessMs": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "reason": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "deviceId",
+                        "completed",
+                        "maxFrameLatenessMs",
+                        "reason"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "plan",
+                  "preparationId",
+                  "status",
+                  "startServerMs",
+                  "uploads",
+                  "reports"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -3449,10 +4024,15 @@
           "show",
           "transport",
           "pendingActions",
+          "mix",
           "role",
           "audienceMap",
           "devices",
-          "assignments"
+          "assignments",
+          "assignmentRevision",
+          "preparations",
+          "appliedCommandIds",
+          "calibration"
         ],
         "additionalProperties": false
       },
@@ -3639,6 +4219,35 @@
                     "sourceOffsetMs",
                     "durationMs",
                     "gain"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "cueMarkers": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "cueId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "positionMs": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "cueId",
+                    "label",
+                    "positionMs"
                   ],
                   "additionalProperties": false
                 }
@@ -4082,6 +4691,30 @@
                 }
               ]
             }
+          },
+          "mix": {
+            "default": {
+              "mixRevision": 0,
+              "masterGain": 1
+            },
+            "type": "object",
+            "properties": {
+              "mixRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "masterGain": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "mixRevision",
+              "masterGain"
+            ],
+            "additionalProperties": false
           },
           "role": {
             "type": "string",
@@ -4543,6 +5176,7 @@
           "show",
           "transport",
           "pendingActions",
+          "mix",
           "role",
           "deviceId",
           "readiness",
@@ -4737,6 +5371,35 @@
                 "sourceOffsetMs",
                 "durationMs",
                 "gain"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cueMarkers": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cueId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "positionMs": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "cueId",
+                "label",
+                "positionMs"
               ],
               "additionalProperties": false
             }
@@ -5180,6 +5843,30 @@
             }
           ]
         }
+      },
+      "mix": {
+        "default": {
+          "mixRevision": 0,
+          "masterGain": 1
+        },
+        "type": "object",
+        "properties": {
+          "mixRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "masterGain": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "mixRevision",
+          "masterGain"
+        ],
+        "additionalProperties": false
       },
       "role": {
         "type": "string",
@@ -5671,6 +6358,456 @@
           ],
           "additionalProperties": false
         }
+      },
+      "assignmentRevision": {
+        "default": 0,
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "preparations": {
+        "default": [],
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "preparationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "domain": {
+              "type": "string",
+              "enum": [
+                "transport",
+                "assets",
+                "assignment",
+                "calibration"
+              ]
+            },
+            "showRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "transportRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "expectedIds": {
+              "maxItems": 2048,
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2047
+              }
+            },
+            "readyIds": {
+              "maxItems": 2048,
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2047
+              }
+            },
+            "excluded": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "deviceId": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2047
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "deviceId",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "preparationId",
+            "domain",
+            "showRevision",
+            "transportRevision",
+            "expectedIds",
+            "readyIds",
+            "excluded"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "appliedCommandIds": {
+        "default": [],
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        }
+      },
+      "calibration": {
+        "default": null,
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "plan": {
+                "type": "object",
+                "properties": {
+                  "protocolVersion": {
+                    "type": "number",
+                    "const": 1
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "serverEpoch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "runId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "runTag": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  "participantIds": {
+                    "maxItems": 2048,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2047
+                    }
+                  },
+                  "packetVersion": {
+                    "type": "string",
+                    "const": "otc-v1"
+                  },
+                  "codebookVersion": {
+                    "type": "string",
+                    "const": "hamming16-11-v1"
+                  },
+                  "paletteVersion": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "palette": {
+                    "type": "object",
+                    "properties": {
+                      "zero": {
+                        "type": "string",
+                        "pattern": "^#[0-9a-fA-F]{6}$"
+                      },
+                      "one": {
+                        "type": "string",
+                        "pattern": "^#[0-9a-fA-F]{6}$"
+                      },
+                      "neutral": {
+                        "type": "string",
+                        "pattern": "^#[0-9a-fA-F]{6}$"
+                      }
+                    },
+                    "required": [
+                      "zero",
+                      "one",
+                      "neutral"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "symbolMs": {
+                    "type": "number",
+                    "const": 200
+                  }
+                },
+                "required": [
+                  "protocolVersion",
+                  "sessionId",
+                  "serverEpoch",
+                  "runId",
+                  "runTag",
+                  "participantIds",
+                  "packetVersion",
+                  "codebookVersion",
+                  "paletteVersion",
+                  "palette",
+                  "symbolMs"
+                ],
+                "additionalProperties": false
+              },
+              "preparationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "armed",
+                  "processing",
+                  "committed",
+                  "discarded"
+                ]
+              },
+              "startServerMs": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "uploads": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "cameraId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "primaryColumn": {
+                      "type": "string",
+                      "enum": [
+                        "left",
+                        "center",
+                        "right"
+                      ]
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "rotationDegrees": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "const": 0
+                        },
+                        {
+                          "type": "number",
+                          "const": 90
+                        },
+                        {
+                          "type": "number",
+                          "const": 180
+                        },
+                        {
+                          "type": "number",
+                          "const": 270
+                        }
+                      ]
+                    },
+                    "exclusionRois": {
+                      "type": "array",
+                      "items": {
+                        "minItems": 3,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "anchors": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "uploadId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "runId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "byteSize": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "cameraId",
+                    "primaryColumn",
+                    "sha256",
+                    "rotationDegrees",
+                    "exclusionRois",
+                    "anchors",
+                    "uploadId",
+                    "runId",
+                    "byteSize",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "reports": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "deviceId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2047
+                    },
+                    "completed": {
+                      "type": "boolean"
+                    },
+                    "maxFrameLatenessMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "deviceId",
+                    "completed",
+                    "maxFrameLatenessMs",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "plan",
+              "preparationId",
+              "status",
+              "startServerMs",
+              "uploads",
+              "reports"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "required": [
@@ -5682,10 +6819,15 @@
       "show",
       "transport",
       "pendingActions",
+      "mix",
       "role",
       "audienceMap",
       "devices",
-      "assignments"
+      "assignments",
+      "assignmentRevision",
+      "preparations",
+      "appliedCommandIds",
+      "calibration"
     ],
     "additionalProperties": false
   },
@@ -5873,6 +7015,35 @@
                 "sourceOffsetMs",
                 "durationMs",
                 "gain"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cueMarkers": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cueId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "positionMs": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "cueId",
+                "label",
+                "positionMs"
               ],
               "additionalProperties": false
             }
@@ -6316,6 +7487,30 @@
             }
           ]
         }
+      },
+      "mix": {
+        "default": {
+          "mixRevision": 0,
+          "masterGain": 1
+        },
+        "type": "object",
+        "properties": {
+          "mixRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "masterGain": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "mixRevision",
+          "masterGain"
+        ],
+        "additionalProperties": false
       },
       "role": {
         "type": "string",
@@ -6777,6 +7972,7 @@
       "show",
       "transport",
       "pendingActions",
+      "mix",
       "role",
       "deviceId",
       "readiness",
@@ -6843,6 +8039,11 @@
       "effectiveServerMs": {
         "type": "number",
         "minimum": 0
+      },
+      "preparationId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
       }
     },
     "required": [
@@ -7201,6 +8402,35 @@
               ],
               "additionalProperties": false
             }
+          },
+          "cueMarkers": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cueId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "positionMs": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "cueId",
+                "label",
+                "positionMs"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -7494,6 +8724,14 @@
           "minLength": 1,
           "maxLength": 160
         }
+      },
+      "evidence": {
+        "default": "physical",
+        "type": "string",
+        "enum": [
+          "physical",
+          "synthetic"
+        ]
       }
     },
     "required": [
@@ -7503,7 +8741,1373 @@
       "commandId",
       "expectedRevision",
       "runId",
-      "uploadIds"
+      "uploadIds",
+      "evidence"
+    ],
+    "additionalProperties": false
+  },
+  "CalibrationCreated": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "plan": {
+        "type": "object",
+        "properties": {
+          "protocolVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "serverEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runTag": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "participantIds": {
+            "maxItems": 2048,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
+            }
+          },
+          "packetVersion": {
+            "type": "string",
+            "const": "otc-v1"
+          },
+          "codebookVersion": {
+            "type": "string",
+            "const": "hamming16-11-v1"
+          },
+          "paletteVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "palette": {
+            "type": "object",
+            "properties": {
+              "zero": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "one": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "neutral": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            },
+            "required": [
+              "zero",
+              "one",
+              "neutral"
+            ],
+            "additionalProperties": false
+          },
+          "symbolMs": {
+            "type": "number",
+            "const": 200
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "sessionId",
+          "serverEpoch",
+          "runId",
+          "runTag",
+          "participantIds",
+          "packetVersion",
+          "codebookVersion",
+          "paletteVersion",
+          "palette",
+          "symbolMs"
+        ],
+        "additionalProperties": false
+      },
+      "preparationId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      }
+    },
+    "required": [
+      "plan",
+      "preparationId"
+    ],
+    "additionalProperties": false
+  },
+  "CalibrationResource": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "plan": {
+        "type": "object",
+        "properties": {
+          "protocolVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "serverEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runTag": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "participantIds": {
+            "maxItems": 2048,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
+            }
+          },
+          "packetVersion": {
+            "type": "string",
+            "const": "otc-v1"
+          },
+          "codebookVersion": {
+            "type": "string",
+            "const": "hamming16-11-v1"
+          },
+          "paletteVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "palette": {
+            "type": "object",
+            "properties": {
+              "zero": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "one": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "neutral": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            },
+            "required": [
+              "zero",
+              "one",
+              "neutral"
+            ],
+            "additionalProperties": false
+          },
+          "symbolMs": {
+            "type": "number",
+            "const": 200
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "sessionId",
+          "serverEpoch",
+          "runId",
+          "runTag",
+          "participantIds",
+          "packetVersion",
+          "codebookVersion",
+          "paletteVersion",
+          "palette",
+          "symbolMs"
+        ],
+        "additionalProperties": false
+      },
+      "preparationId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "created",
+          "armed",
+          "processing",
+          "committed",
+          "discarded"
+        ]
+      },
+      "startServerMs": {
+        "anyOf": [
+          {
+            "type": "number",
+            "minimum": 0
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "uploads": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "cameraId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "primaryColumn": {
+              "type": "string",
+              "enum": [
+                "left",
+                "center",
+                "right"
+              ]
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "rotationDegrees": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "const": 0
+                },
+                {
+                  "type": "number",
+                  "const": 90
+                },
+                {
+                  "type": "number",
+                  "const": 180
+                },
+                {
+                  "type": "number",
+                  "const": 270
+                }
+              ]
+            },
+            "exclusionRois": {
+              "type": "array",
+              "items": {
+                "minItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "x",
+                    "y"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "anchors": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "uploadId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "runId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "byteSize": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "cameraId",
+            "primaryColumn",
+            "sha256",
+            "rotationDegrees",
+            "exclusionRois",
+            "anchors",
+            "uploadId",
+            "runId",
+            "byteSize",
+            "label"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "reports": {
+        "default": [],
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "deviceId": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
+            },
+            "completed": {
+              "type": "boolean"
+            },
+            "maxFrameLatenessMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "deviceId",
+            "completed",
+            "maxFrameLatenessMs",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "plan",
+      "preparationId",
+      "status",
+      "startServerMs",
+      "uploads",
+      "reports"
+    ],
+    "additionalProperties": false
+  },
+  "CameraUploadReceipt": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "cameraId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      },
+      "primaryColumn": {
+        "type": "string",
+        "enum": [
+          "left",
+          "center",
+          "right"
+        ]
+      },
+      "sha256": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "rotationDegrees": {
+        "anyOf": [
+          {
+            "type": "number",
+            "const": 0
+          },
+          {
+            "type": "number",
+            "const": 90
+          },
+          {
+            "type": "number",
+            "const": 180
+          },
+          {
+            "type": "number",
+            "const": 270
+          }
+        ]
+      },
+      "exclusionRois": {
+        "type": "array",
+        "items": {
+          "minItems": 3,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "anchors": {
+        "anyOf": [
+          {
+            "type": "array",
+            "items": [
+              {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "uploadId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      },
+      "runId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      },
+      "byteSize": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      },
+      "label": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "cameraId",
+      "primaryColumn",
+      "sha256",
+      "rotationDegrees",
+      "exclusionRois",
+      "anchors",
+      "uploadId",
+      "runId",
+      "byteSize",
+      "label"
+    ],
+    "additionalProperties": false
+  },
+  "JobResource": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "progress": {
+        "type": "object",
+        "properties": {
+          "protocolVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "validate",
+              "decode",
+              "track",
+              "register",
+              "complete",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "progress": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "jobId",
+          "runId",
+          "stage",
+          "progress",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "diagnostics": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "result": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "protocolVersion": {
+                "type": "number",
+                "const": 1
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "serverEpoch": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "runId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "runTag": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "evidence": {
+                "type": "string",
+                "enum": [
+                  "synthetic",
+                  "physical"
+                ]
+              },
+              "decoderVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "inputHashes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "cameraId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "cameraId",
+                    "sha256"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "observations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "cameraId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "trackId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "deviceId": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "accepted",
+                        "ambiguous",
+                        "rejected"
+                      ]
+                    },
+                    "centerPx": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "firstPtsMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "lastPtsMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "decodeScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "correctedBits": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "erasedBits": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "cameraId",
+                    "trackId",
+                    "deviceId",
+                    "status",
+                    "centerPx",
+                    "firstPtsMs",
+                    "lastPtsMs",
+                    "decodeScore",
+                    "correctedBits",
+                    "erasedBits",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "locations": {
+                "maxItems": 2048,
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "deviceId": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        },
+                        "column": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "left",
+                                "center",
+                                "right"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "sourceCameraIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          }
+                        },
+                        "decodeScore": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mappingResidualPx": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "const": "localized"
+                        },
+                        "x": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "y": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "mappingMode": {
+                          "type": "string",
+                          "enum": [
+                            "manual-anchors",
+                            "overlap"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "deviceId",
+                        "column",
+                        "sourceCameraIds",
+                        "decodeScore",
+                        "mappingResidualPx",
+                        "status",
+                        "x",
+                        "y",
+                        "mappingMode"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "deviceId": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        },
+                        "column": {
+                          "type": "string",
+                          "enum": [
+                            "left",
+                            "center",
+                            "right"
+                          ]
+                        },
+                        "sourceCameraIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          }
+                        },
+                        "decodeScore": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mappingResidualPx": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "const": "coarse"
+                        },
+                        "x": {
+                          "type": "null"
+                        },
+                        "y": {
+                          "type": "null"
+                        },
+                        "mappingMode": {
+                          "type": "string",
+                          "enum": [
+                            "manual-column",
+                            "optical-column"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "deviceId",
+                        "column",
+                        "sourceCameraIds",
+                        "decodeScore",
+                        "mappingResidualPx",
+                        "status",
+                        "x",
+                        "y",
+                        "mappingMode"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "deviceId": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        },
+                        "column": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "left",
+                                "center",
+                                "right"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "sourceCameraIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          }
+                        },
+                        "decodeScore": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mappingResidualPx": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "const": "ambiguous"
+                        },
+                        "x": {
+                          "type": "null"
+                        },
+                        "y": {
+                          "type": "null"
+                        },
+                        "mappingMode": {
+                          "type": "string",
+                          "const": "none"
+                        }
+                      },
+                      "required": [
+                        "deviceId",
+                        "column",
+                        "sourceCameraIds",
+                        "decodeScore",
+                        "mappingResidualPx",
+                        "status",
+                        "x",
+                        "y",
+                        "mappingMode"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "deviceId": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        },
+                        "column": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "left",
+                                "center",
+                                "right"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "sourceCameraIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          }
+                        },
+                        "decodeScore": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mappingResidualPx": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "const": "unseen"
+                        },
+                        "x": {
+                          "type": "null"
+                        },
+                        "y": {
+                          "type": "null"
+                        },
+                        "mappingMode": {
+                          "type": "string",
+                          "const": "none"
+                        }
+                      },
+                      "required": [
+                        "deviceId",
+                        "column",
+                        "sourceCameraIds",
+                        "decodeScore",
+                        "mappingResidualPx",
+                        "status",
+                        "x",
+                        "y",
+                        "mappingMode"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "cameras": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "cameraId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "frameWidth": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "frameHeight": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "phasePtsMs": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "acceptedTracks": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "rejectedTracks": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "cameraId",
+                    "frameWidth",
+                    "frameHeight",
+                    "phasePtsMs",
+                    "acceptedTracks",
+                    "rejectedTracks",
+                    "messages"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "processingMs": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "protocolVersion",
+              "sessionId",
+              "serverEpoch",
+              "runId",
+              "runTag",
+              "evidence",
+              "decoderVersion",
+              "inputHashes",
+              "observations",
+              "locations",
+              "cameras",
+              "warnings",
+              "processingMs"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "progress",
+      "diagnostics",
+      "result"
+    ],
+    "additionalProperties": false
+  },
+  "PreparationStatus": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "preparationId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      },
+      "domain": {
+        "type": "string",
+        "enum": [
+          "transport",
+          "assets",
+          "assignment",
+          "calibration"
+        ]
+      },
+      "showRevision": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "transportRevision": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "expectedIds": {
+        "maxItems": 2048,
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2047
+        }
+      },
+      "readyIds": {
+        "maxItems": 2048,
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2047
+        }
+      },
+      "excluded": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "deviceId": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "deviceId",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "preparationId",
+      "domain",
+      "showRevision",
+      "transportRevision",
+      "expectedIds",
+      "readyIds",
+      "excluded"
     ],
     "additionalProperties": false
   },
@@ -8060,6 +10664,67 @@
           "payload"
         ],
         "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "protocolVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "serverEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "type": {
+            "type": "string",
+            "const": "participant.column"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "column": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "left",
+                      "center",
+                      "right"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "column"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "sessionId",
+          "serverEpoch",
+          "messageId",
+          "type",
+          "payload"
+        ],
+        "additionalProperties": false
       }
     ]
   },
@@ -8487,6 +11152,35 @@
                             "sourceOffsetMs",
                             "durationMs",
                             "gain"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "cueMarkers": {
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "cueId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "label": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100
+                            },
+                            "positionMs": {
+                              "type": "number",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "cueId",
+                            "label",
+                            "positionMs"
                           ],
                           "additionalProperties": false
                         }
@@ -8930,6 +11624,30 @@
                         }
                       ]
                     }
+                  },
+                  "mix": {
+                    "default": {
+                      "mixRevision": 0,
+                      "masterGain": 1
+                    },
+                    "type": "object",
+                    "properties": {
+                      "mixRevision": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "masterGain": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "mixRevision",
+                      "masterGain"
+                    ],
+                    "additionalProperties": false
                   },
                   "role": {
                     "type": "string",
@@ -9421,6 +12139,456 @@
                       ],
                       "additionalProperties": false
                     }
+                  },
+                  "assignmentRevision": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "preparations": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "preparationId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "domain": {
+                          "type": "string",
+                          "enum": [
+                            "transport",
+                            "assets",
+                            "assignment",
+                            "calibration"
+                          ]
+                        },
+                        "showRevision": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "transportRevision": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "expectedIds": {
+                          "maxItems": 2048,
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2047
+                          }
+                        },
+                        "readyIds": {
+                          "maxItems": 2048,
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2047
+                          }
+                        },
+                        "excluded": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "deviceId": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2047
+                              },
+                              "reason": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "deviceId",
+                              "reason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "preparationId",
+                        "domain",
+                        "showRevision",
+                        "transportRevision",
+                        "expectedIds",
+                        "readyIds",
+                        "excluded"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "appliedCommandIds": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    }
+                  },
+                  "calibration": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "plan": {
+                            "type": "object",
+                            "properties": {
+                              "protocolVersion": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "sessionId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "serverEpoch": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "runId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "runTag": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 255
+                              },
+                              "participantIds": {
+                                "maxItems": 2048,
+                                "type": "array",
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2047
+                                }
+                              },
+                              "packetVersion": {
+                                "type": "string",
+                                "const": "otc-v1"
+                              },
+                              "codebookVersion": {
+                                "type": "string",
+                                "const": "hamming16-11-v1"
+                              },
+                              "paletteVersion": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "palette": {
+                                "type": "object",
+                                "properties": {
+                                  "zero": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-fA-F]{6}$"
+                                  },
+                                  "one": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-fA-F]{6}$"
+                                  },
+                                  "neutral": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-fA-F]{6}$"
+                                  }
+                                },
+                                "required": [
+                                  "zero",
+                                  "one",
+                                  "neutral"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "symbolMs": {
+                                "type": "number",
+                                "const": 200
+                              }
+                            },
+                            "required": [
+                              "protocolVersion",
+                              "sessionId",
+                              "serverEpoch",
+                              "runId",
+                              "runTag",
+                              "participantIds",
+                              "packetVersion",
+                              "codebookVersion",
+                              "paletteVersion",
+                              "palette",
+                              "symbolMs"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "preparationId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "created",
+                              "armed",
+                              "processing",
+                              "committed",
+                              "discarded"
+                            ]
+                          },
+                          "startServerMs": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "uploads": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "cameraId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "primaryColumn": {
+                                  "type": "string",
+                                  "enum": [
+                                    "left",
+                                    "center",
+                                    "right"
+                                  ]
+                                },
+                                "sha256": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                },
+                                "rotationDegrees": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                      "const": 0
+                                    },
+                                    {
+                                      "type": "number",
+                                      "const": 90
+                                    },
+                                    {
+                                      "type": "number",
+                                      "const": 180
+                                    },
+                                    {
+                                      "type": "number",
+                                      "const": 270
+                                    }
+                                  ]
+                                },
+                                "exclusionRois": {
+                                  "type": "array",
+                                  "items": {
+                                    "minItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "anchors": {
+                                  "anyOf": [
+                                    {
+                                      "type": "array",
+                                      "items": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {
+                                              "type": "number"
+                                            },
+                                            "y": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {
+                                              "type": "number"
+                                            },
+                                            "y": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {
+                                              "type": "number"
+                                            },
+                                            "y": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "x": {
+                                              "type": "number"
+                                            },
+                                            "y": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "uploadId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "runId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "byteSize": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "cameraId",
+                                "primaryColumn",
+                                "sha256",
+                                "rotationDegrees",
+                                "exclusionRois",
+                                "anchors",
+                                "uploadId",
+                                "runId",
+                                "byteSize",
+                                "label"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "reports": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "deviceId": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2047
+                                },
+                                "completed": {
+                                  "type": "boolean"
+                                },
+                                "maxFrameLatenessMs": {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                "reason": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "deviceId",
+                                "completed",
+                                "maxFrameLatenessMs",
+                                "reason"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "plan",
+                          "preparationId",
+                          "status",
+                          "startServerMs",
+                          "uploads",
+                          "reports"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -9432,10 +12600,15 @@
                   "show",
                   "transport",
                   "pendingActions",
+                  "mix",
                   "role",
                   "audienceMap",
                   "devices",
-                  "assignments"
+                  "assignments",
+                  "assignmentRevision",
+                  "preparations",
+                  "appliedCommandIds",
+                  "calibration"
                 ],
                 "additionalProperties": false
               },
@@ -9622,6 +12795,35 @@
                             "sourceOffsetMs",
                             "durationMs",
                             "gain"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "cueMarkers": {
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "cueId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "label": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100
+                            },
+                            "positionMs": {
+                              "type": "number",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "cueId",
+                            "label",
+                            "positionMs"
                           ],
                           "additionalProperties": false
                         }
@@ -10065,6 +13267,30 @@
                         }
                       ]
                     }
+                  },
+                  "mix": {
+                    "default": {
+                      "mixRevision": 0,
+                      "masterGain": 1
+                    },
+                    "type": "object",
+                    "properties": {
+                      "mixRevision": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "masterGain": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "mixRevision",
+                      "masterGain"
+                    ],
+                    "additionalProperties": false
                   },
                   "role": {
                     "type": "string",
@@ -10526,6 +13752,7 @@
                   "show",
                   "transport",
                   "pendingActions",
+                  "mix",
                   "role",
                   "deviceId",
                   "readiness",
@@ -11054,6 +14281,35 @@
                         "sourceOffsetMs",
                         "durationMs",
                         "gain"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "cueMarkers": {
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "cueId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "positionMs": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "cueId",
+                        "label",
+                        "positionMs"
                       ],
                       "additionalProperties": false
                     }

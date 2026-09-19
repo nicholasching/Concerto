@@ -75,6 +75,23 @@ describe("engine", () => {
   const started = () => ctx.sources.filter(source => source.startArgs.length > 0);
   const startOf = (source: FakeSource) => source.startArgs[0];
 
+  test("a later replacement mix cancels the earlier future automation without affecting current gain", () => {
+    engine.load(show, stopped(0), "channel-0", mix);
+    clock.advance(100);
+    engine.setMix({ ...mix, masterGain: 0.2 }, T0 + 1000);
+    engine.setMix({ ...mix, masterGain: 0.7 }, T0 + 2000);
+    expect(ctx.gains[0].gain.at(audio(T0 + 1500))).toBe(1);
+    expect(ctx.gains[0].gain.at(audio(T0 + 2100))).toBe(0.7);
+  });
+
+  test("output clock startup rounding never schedules a negative AudioParam time", () => {
+    ctx.outputTimestamp = { contextTime: 0.00000001, performanceTime: T0 + 0.001 };
+    engine.load(show, stopped(0), null, mix);
+    for (const node of ctx.gains) for (const [kind, first, second] of node.gain.events) {
+      expect(kind === "cancel" ? first : second).toBeGreaterThanOrEqual(0);
+    }
+  });
+
   test("play schedules the assigned channel at the common start with the right offset", () => {
     engine.load(show, stopped(0), "channel-1", mix);
     engine.setTransport(playing(1, T0 + 2000, 0), T0 + 2000);

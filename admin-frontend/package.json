@@ -10,6 +10,8 @@
   "dependencies": {
     "@orchestra/contracts": "workspace:*",
     "@orchestra/selection": "workspace:*",
+    "@orchestra/sync": "workspace:*",
+    "qrcode": "1.5.4",
     "next": "16.2.7",
     "react": "19.2.7",
     "react-dom": "19.2.7"

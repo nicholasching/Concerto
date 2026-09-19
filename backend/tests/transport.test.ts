@@ -305,20 +305,22 @@ describe("scheduled transport", () => {
     const effectiveServerMs = serverMs + 5000;
     await transport(context.app, { commandId: "play-1", action: "play", expectedRevision: 1, showRevision: 1, effectiveServerMs });
 
-    const snapshot = context.state.participantSnapshot(1, context.clock);
+    const snapshot = context.state.participantSnapshot(0, context.clock);
     const pending = snapshot?.pendingActions[0];
     if (pending?.domain !== "transport") throw new Error("expected a pending transport action in the snapshot");
     expect(pending.effectiveServerMs).toBe(effectiveServerMs);
     expect(pending.transport.startServerMs).toBe(effectiveServerMs);
+    expect(context.state.participantSnapshot(1, context.clock)?.pendingActions).toHaveLength(0);
   });
 
   test("replacing a pending change in one domain names the command it superseded", async () => {
     const context = await prepared();
     await transport(context.app, { commandId: "stop-1", action: "stop", expectedRevision: 1, showRevision: 1 });
-    await transport(context.app, { commandId: "stop-2", action: "stop", expectedRevision: 1, showRevision: 1 });
+    await transport(context.app, { commandId: "stop-2", action: "stop", expectedRevision: 2, showRevision: 1 });
 
     expect(context.state.pendingIn("transport")).toMatchObject({ commandId: "stop-2", supersedesCommandId: "stop-1" });
     expect(context.state.pendingActions).toHaveLength(1);
+    expect(context.state.pendingIn("transport")).toMatchObject({ transport: { transportRevision: 3 } });
   });
 
   test("a retried transport command schedules once", async () => {

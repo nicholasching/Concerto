@@ -131,6 +131,10 @@
     "startServerMs": null
   },
   "pendingActions": [],
+  "mix": {
+    "mixRevision": 0,
+    "masterGain": 1
+  },
   "role": "admin",
   "audienceMap": {
     "mapRevision": 1,
@@ -1006,5 +1010,9 @@
       "assignmentRevision": 0,
       "mapRevision": 1
     }
-  ]
+  ],
+  "assignmentRevision": 0,
+  "preparations": [],
+  "appliedCommandIds": [],
+  "calibration": null
 }

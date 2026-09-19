@@ -14,6 +14,7 @@ interface Segment extends PlaybackState {
   endServerMs: number | null;
   gain: GainNode;
   sources: AudioBufferSourceNode[];
+  clipGains: GainNode[];
 }
 
 export interface PlaybackEngineOptions {
@@ -42,8 +43,9 @@ export class PlaybackEngine {
   private readonly master: GainNode;
   private readonly gate: GainNode;
   private readonly channelGains = new Map<string, GainNode>();
-  private readonly levels = new Map<AudioParam, number>();
+  private readonly ramps = new Map<AudioParam, { from: number; to: number; at: number }>();
   private mix: MixState = { masterGain: 1, channels: [] };
+  private pendingMix: Pending<MixState> | null = null;
   private panicked = false;
   readonly missingTracks = new Set<string>();
 
@@ -64,6 +66,7 @@ export class PlaybackEngine {
     this.state = { transport, channelId };
     this.pendingTransport = null;
     this.pendingChannel = null;
+    this.pendingMix = null;
     this.panicked = false;
     this.setMix(mix, this.now());
     this.rebuild();
@@ -82,10 +85,12 @@ export class PlaybackEngine {
 
   /** Gains change at a server time; asset timing never does. */
   setMix(mix: MixState, atServerMs: number): void {
-    this.mix = mix;
+    this.promote(this.now());
     const at = Math.max(atServerMs, this.now());
+    if (atServerMs <= this.now()) { this.mix = mix; this.pendingMix = null; }
+    else this.pendingMix = { value: mix, atServerMs: at };
     this.ramp(this.master.gain, mix.masterGain, at);
-    for (const [channelId, node] of this.channelGains) this.ramp(node.gain, this.levelOf(channelId), at);
+    for (const [channelId, node] of this.channelGains) this.ramp(node.gain, this.levelOf(channelId, mix), at);
   }
 
   /** Immediate: stop every source and close the output gate. */
@@ -94,6 +99,7 @@ export class PlaybackEngine {
     this.segments = [];
     this.pendingTransport = null;
     this.pendingChannel = null;
+    this.pendingMix = null;
     this.panicked = true;
     if (this.state) this.state = { ...this.state, transport: stopped(this.state.transport) };
     this.closeGate();
@@ -138,9 +144,10 @@ export class PlaybackEngine {
   }
 
   private now(): number { return this.options.clock.nowServerMs(); }
-  private audio(serverMs: number): number { return serverMsToAudioTime(this.options.clock, this.options.ctx, serverMs); }
+  private audio(serverMs: number): number { return Math.max(0, serverMsToAudioTime(this.options.clock, this.options.ctx, serverMs)); }
 
   private promote(now: number): void {
+    if (this.pendingMix && this.pendingMix.atServerMs <= now) { this.mix = this.pendingMix.value; this.pendingMix = null; }
     if (!this.state) return;
     if (this.pendingTransport && this.pendingTransport.atServerMs <= now) {
       this.state = { ...this.state, transport: this.pendingTransport.value };
@@ -193,7 +200,7 @@ export class PlaybackEngine {
     const start = this.audio(startServerMs);
     gain.gain.setValueAtTime(0, start);
     gain.gain.linearRampToValueAtTime(1, start + RAMP_MS / 1000);
-    const segment: Segment = { ...state, startServerMs, endServerMs: null, gain, sources: [] };
+    const segment: Segment = { ...state, startServerMs, endServerMs: null, gain, sources: [], clipGains: [] };
     this.segments.push(segment);
     if (this.panicked || state.channelId === null) return segment;
     gain.connect(this.channelGain(state.channelId));
@@ -210,6 +217,7 @@ export class PlaybackEngine {
       source.onended = () => { source.disconnect(); clipGain.disconnect(); };
       source.start(this.audio(clip.startServerMs), clip.offsetMs / 1000, clip.durationMs / 1000);
       segment.sources.push(source);
+      segment.clipGains.push(clipGain);
     }
     return segment;
   }
@@ -238,6 +246,8 @@ export class PlaybackEngine {
       source.disconnect();
     }
     segment.sources = [];
+    for (const gain of segment.clipGains) gain.disconnect();
+    segment.clipGains = [];
     segment.gain.disconnect();
   }
 
@@ -246,24 +256,29 @@ export class PlaybackEngine {
     if (!node) {
       node = this.options.ctx.createGain();
       node.gain.value = this.levelOf(channelId);
-      this.levels.set(node.gain, node.gain.value);
       node.connect(this.master);
       this.channelGains.set(channelId, node);
+      if (this.pendingMix) this.ramp(node.gain, this.levelOf(channelId, this.pendingMix.value), this.pendingMix.atServerMs);
     }
     return node;
   }
 
-  private levelOf(channelId: string): number {
-    const channel = this.mix.channels.find(item => item.channelId === channelId);
-    return channel ? channelLevel(channel, this.mix.channels) : 0;
+  private levelOf(channelId: string, mix = this.mix): number {
+    const channel = mix.channels.find(item => item.channelId === channelId);
+    return channel ? channelLevel(channel, mix.channels) : 0;
   }
 
   private ramp(param: AudioParam, value: number, atServerMs: number): void {
     const at = this.audio(atServerMs);
-    param.cancelScheduledValues(at);
-    param.setValueAtTime(this.levels.get(param) ?? param.value, at);
+    const now = this.audio(this.now());
+    const prior = this.ramps.get(param);
+    const fraction = prior ? Math.max(0, Math.min(1, (now - prior.at) / (RAMP_MS / 1000))) : 0;
+    const current = prior ? prior.from + (prior.to - prior.from) * fraction : param.value;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(current, now);
+    param.setValueAtTime(current, at);
     param.linearRampToValueAtTime(value, at + RAMP_MS / 1000);
-    this.levels.set(param, value);
+    this.ramps.set(param, { from: current, to: value, at });
   }
 
   private closeGate(): void {

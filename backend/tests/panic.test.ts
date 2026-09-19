@@ -110,9 +110,14 @@ const midShow = async (context: Harness) => {
     commandId: "mix-1", expectedRevision: 0, masterGain: 1, channels: show().channels,
     effectiveServerMs: serverMs + 10_000,
   });
-  await operator(context.app, "/api/assignments", {
+  const assignment = {
     commandId: "assign-1", expectedRevision: 0, mapRevision: 0, deviceIds: [0, 1], channelId: "melody",
     effectiveServerMs: serverMs + 10_000,
+  };
+  const prep = await (await operator(context.app, "/api/assignments/prepare", { ...assignment, commandId: "assign-prep" })).json();
+  context.preparations.current("assignment")!.acknowledgePreparation({ deviceId: 0, preparationId: prep.preparationId, ready: true, reason: null });
+  await operator(context.app, "/api/assignments", {
+    ...assignment, preparationId: prep.preparationId,
   });
 };
 

@@ -1,32 +1,50 @@
-// Console clock helper. The shared clock lives in @orchestra/sync (Team 1); the estimator is not
-// implemented yet, so this module reads the server's own serverMs field from each snapshot to
-// establish a single offset. This is not a second estimator — it uses the time the server reports,
-// not a probed estimate. When Team 1's clock is ready, swap toLocalServerMs here for
-// SynchronizedClock.toLocalPerformanceMs and nothing else changes.
+import { ClockSync } from "@orchestra/sync";
+import { ServerMessage } from "@orchestra/contracts";
 
-let offsetMs = 0; // serverMs = localPerfMs + offsetMs
-let lastSyncLocalMs = 0;
+let socket: WebSocket | null = null;
+let identity: { sessionId: string; serverEpoch: string } | null = null;
+let closeCurrent: (() => void) | null = null;
+const clock = new ClockSync({ send: payload => {
+  if (socket?.readyState === WebSocket.OPEN && identity) socket.send(JSON.stringify({ protocolVersion: 1, ...identity,
+    messageId: crypto.randomUUID(), type: "clock.probe", payload }));
+} });
 
-const localPerfMs = () => performance.timeOrigin + performance.now();
-
-export function syncFromServerMs(serverMs: number) {
-  offsetMs = serverMs - localPerfMs();
-  lastSyncLocalMs = localPerfMs();
+export function connectClock(url: string): () => void {
+  closeCurrent?.();
+  let stopped = false;
+  let retry: ReturnType<typeof setTimeout> | null = null;
+  const open = () => {
+    if (stopped) return;
+    const ws = new WebSocket(url); socket = ws;
+    ws.onmessage = event => {
+      if (ws !== socket) return;
+      let raw: unknown;
+      try { raw = JSON.parse(String(event.data)); } catch { return; }
+      const parsed = ServerMessage.safeParse(raw);
+      if (!parsed.success) return;
+      const message = parsed.data;
+      if (message.type === "state.snapshot" && message.payload.role === "admin") {
+        identity = { sessionId: message.sessionId, serverEpoch: message.serverEpoch };
+        clock.start(message.serverEpoch);
+      } else if (message.type === "clock.reply" && message.serverEpoch === identity?.serverEpoch) clock.accept({ ...message.payload, serverEpoch: message.serverEpoch });
+    };
+    ws.onclose = () => { if (ws !== socket) return; clock.stop(); if (!stopped) retry = setTimeout(open, 1000); };
+  };
+  const visibility = () => { if (document.visibilityState === "visible") clock.refresh(); };
+  document.addEventListener("visibilitychange", visibility);
+  open();
+  closeCurrent = () => { stopped = true; if (retry) clearTimeout(retry); socket?.close(); socket = null; clock.stop(); document.removeEventListener("visibilitychange", visibility); };
+  return closeCurrent;
 }
 
-// Current time in the server's ms domain.
-export function nowServerMs(): number {
-  return localPerfMs() + offsetMs;
+export const nowServerMs = () => clock.nowServerMs();
+export const clockReady = () => clock.quality().ready;
+export const lastSyncAgeMs = () => clock.quality().sampleAgeMs ?? Infinity;
+export function futureServerMs(seconds = 4): number {
+  if (!clockReady()) throw new Error("Wait for the operator clock to synchronize.");
+  return nowServerMs() + Math.max(4, seconds) * 1000;
 }
-
-export function lastSyncAgeMs(): number {
-  return localPerfMs() - lastSyncLocalMs;
-}
-
-// Showhead position for a transport state, in ms from the show origin.
-export function showPositionMs(transport: { status: "stopped" | "paused" | "playing"; positionMs: number; startServerMs: number | null }): number {
-  if (transport.status === "playing" && transport.startServerMs !== null) {
-    return transport.positionMs + Math.max(0, nowServerMs() - transport.startServerMs);
-  }
-  return transport.positionMs;
+export function showPositionMs(transport: { status: string; positionMs: number; startServerMs: number | null }): number {
+  return transport.status === "playing" && transport.startServerMs !== null && clockReady()
+    ? transport.positionMs + Math.max(0, nowServerMs() - transport.startServerMs) : transport.positionMs;
 }

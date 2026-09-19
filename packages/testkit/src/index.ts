@@ -21,7 +21,8 @@ export function participantSnapshot(snapshot: AdminSnapshotData, deviceId = 0): 
   const readiness = snapshot.devices.find(device => device.deviceId === deviceId);
   const assignment = snapshot.assignments.find(item => item.deviceId === deviceId);
   const location = snapshot.audienceMap.locations.find(item => item.deviceId === deviceId);
-  const { audienceMap: _map, devices: _devices, assignments: _assignments, ...base } = snapshot;
+  const { audienceMap: _map, devices: _devices, assignments: _assignments, assignmentRevision: _ar,
+    preparations: _preps, appliedCommandIds: _commands, calibration: _calibration, ...base } = snapshot;
   return ParticipantSnapshot.parse({ ...base, role: "participant", deviceId, readiness, assignment, location });
 }
 

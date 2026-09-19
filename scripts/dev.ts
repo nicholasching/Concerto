@@ -9,12 +9,17 @@ function spawn(args: string[], env: Record<string, string> = {}) {
 }
 function frontend(app: string, port: number, mockPort?: number) {
   spawn([nextCli(app), "dev", app, "--webpack", "--port", String(port)], {
-    NEXT_PUBLIC_API_URL: `http://localhost:${mockPort ?? 8080}`,
-    NEXT_PUBLIC_WS_URL: `ws://localhost:${mockPort ?? 8080}/ws`,
+    ...(mockPort ? { NEXT_PUBLIC_API_URL: `http://localhost:${mockPort}`, NEXT_PUBLIC_WS_URL: `ws://localhost:${mockPort}/ws` } : {}),
+    NEXT_PUBLIC_SESSION_ID: mockPort ? "demo" : process.env.SESSION_ID ?? "dev-session",
     NEXT_PUBLIC_ENABLE_MOCKS: mockPort ? "1" : "0",
   });
 }
-if (mode === "sync-demo" || mode === "all") spawn([resolve(ROOT, "backend/src/index.ts")]);
+if (mode === "sync-demo" || mode === "all") {
+  spawn([resolve(ROOT, "backend/src/index.ts")], { OPERATOR_SECRET: process.env.OPERATOR_SECRET ?? "local-demo-only",
+    HOST: process.env.HOST ?? "0.0.0.0", CHECKPOINT_PATH: process.env.CHECKPOINT_PATH ?? "runtime/local/checkpoint.json",
+    ASSETS_PATH: process.env.ASSETS_PATH ?? "runtime/local/assets", UPLOADS_PATH: process.env.UPLOADS_PATH ?? "runtime/local/uploads", JOBS_PATH: process.env.JOBS_PATH ?? "runtime/local/jobs" });
+  console.log("Local concert: audience http://localhost:3000 | operator http://localhost:3001. Default local operator secret: local-demo-only (override with OPERATOR_SECRET).");
+}
 if (mode === "client-demo") { spawn([resolve(ROOT, "tools/client-demo/index.ts")]); frontend("client-frontend", 3000, 18081); }
 else if (mode === "admin-demo") { frontend("admin-frontend", 3001); }
 else if (mode === "all") { frontend("client-frontend", 3000); frontend("admin-frontend", 3001); }

@@ -4,6 +4,14 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Local integration, 2026-09-19
+
+All four feature branches are merged into main, through merge 5eb08ab. Captain integration is verified locally: real clocks, operator authentication, show editing, calibration uploads/worker/review, map selection, routing, transport, mix and recovery are connected. All software gates, real-worker E2E, production startup, source isolation and the five-minute 1500-socket test pass. User requested local functionality before Railway deployment.
+
+Read [integration status/handoff](teams/integration/handoff.md), [verification](evidence/integration/verification.md), [integration journal](teams/integration/journal/20260919-captain-integration.md), [accepted integration boundaries](decisions/20260919-140000-integration-boundaries.md), and [stage 05](stages/05-integration-rehearsal.md). Physical phone/camera/acoustic/venue acceptance is still outstanding. The foundation notes below are historical, not the current implementation inventory.
+
+### Historical foundation checkpoint
+
 - Software foundation is verified and ready for four teams. Canonical baseline: Git tag `foundation-v1`; resolve its SHA with `git rev-parse foundation-v1` and record it in your first journal. The immutable tag avoids embedding its own commit hash inside itself.
 - Four local feature branches start at that baseline. Remote publication is separate; see root README.
 - Contracts, exhaustive codebook, fixture harnesses, application shells, Python boundary CLI, gates and CI configuration exist. NTP, concert APIs, sound, flashing, video localization, interactive console, load/e2e and physical evidence remain assigned work.

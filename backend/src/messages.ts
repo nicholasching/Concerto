@@ -62,11 +62,44 @@ export const handleClientMessage = (input: {
     return error(clock, "STALE_EPOCH", "Resynchronize before reporting state for this server epoch.");
   }
 
+  if (message.data.type === "participant.column") {
+    state.chooseColumn(deviceId, message.data.payload.column);
+    const snapshot = state.participantSnapshot(deviceId, clock)!;
+    return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };
+  }
+
+  if (message.data.type === "assets.ready") {
+    const payload = message.data.payload;
+    const barrier = preparations?.current("assets");
+    if (!barrier || payload.showRevision !== state.showRevision || payload.preparationId !== barrier.preparationId) return error(clock, "STALE_PREPARATION", "Asset preparation was replaced.");
+    const verified = state.show.tracks.every(track => payload.trackHashes[track.trackId] === track.sha256);
+    barrier.acknowledgePreparation({ deviceId, preparationId: payload.preparationId, ready: payload.ready && verified,
+      reason: verified ? payload.reason : "assets-missing" });
+    const snapshot = state.participantSnapshot(deviceId, clock)!;
+    return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };
+  }
+
+  if (message.data.type === "calibration.result") {
+    const run = calibrations?.get(message.data.payload.runId);
+    if (!run || !run.plan.participantIds.includes(deviceId) || run.startServerMs === null) return error(clock, "STALE_CALIBRATION", "No armed calibration for this device.");
+    if (run.status === "discarded" || run.status === "committed") return error(clock, "STALE_CALIBRATION", "This calibration run is closed.");
+    const { completed, maxFrameLatenessMs, reason } = message.data.payload;
+    run.reports.set(deviceId, { deviceId, completed, maxFrameLatenessMs, reason });
+    const snapshot = state.participantSnapshot(deviceId, clock)!;
+    return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };
+  }
+
   if (message.data.type === "device.status") {
     if (message.data.payload.deviceId !== deviceId) {
       return error(clock, "DEVICE_MISMATCH", "A socket may only report status for the device it authenticated as.");
     }
     state.applyStatus(deviceId, message.data.payload);
+    const status = message.data.payload;
+    if (!status.foreground || !status.clockReady) preparations?.current("calibration")?.exclude(deviceId, "clock or foreground no longer ready");
+    if (!status.foreground || !status.clockReady || !status.audioUnlocked) {
+      preparations?.current("transport")?.exclude(deviceId, "audio, clock or foreground no longer ready");
+      preparations?.current("assignment")?.exclude(deviceId, "audio, clock or foreground no longer ready");
+    }
     const snapshot = state.participantSnapshot(deviceId, clock);
     if (!snapshot) return error(clock, "UNKNOWN_DEVICE", "This device is not registered in the current session.");
     return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };
@@ -88,6 +121,17 @@ export const handleClientMessage = (input: {
     if (!counted) return error(clock, "STALE_PREPARATION", "This acknowledgement does not match the current preparation.");
     const snapshot = state.participantSnapshot(deviceId, clock);
     if (!snapshot) return error(clock, "UNKNOWN_DEVICE", "This device is not registered in the current session.");
+    return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };
+  }
+
+  if (message.data.type === "assignment.ready") {
+    const payload = message.data.payload;
+    const barrier = preparations?.current("assignment");
+    if (!barrier || preparations?.assignment?.assignmentRevision !== payload.assignmentRevision
+      || !barrier.acknowledgePreparation({ ...payload, deviceId })) {
+      return error(clock, "STALE_PREPARATION", "This acknowledgement does not match the current assignment.");
+    }
+    const snapshot = state.participantSnapshot(deviceId, clock)!;
     return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };
   }
 

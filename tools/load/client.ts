@@ -1,7 +1,7 @@
 import { ClientMessage, PROTOCOL_VERSION, ServerMessage } from "@orchestra/contracts";
 // Relative import: tools/ is not a workspace, so @orchestra/sync does not resolve here. Adding it
 // would change the root manifest and lockfile, which belong to the captain.
-import { ClockEstimator, PROBE_CONSTANTS, epochNow } from "../../packages/sync/src/index";
+import { ClockSync } from "../../packages/sync/src/index";
 
 export interface ClientResult {
   deviceId: number;
@@ -28,10 +28,9 @@ export interface ClientResult {
 export class SimulatedClient {
   readonly result: ClientResult;
   private socket: WebSocket | null = null;
-  private estimator = new ClockEstimator();
+  private readonly clock = new ClockSync({ send: probe => this.send("clock.probe", probe) });
   private resumeToken = "";
   private serverEpoch = "";
-  private probeTimer: ReturnType<typeof setTimeout> | null = null;
   private statusTimer: ReturnType<typeof setInterval> | null = null;
   private cueDeadlineServerMs: number | null = null;
 
@@ -101,21 +100,18 @@ export class SimulatedClient {
 
   start(): void {
     this.statusTimer = setInterval(() => this.reportStatus(), 2000);
-    this.probePair();
-    this.scheduleNextProbe();
+    this.clock.start(this.serverEpoch);
   }
 
   stop(): void {
-    if (this.probeTimer) clearTimeout(this.probeTimer);
+    this.clock.stop();
     if (this.statusTimer) clearInterval(this.statusTimer);
-    this.probeTimer = null;
     this.statusTimer = null;
     this.socket?.close();
   }
 
   async reconnect(): Promise<void> {
     this.stop();
-    this.estimator = new ClockEstimator();
     await this.join();
     await this.connect();
     this.start();
@@ -141,7 +137,7 @@ export class SimulatedClient {
     this.result.cueMarginMs = pending.effectiveServerMs - snapshot.serverMs;
   }
 
-  private send(type: "clock.probe" | "device.status" | "transport.ready" | "calibration.ready", payload: unknown): void {
+  private send(type: "clock.probe" | "device.status" | "transport.ready" | "calibration.ready" | "assignment.ready", payload: unknown): void {
     if (this.socket?.readyState !== WebSocket.OPEN) return;
     try {
       this.socket.send(JSON.stringify(ClientMessage.parse({
@@ -153,23 +149,8 @@ export class SimulatedClient {
     }
   }
 
-  private probePair(): void {
-    const probeGroupId = this.estimator.beginProbeGroup();
-    this.send("clock.probe", { probeGroupId, probeGroupIndex: 0, t0: epochNow() });
-    setTimeout(() => this.send("clock.probe", { probeGroupId, probeGroupIndex: 1, t0: epochNow() }), PROBE_CONSTANTS.PROBE_GAP_MS);
-  }
-
-  private scheduleNextProbe(): void {
-    this.probeTimer = setTimeout(() => {
-      this.probePair();
-      // Re-read the policy after every pair: it is intentionally rapid while the measurement
-      // window fills, then settles to the steady cadence once the clock is ready.
-      this.scheduleNextProbe();
-    }, this.estimator.nextProbeDelayMs());
-  }
-
   private reportStatus(): void {
-    const quality = this.estimator.quality();
+    const quality = this.clock.quality();
     this.send("device.status", {
       deviceId: this.result.deviceId, connected: true, foreground: true,
       clockReady: quality.ready, clockUncertaintyMs: quality.uncertaintyMs, clockSampleAgeMs: quality.sampleAgeMs,
@@ -186,30 +167,45 @@ export class SimulatedClient {
       return;
     }
     if (message.type === "clock.reply") {
-      this.estimator.accept({ serverEpoch: message.serverEpoch, ...message.payload });
-      const stats = this.estimator.stats();
+      this.clock.accept({ serverEpoch: message.serverEpoch, ...message.payload });
+      const stats = this.clock.estimator.stats();
       this.result.purePairs = stats.pairsPure;
       this.result.impurePairs = stats.pairsImpure;
       return;
     }
     if (message.type === "lease.renew") {
-      if (message.payload.expiresServerMs <= this.estimator.nowServerMs()) this.result.leaseExpiries++;
+      if (message.payload.expiresServerMs <= this.clock.nowServerMs()) this.result.leaseExpiries++;
       return;
     }
     if (message.type === "transport.prepare") {
       const payload = message.payload;
       // A real phone takes time to decode assets before it can honestly say it is ready.
-      setTimeout(() => {
-        this.result.clockReadyWhenAcknowledged = this.estimator.quality().ready;
+      const deadline = performance.now() + this.ackDelayMs + 10000;
+      const acknowledge = () => {
+        const ready = this.clock.quality().ready;
+        if (!ready && performance.now() < deadline) { setTimeout(acknowledge, 100); return; }
+        this.result.clockReadyWhenAcknowledged = ready;
         this.send("transport.ready", {
-          preparationId: payload.preparationId, ready: true, reason: null,
+          preparationId: payload.preparationId, ready, reason: ready ? null : "clock-not-ready",
           showRevision: payload.showRevision, transportRevision: payload.transportRevision,
         });
-        this.result.acknowledgedPreparation = true;
-        if (this.cueDeadlineServerMs === null || this.estimator.nowServerMs() < this.cueDeadlineServerMs) {
+        this.result.acknowledgedPreparation = ready;
+        if (ready && (this.cueDeadlineServerMs === null || this.clock.nowServerMs() < this.cueDeadlineServerMs)) {
           this.result.acknowledgedBeforeDeadline = true;
         }
-      }, this.ackDelayMs);
+      };
+      setTimeout(acknowledge, this.ackDelayMs);
+      return;
+    }
+    if (message.type === "assignment.prepare") {
+      const payload = message.payload, deadline = performance.now() + 10000;
+      const acknowledge = () => {
+        const ready = this.clock.quality().ready;
+        if (!ready && performance.now() < deadline) { setTimeout(acknowledge, 100); return; }
+        this.send("assignment.ready", { preparationId: payload.preparationId,
+          assignmentRevision: payload.assignment.assignmentRevision, ready, reason: ready ? null : "clock-not-ready" });
+      };
+      setTimeout(acknowledge, this.ackDelayMs);
       return;
     }
     if (message.type === "calibration.prepare") {
@@ -221,7 +217,7 @@ export class SimulatedClient {
     }
     if (message.type === "transport.commit") {
       // How much warning the phone got before the moment it has to act on.
-      this.result.cueMarginMs = message.effectiveServerMs - this.estimator.nowServerMs();
+      this.result.cueMarginMs = message.effectiveServerMs - this.clock.nowServerMs();
       this.result.cueLearnedFrom ??= "broadcast";
       return;
     }

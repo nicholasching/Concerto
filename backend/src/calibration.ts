@@ -32,6 +32,8 @@ export interface CalibrationRunRecord {
   status: RunStatus;
   startServerMs: number | null;
   uploads: Map<string, CameraUpload>;
+  preparationId: string;
+  reports: Map<number, { deviceId: number; completed: boolean; maxFrameLatenessMs: number; reason: string | null }>;
 }
 
 export type CreateOutcome =
@@ -64,7 +66,7 @@ export class CalibrationRuns {
       packetVersion: "otc-v1", codebookVersion: "hamming16-11-v1",
       paletteVersion: input.paletteVersion, palette: input.palette, symbolMs: 200,
     });
-    const run: CalibrationRunRecord = { plan, status: "created", startServerMs: null, uploads: new Map() };
+    const run: CalibrationRunRecord = { plan, status: "created", startServerMs: null, uploads: new Map(), preparationId: "pending", reports: new Map() };
     this.runs.set(plan.runId, run);
     return { ok: true, run };
   }
@@ -92,5 +94,12 @@ export class CalibrationRuns {
 
   addUpload(upload: CameraUpload): void {
     this.runs.get(upload.runId)?.uploads.set(upload.uploadId, upload);
+  }
+
+  get nextTag(): number { return this.nextRunTag; }
+  restoreNextTag(next: number): void { this.nextRunTag = Math.max(this.nextRunTag, next); }
+  resource(run = this.activeRun) {
+    return run ? { plan: run.plan, preparationId: run.preparationId, status: run.status,
+      startServerMs: run.startServerMs, uploads: [...run.uploads.values()], reports: [...run.reports.values()] } : null;
   }
 }

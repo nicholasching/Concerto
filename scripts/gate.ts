@@ -9,7 +9,7 @@ const teams = target === "all" ? ["sync", "client", "admin", "otc"] : [target];
 for (const team of teams) {
   if (team === "otc") await run([process.execPath, "run", "test:otc"]);
   else {
-    const tests = team === "sync" ? ["backend/tests", "packages/sync/tests", "packages/testkit/tests"] : [`${team === "client" ? "client" : "admin"}-frontend/tests`, `packages/${team === "client" ? "audio" : "selection"}`];
+    const tests = team === "sync" ? ["./backend/tests", "./packages/sync/tests", "./packages/testkit/tests", "./tools/load/tests"] : [`./${team === "client" ? "client" : "admin"}-frontend/tests`, `./packages/${team === "client" ? "audio" : "selection"}/tests`];
     await run([process.execPath, "test", ...tests]);
     await build(team);
   }

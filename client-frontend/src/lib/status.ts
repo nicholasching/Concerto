@@ -9,5 +9,5 @@ export function participantStatus(snapshot: ParticipantSnapshotData): string {
   if (assignment.channelId === null) return "No channel assigned";
   const tracks = show.clips.filter(clip => clip.channelId === assignment.channelId).map(clip => show.tracks.find(track => track.trackId === clip.trackId));
   if (tracks.some(track => !track || readiness.decodedTrackHashes[track.trackId] !== track.sha256)) return "Assets not ready";
-  return "Prepared; playback implementation pending";
+  return "Audio ready";
 }

@@ -1,6 +1,12 @@
 # Stage 05 - Integration and rehearsal
 
-Status: not started. Owner: captain and all human leads. Base: foundation-v1.
+Status: verified for local software; physical rehearsal not started. Owner: captain and all human leads. Base: foundation-v1; all four branches merged on main through 5eb08ab.
+
+## Local implementation checkpoint — 2026-09-19
+
+The user clarified the immediate milestone: get the app working locally, then handle Railway. The operator and participant now use real authenticated HTTP/WebSocket services, a shared clock, verified audio assets, preparation barriers, calibration flashing and uploads, the real Python worker, reviewed map commits, selection/routing, common transport, mix, panic and restart recovery. No runtime dependency on the BeatSync reference tree exists.
+
+Read [integration status](../teams/integration/status.md), [handoff](../teams/integration/handoff.md), [verification](../evidence/integration/verification.md) and [accepted boundaries](../decisions/20260919-140000-integration-boundaries.md). The original merge checkpoints below remain the physical acceptance sequence; software and synthetic success does not satisfy the phone/camera/acoustic portions.
 
 ## Merge checkpoints
 

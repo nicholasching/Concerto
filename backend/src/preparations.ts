@@ -5,6 +5,7 @@ export type PreparationDomain = "transport" | "assets" | "assignment" | "calibra
 // One active preparation per domain. Starting a new one discards the previous barrier, which is
 // what makes an acknowledgement for a superseded preparation unable to satisfy the current one.
 export class Preparations {
+  assignment: { preparationId: string; assignmentRevision: number; mapRevision: number; channelId: string | null; deviceIds: number[] } | null = null;
   private readonly active = new Map<PreparationDomain, Barrier>();
 
   start(domain: PreparationDomain, barrier: Barrier): void {
@@ -17,6 +18,12 @@ export class Preparations {
 
   clear(domain: PreparationDomain): void {
     this.active.delete(domain);
+  }
+
+  snapshot() {
+    return [...this.active].map(([domain, barrier]) => ({ domain, preparationId: barrier.preparationId,
+      showRevision: barrier.showRevision, transportRevision: barrier.transportRevision,
+      expectedIds: barrier.expectedDevices(), readyIds: barrier.readyDevices(), excluded: barrier.excludedDevices() }));
   }
 
   // A device that drops is excluded everywhere it was expected, so no barrier waits on it.

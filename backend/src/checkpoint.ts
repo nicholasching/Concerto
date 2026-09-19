@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
-import { AudienceMap, Show } from "@orchestra/contracts";
+import { Assignment, AudienceMap, Show } from "@orchestra/contracts";
 
 export const CheckpointFile = z.strictObject({
   version: z.literal(3),
@@ -17,6 +17,8 @@ export const CheckpointFile = z.strictObject({
   show: Show.nullable(),
   map: AudienceMap.nullable(),
   committedRunTag: z.number().int().min(0).max(255).nullable(),
+  nextRunTag: z.number().int().min(0).max(256).default(0),
+  assignments: z.array(Assignment).default([]),
 });
 export type CheckpointData = z.infer<typeof CheckpointFile>;
 

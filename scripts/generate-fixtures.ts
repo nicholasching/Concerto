@@ -51,7 +51,8 @@ const result = OtcResult.parse({ ...identity, runId: manifest.runId, runTag: man
 const devices = manifest.participantIds.map(deviceId => ({ deviceId, connected: true, foreground: true, clockReady: true, clockUncertaintyMs: 5, clockSampleAgeMs: 100, audioUnlocked: false, decodedTrackHashes: {} }));
 const assignments = manifest.participantIds.map(deviceId => ({ deviceId, channelId: null, assignmentRevision: 0, mapRevision: 1 }));
 const snapshot = AdminSnapshot.parse({ ...identity, revision: 1, serverMs: 90000, role: "admin", show, transport: { status: "stopped", transportRevision: 0, showRevision: 1, positionMs: 0, startServerMs: null }, pendingActions: [], audienceMap: { mapRevision: 1, runId: manifest.runId, evidence: "synthetic", locations }, devices, assignments });
-const { audienceMap: _map, devices: _devices, assignments: _assignments, ...common } = snapshot;
+const { audienceMap: _map, devices: _devices, assignments: _assignments, assignmentRevision: _ar,
+  preparations: _preps, appliedCommandIds: _commands, calibration: _calibration, ...common } = snapshot;
 const participant = ParticipantSnapshot.parse({ ...common, role: "participant", deviceId: 0, readiness: devices[0], assignment: assignments[0], location: snapshot.audienceMap.locations[0] });
 const { cameras: _cameras, ...run } = manifest;
 const { startServerMs: _start, ...plan } = run;

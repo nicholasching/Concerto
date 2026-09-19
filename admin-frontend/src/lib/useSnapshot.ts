@@ -1,10 +1,10 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { createAdapter } from "./adapter";
-import { syncFromServerMs } from "./clock";
+import { connectClock } from "./clock";
 import type { AdminSnapshotData } from "@orchestra/contracts";
 
-const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+export const api = process.env.NEXT_PUBLIC_API_URL ?? (typeof window === "undefined" ? "http://localhost:8080" : `${window.location.protocol}//${window.location.hostname}:8080`);
 
 // One adapter instance for the whole console so pending state is shared across screens.
 const adapter = createAdapter(api);
@@ -15,6 +15,7 @@ export interface SnapshotState {
   error: string | null;
   loading: boolean;
   refresh: () => Promise<void>;
+  login: (secret: string) => Promise<void>;
 }
 
 // Polls the snapshot through the adapter and keeps the console clock synced to the server's ms.
@@ -27,7 +28,6 @@ export function useSnapshot(intervalMs = 1000): SnapshotState {
   const refresh = useCallback(async () => {
     try {
       const data = await adapter.getSnapshot();
-      syncFromServerMs(data.serverMs);
       setSnapshot(data);
       setError(null);
     } catch (err) {
@@ -37,6 +37,19 @@ export function useSnapshot(intervalMs = 1000): SnapshotState {
     }
   }, []);
 
+  const login = useCallback(async (secret: string) => {
+    const info = await adapter.discoverSession();
+    adapter.configure(secret, info.sessionId);
+    await adapter.getSnapshot();
+    try { sessionStorage.setItem("orchestra:operator", secret); } catch { /* page-only access */ }
+    connectClock(adapter.socketUrl());
+    await refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    try { const secret = sessionStorage.getItem("orchestra:operator"); if (secret) void login(secret).catch(err => setError(String(err))); } catch { /* no storage */ }
+  }, [login]);
+
   useEffect(() => {
     void refresh();
     const id = setInterval(refresh, intervalMs);
@@ -45,5 +58,5 @@ export function useSnapshot(intervalMs = 1000): SnapshotState {
 
   // Re-render-friendly refresh that also bumps pending state.
   const forceRefresh = useCallback(async () => { setTick(t => t + 1); await refresh(); }, [refresh]);
-  return { snapshot, error, loading, refresh: forceRefresh };
+  return { snapshot, error, loading, refresh: forceRefresh, login };
 }

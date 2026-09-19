@@ -59,3 +59,9 @@ Subplan: [teams/audio-client/plans/02](teams/audio-client/plans/02-join-resume-c
 
 - `useWebSocketReconnection.ts` → `client-frontend/src/lib/connection.ts`. Kept: 1 s initial delay, ×1.1 growth, 10 s cap, up to 15% jitter, 15-attempt limit, 5 s connect timeout for Safari's silent drops, and immediate reconnect on visibility/online with a fresh attempt budget. Changed: a plain class with injected timers and socket instead of React refs and the Zustand store; each reconnect re-resumes identity over HTTP before opening the socket; a "replaced" close stops reconnecting.
 - `websocket/dispatch.ts` (sha256 `5b4c97a0430907756cf904eb6b13b96be4e946882d8b1284857a97f44c92c963`): not copied. Messages are validated with the shared `ServerMessage` schema and handled by type.
+
+## Captain integration clock lifecycle — 2026-09-19
+
+`packages/sync/src/lifecycle.ts` composes the extracted estimator for both browsers and the socket simulator. The estimator's 25 ms pair gap, 5 ms purity tolerance, 16-sample window, minimum-RTT selection, 20 ms readiness threshold and 3750 ms sample expiry are unchanged. Lifecycle timers add per-client jitter and correlate replies with the exact sent timestamp and epoch.
+
+A load experiment exposed that waiting another 2500 ms after a rejected/missing steady-state pair could expire an otherwise good clock. The lifecycle now evaluates the reply after the initial 50 ms interval and rapidly retries missing/impure pairs or an unready clock. Valid steady-state pairs retain the 2500 ms cadence with jitter. Deterministic dropped-pair and epoch/reset tests cover this change; the load harness uses this same lifecycle rather than a second probe loop. Native timer calls are wrapped to preserve their browser receiver semantics. These are local orchestration changes, not optical latency or audio-output compensation. The reference source remains unchanged.

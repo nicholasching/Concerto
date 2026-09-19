@@ -42,14 +42,14 @@ const assignmentCommit = (channelId: string | null, revision: number, at: number
   ({ ...envelope, type: "assignment.commit", effectiveServerMs: at, payload: { commandId: `a${revision}`, effectiveServerMs: at, supersedesCommandId: null, domain: "assignment", assignments: [{ deviceId, channelId, assignmentRevision: revision, mapRevision: 1 }] } });
 const lastReply = () => sent.at(-1)!;
 
-test("attaching an engine loads the snapshot state and replays pending changes and the lease", () => {
+test("snapshot recovery schedules missed commits without reloading the engine or lease", () => {
   const snapshot: ParticipantSnapshotData = { ...structuredClone(base), pendingActions: [
     { commandId: "t", effectiveServerMs: T0 + 2000, supersedesCommandId: null, domain: "transport", transport: playing(1, T0 + 2000) },
     { commandId: "a", effectiveServerMs: T0 + 3000, supersedesCommandId: null, domain: "assignment", assignments: [{ deviceId: me.deviceId, channelId: "channel-2", assignmentRevision: 1, mapRevision: 1 }] },
   ] };
   control.handle({ ...envelope, type: "lease.renew", payload: { expiresServerMs: T0 + 10_000 } });
   control.applySnapshot(snapshot);
-  expect(calls).toEqual([["lease", T0 + 10_000], ["load", 0, null], ["transport", 1, T0 + 2000], ["channel", "channel-2", T0 + 3000], ["lease", T0 + 10_000]]);
+  expect(calls).toEqual([["lease", T0 + 10_000], ["transport", 1, T0 + 2000], ["channel", "channel-2", T0 + 3000]]);
 });
 
 test("transport.prepare checks audio, clock, show revision and decoded tracks", () => {
@@ -110,6 +110,20 @@ test("a newer mix doesn't cancel a pending transport change", () => {
   expect(control.view().pendingTransport).not.toBeNull();
 });
 
+test("effective mix snapshots and duplicate scheduled commits never reload or restart the transport", () => {
+  const cue = transportCommit(playing(2, T0 + 4000), T0 + 4000);
+  control.handle(cue);
+  if (cue.type !== "transport.commit") throw new Error("transport");
+  control.applySnapshot({ ...base, pendingActions: [cue.payload] });
+  control.handle(cue);
+  expect(calls.filter(call => call[0] === "transport")).toHaveLength(1);
+  now = T0 + 5000;
+  control.applySnapshot({ ...base, transport: cue.payload.transport, mix: { masterGain: 0.3, mixRevision: 1 } });
+  expect(calls.filter(call => call[0] === "load")).toHaveLength(0);
+  expect(calls.filter(call => call[0] === "transport")).toHaveLength(1);
+  expect(calls.at(-1)).toEqual(["mix", 0.3, now]);
+});
+
 test("after panic only a newer transport revision can play, even from a snapshot", () => {
   control.handle(transportCommit(playing(3, T0 - 1000), T0 - 1000));
   control.handle({ ...envelope, type: "panic", payload: { commandId: "p" } });
@@ -117,7 +131,7 @@ test("after panic only a newer transport revision can play, even from a snapshot
   expect(control.view()).toMatchObject({ panicked: true });
   control.handle(transportCommit(playing(3, T0 + 1000), T0 + 1000));
   control.applySnapshot({ ...structuredClone(base), transport: playing(3, T0 - 1000) });
-  expect(calls.at(-1)).toEqual(["load", 3, null]);
+  expect(calls.at(-1)).toEqual(["transport", 3, T0]);
   expect(control.view()).toMatchObject({ transport: { status: "stopped" }, panicked: true });
   control.handle(transportCommit(playing(4, T0 + 2000), T0 + 2000));
   expect(calls.at(-1)).toEqual(["transport", 4, T0 + 2000]);
@@ -125,11 +139,11 @@ test("after panic only a newer transport revision can play, even from a snapshot
   expect(control.view()).toMatchObject({ transport: { status: "playing", transportRevision: 4 }, panicked: false });
 });
 
-test("a reconnecting phone keeps the last master gain it knew", () => {
+test("a reconnecting phone recovers the authoritative master gain", () => {
   control.handle({ ...envelope, type: "mix.commit", effectiveServerMs: T0, payload: { commandId: "m1", effectiveServerMs: T0, supersedesCommandId: null, domain: "mix", mixRevision: 1, masterGain: 0.25, channels: base.show.channels } });
   const loads: number[] = [];
   control.attach({ ...engine, load: (_show, _transport, _channel, mix) => { loads.push(mix.masterGain); } });
-  control.applySnapshot(structuredClone(base));
+  control.applySnapshot({ ...structuredClone(base), mix: { masterGain: 0.25, mixRevision: 1 } });
   expect(loads.at(-1)).toBe(0.25);
 });
 

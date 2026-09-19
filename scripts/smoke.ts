@@ -1,12 +1,13 @@
 import { nextCli } from "./build";
 import { ROOT } from "./run";
+import { resolve } from "node:path";
 
-// Real HTTP startup of the built shells, using private test ports.
+// Real HTTP startup of the production builds, using private test ports and isolated data.
 const children: ReturnType<typeof Bun.spawn>[] = [];
 try {
-  children.push(Bun.spawn([process.execPath, "backend/dist/index.js"], { cwd: ROOT, env: { ...process.env, PORT: "18080" }, stdout: "ignore", stderr: "inherit" }));
+  children.push(Bun.spawn([process.execPath, "backend/dist/index.js"], { cwd: ROOT, env: { ...process.env, PORT: "18080", SESSION_ID: "smoke-test", OPERATOR_SECRET: crypto.randomUUID(), CHECKPOINT_PATH: resolve(ROOT, "runtime/smoke", crypto.randomUUID(), "checkpoint.json") }, stdout: "ignore", stderr: "inherit" }));
   for (const [app, port] of [["client-frontend", "13000"], ["admin-frontend", "13001"]]) children.push(Bun.spawn([process.execPath, nextCli(app), "start", app, "--port", port], { cwd: ROOT, env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" }, stdout: "ignore", stderr: "inherit" }));
-  for (const [index, port, path, expected] of [[0, 18080, "/api/health", "foundation"], [1, 13000, "/", "FOUNDATION SHELL"], [2, 13001, "/", "FOUNDATION SHELL"]] as const) {
+  for (const [index, port, path, expected] of [[0, 18080, "/api/health", "audience-orchestra-control"], [1, 13000, "/", "Audience client"], [2, 13001, "/", "Admin console"]] as const) {
     const deadline = Date.now() + 30000;
     let passed = false;
     while (Date.now() < deadline) {
@@ -19,7 +20,7 @@ try {
       await Bun.sleep(250);
     }
     if (!passed) throw new Error(`Startup check failed on ${port}`);
-    console.log(`PASS: built shell on ${port}`);
+    console.log(`PASS: production application on ${port}`);
   }
 } finally {
   for (const child of children) child.kill();

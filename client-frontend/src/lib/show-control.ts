@@ -57,7 +57,7 @@ export class ShowControl {
   private panicRevision = -1;
   private panicked = false;
   private engine: Engine | null = null;
-  /** Last master gain seen this page load; the snapshot doesn't carry it (see proposed ADR). */
+  /** Effective master gain, including recovery from the authoritative snapshot. */
   private lastMasterGain = 1;
   private epoch: string | null = null;
   private needsReload = false;
@@ -89,14 +89,18 @@ export class ShowControl {
       this.lastMasterGain = 1;
     }
     this.settle();
-    const before = this.playbackKey();
+    const before = { show: JSON.stringify([this.show?.showId, this.show?.showRevision]),
+      transport: JSON.stringify([this.transport, this.pendingTransport]), channel: JSON.stringify([this.channelId, this.pendingChannel]),
+      mix: JSON.stringify([this.mix, this.pendingMix]) };
     this.show = snapshot.show;
     if (snapshot.transport.transportRevision > this.panicRevision) this.panicked = false;
     this.transport = this.guardPanic(snapshot.transport);
     this.transportRevision = snapshot.transport.transportRevision;
     this.channelId = snapshot.assignment.channelId;
     this.assignmentRevision = snapshot.assignment.assignmentRevision;
-    this.mix = { masterGain: this.lastMasterGain, channels: snapshot.show.channels };
+    this.lastMasterGain = snapshot.mix.masterGain;
+    this.mixRevision = snapshot.mix.mixRevision;
+    this.mix = { masterGain: snapshot.mix.masterGain, channels: snapshot.show.channels };
     this.pendingTransport = this.pendingChannel = this.pendingMix = null;
     for (const action of snapshot.pendingActions) {
       if (action.domain === "transport" && action.transport.transportRevision > this.transportRevision && action.transport.transportRevision > this.panicRevision) {
@@ -108,12 +112,19 @@ export class ShowControl {
         this.pendingMix = { value: { masterGain: action.masterGain, channels: action.channels }, atServerMs: action.effectiveServerMs };
       }
     }
-    if (epochChanged || this.needsReload || before !== this.playbackKey()) this.reloadEngine();
+    if (epochChanged || this.needsReload || before.show !== JSON.stringify([this.show.showId, this.show.showRevision])) this.reloadEngine();
+    else {
+      const now = this.options.now() ?? snapshot.serverMs;
+      if (before.transport !== JSON.stringify([this.transport, this.pendingTransport])) this.engine?.setTransport(this.pendingTransport?.value ?? this.transport, this.pendingTransport?.atServerMs ?? now);
+      if (before.channel !== JSON.stringify([this.channelId, this.pendingChannel])) this.engine?.setChannel(this.pendingChannel ? this.pendingChannel.value : this.channelId, this.pendingChannel?.atServerMs ?? now);
+      if (before.mix !== JSON.stringify([this.mix, this.pendingMix])) this.engine?.setMix(this.pendingMix?.value ?? this.mix, this.pendingMix?.atServerMs ?? now);
+    }
+    this.transportRevision = Math.max(this.transportRevision, this.pendingTransport?.value.transportRevision ?? -1);
+    for (const action of snapshot.pendingActions) {
+      if (action.domain === "mix") this.mixRevision = Math.max(this.mixRevision, action.mixRevision);
+      if (action.domain === "assignment") this.assignmentRevision = Math.max(this.assignmentRevision, action.assignments.find(item => item.deviceId === snapshot.deviceId)?.assignmentRevision ?? -1);
+    }
     this.needsReload = false;
-  }
-
-  private playbackKey(): string {
-    return JSON.stringify([this.show, this.transport, this.channelId, this.mix, this.pendingTransport, this.pendingChannel, this.pendingMix]);
   }
 
   handle(message: ServerMessageData): void {
@@ -164,7 +175,7 @@ export class ShowControl {
     const me = this.options.identity();
     const { preparationId, assignment } = message.payload;
     if (!me || assignment.deviceId !== me.deviceId) return;
-    const reason = !this.options.facts().audioRunning ? "audio-locked" : !this.channelReady(assignment.channelId) ? "assets-missing" : null;
+    const reason = !this.options.facts().audioRunning ? "audio-locked" : !this.options.facts().clockUsable ? "clock-or-foreground" : !this.channelReady(assignment.channelId) ? "assets-missing" : null;
     this.reply({ type: "assignment.ready", payload: { preparationId, ready: reason === null, reason, assignmentRevision: assignment.assignmentRevision } });
   }
 

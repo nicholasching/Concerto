@@ -15,6 +15,9 @@ export const schemas = {
   MixRequest: models.MixRequest, SaveShowRequest: models.SaveShowRequest, PanicRequest: models.PanicRequest,
   CalibrationCreateRequest: models.CalibrationCreateRequest, CalibrationArmRequest: models.CalibrationArmRequest,
   CommitMapRequest: models.CommitMapRequest, CreateJobRequest: models.CreateJobRequest,
+  CalibrationCreated: models.CalibrationCreated, CalibrationResource: models.CalibrationResource,
+  CameraUploadReceipt: models.CameraUploadReceipt, JobResource: models.JobResource,
+  PreparationStatus: models.PreparationStatus,
   ClientMessage, ServerMessage,
 };
 export type SchemaName = keyof typeof schemas;

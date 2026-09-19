@@ -56,6 +56,8 @@ export class SessionState {
   private pendingActionsCache: PendingActionData[] | null = null;
   private assignmentRevisionCounter = 0;
   private mixRevisionCounter = 0;
+  private effectiveMixRevision = 0;
+  private readonly transportRecipients = new Map<number, Set<number>>();
   private channelState: ChannelData[] | null = null;
   private masterGainState = 1;
   private mapRevisionCounter = 0;
@@ -65,6 +67,24 @@ export class SessionState {
   private readonly readiness = new Map<number, DeviceReadinessData>();
   private readonly assignments = new Map<number, AssignmentData>();
   private readonly locations = new Map<number, LocationData>();
+  private adminContext: () => Partial<Pick<AdminSnapshotData, "preparations" | "calibration">> = () => ({});
+  private readonly appliedCommands = new Set<string>();
+
+  setAdminContext(provider: typeof this.adminContext): void { this.adminContext = provider; }
+  private applied(commandId: string): void {
+    this.appliedCommands.add(commandId);
+    if (this.appliedCommands.size > 1000) this.appliedCommands.delete(this.appliedCommands.values().next().value!);
+  }
+  get durableAssignments(): AssignmentData[] {
+    return [...this.assignments.values()].map(assignment => this.pendingAssignments.get(assignment.deviceId)?.assignment ?? assignment);
+  }
+  restoreAssignments(assignments: AssignmentData[]): void {
+    for (const assignment of assignments) {
+      if (!this.isRegistered(assignment.deviceId)) continue;
+      this.assignments.set(assignment.deviceId, Assignment.parse(assignment));
+      this.assignmentRevisionCounter = Math.max(this.assignmentRevisionCounter, assignment.assignmentRevision);
+    }
+  }
 
   get revision(): number {
     return this.revisionCounter;
@@ -77,8 +97,7 @@ export class SessionState {
     return this.channelState ? { ...base, channels: this.channelState } : base;
   }
 
-  // The snapshot has no field for master gain, so a reconnecting client cannot recover it from
-  // state; it only ever sees it on a mix.commit broadcast. Recorded as a contract gap.
+  // Effective gain is included in every snapshot; allocated revisions also include pending mix.
   get masterGain(): number {
     return this.masterGainState;
   }
@@ -95,11 +114,21 @@ export class SessionState {
   get transport() {
     return this.transportState;
   }
+  get transportRevision(): number { return Math.max(this.transportState.transportRevision, this.pendingTransport?.transport.transportRevision ?? 0); }
 
   // The server assigns the revision. A client cannot choose which version of the show it is
   // writing, only what is in it.
   saveShow(show: ShowData): ShowData {
+    this.pendingMix = null;
+    this.channelState = null;
+    this.masterGainState = 1;
+    this.pendingActionsCache = null;
     this.savedShow = Show.parse({ ...show, showRevision: this.showRevision + 1 });
+    for (const [deviceId, assignment] of this.assignments) {
+      if (assignment.channelId !== null && !show.channels.some(channel => channel.channelId === assignment.channelId)) {
+        this.assignments.set(deviceId, { ...assignment, channelId: null, assignmentRevision: ++this.assignmentRevisionCounter });
+      }
+    }
     this.transportState = stoppedTransport(this.transportState.transportRevision + 1, this.savedShow.showRevision);
     this.revisionCounter++;
     return this.savedShow;
@@ -149,9 +178,11 @@ export class SessionState {
   // A replacement cancels only the previous change in the same domain. An unrelated domain is
   // untouched, so scheduling a mix change cannot cancel a transport start that was already
   // accepted, however close together the two commands arrive.
-  scheduleTransport(action: Extract<PendingActionData, { domain: "transport" }>): string | null {
+  scheduleTransport(action: Extract<PendingActionData, { domain: "transport" }>, recipients?: number[]): string | null {
     const superseded = this.pendingTransport?.commandId ?? null;
     this.pendingTransport = PendingAction.parse({ ...action, supersedesCommandId: superseded }) as typeof action;
+    if (recipients) this.transportRecipients.set(action.transport.transportRevision, new Set(recipients));
+    for (const revision of this.transportRecipients.keys()) if (revision !== this.transportState.transportRevision && revision !== action.transport.transportRevision) this.transportRecipients.delete(revision);
     this.pendingActionsCache = null;
     this.revisionCounter++;
     return superseded;
@@ -203,11 +234,12 @@ export class SessionState {
    * that does not wait for a common future moment: a scheduled silence is not a panic.
    */
   panic(): void {
+    const nextRevision = Math.max(this.transportState.transportRevision, this.pendingTransport?.transport.transportRevision ?? 0) + 1;
     this.pendingTransport = null;
     this.pendingMix = null;
     this.pendingAssignments.clear();
     this.pendingActionsCache = null;
-    this.transportState = stoppedTransport(this.transportState.transportRevision + 1, this.showRevision);
+    this.transportState = stoppedTransport(nextRevision, this.showRevision);
     this.revisionCounter++;
   }
 
@@ -215,20 +247,24 @@ export class SessionState {
   // building a snapshot, so a reader never sees a pending action whose time has already passed.
   applyDue(nowServerMs: number): void {
     if (this.pendingTransport && this.pendingTransport.effectiveServerMs <= nowServerMs) {
+      this.applied(this.pendingTransport.commandId);
       this.transportState = this.pendingTransport.transport;
       this.pendingTransport = null;
       this.pendingActionsCache = null;
       this.revisionCounter++;
     }
     if (this.pendingMix && this.pendingMix.effectiveServerMs <= nowServerMs) {
+      this.applied(this.pendingMix.commandId);
       this.channelState = this.pendingMix.channels;
       this.masterGainState = this.pendingMix.masterGain;
+      this.effectiveMixRevision = this.pendingMix.mixRevision;
       this.pendingMix = null;
       this.pendingActionsCache = null;
       this.revisionCounter++;
     }
     for (const [deviceId, entry] of [...this.pendingAssignments]) {
       if (entry.effectiveServerMs > nowServerMs) continue;
+      this.applied(entry.commandId);
       this.assignments.set(deviceId, entry.assignment);
       this.pendingAssignments.delete(deviceId);
       this.pendingActionsCache = null;
@@ -255,6 +291,15 @@ export class SessionState {
   applyStatus(deviceId: number, status: DeviceReadinessData): void {
     if (!this.readiness.has(deviceId)) return;
     this.readiness.set(deviceId, DeviceReadiness.parse({ ...status, deviceId }));
+    this.revisionCounter++;
+  }
+
+  chooseColumn(deviceId: number, column: "left" | "center" | "right" | null): void {
+    if (!this.isRegistered(deviceId)) return;
+    this.locations.set(deviceId, column === null ? defaultLocation(deviceId) : {
+      ...defaultLocation(deviceId), status: "coarse", column, mappingMode: "manual-column", x: null, y: null,
+    });
+    this.mapRevisionCounter++;
     this.revisionCounter++;
   }
 
@@ -333,34 +378,47 @@ export class SessionState {
   connectedDeviceIds(): number[] {
     return [...this.readiness.values()].filter(device => device.connected).map(device => device.deviceId);
   }
+  playbackDeviceIds(): number[] {
+    return this.connectedDeviceIds().filter(id => this.transportRecipients.get(this.transportState.transportRevision)?.has(id) ?? true);
+  }
 
   private base(clock: ServerClock) {
     return {
       protocolVersion: PROTOCOL_VERSION, sessionId: clock.sessionId, serverEpoch: clock.serverEpoch,
       revision: this.revisionCounter, serverMs: clock.nowServerMs(),
       show: this.show, transport: this.transportState, pendingActions: this.pendingActions,
+      mix: { mixRevision: this.effectiveMixRevision, masterGain: this.masterGainState },
     };
   }
 
   participantSnapshot(deviceId: number, clock: ServerClock): ParticipantSnapshotData | null {
+    this.applyDue(clock.nowServerMs());
     const readiness = this.readiness.get(deviceId);
     const assignment = this.assignments.get(deviceId);
     const location = this.locations.get(deviceId);
     if (!readiness || !assignment || !location) return null;
     const pendingActions = this.pendingActions.flatMap<PendingActionData>(action => {
+      if (action.domain === "transport" && action.transport.status === "playing" && this.transportRecipients.has(action.transport.transportRevision)
+        && !this.transportRecipients.get(action.transport.transportRevision)!.has(deviceId)) return [];
       if (action.domain !== "assignment") return [action];
       const assignments = action.assignments.filter(item => item.deviceId === deviceId);
       return assignments.length ? [{ ...action, assignments }] : [];
     });
-    return ParticipantSnapshot.parse({ ...this.base(clock), pendingActions, role: "participant", deviceId, readiness, assignment, location });
+    const excluded = this.transportState.status === "playing" && this.transportRecipients.has(this.transportState.transportRevision)
+      && !this.transportRecipients.get(this.transportState.transportRevision)!.has(deviceId);
+    return ParticipantSnapshot.parse({ ...this.base(clock), transport: excluded ? stoppedTransport(this.transportState.transportRevision, this.showRevision) : this.transportState,
+      pendingActions, role: "participant", deviceId, readiness, assignment, location });
   }
 
   adminSnapshot(clock: ServerClock): AdminSnapshotData {
+    this.applyDue(clock.nowServerMs());
     return AdminSnapshot.parse({
       ...this.base(clock), role: "admin",
       audienceMap: this.audienceMap,
       devices: [...this.readiness.values()],
       assignments: [...this.assignments.values()],
+      assignmentRevision: this.assignmentRevisionCounter,
+      appliedCommandIds: [...this.appliedCommands], ...this.adminContext(),
     });
   }
 }

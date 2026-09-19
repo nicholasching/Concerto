@@ -25,6 +25,10 @@ export const CommandContext = {
 };
 export const CommandAccepted = z.strictObject({
   ...SessionIdentity, commandId: Id, revision: Revision,
+  effectiveServerMs: Milliseconds.optional(), preparationId: Id.optional(),
+  supersededCommandIds: z.array(Id).optional(),
+  ready: z.number().int().nonnegative().optional(),
+  excluded: z.array(z.strictObject({ deviceId: DeviceId, reason: z.string() })).optional(),
 });
 
 export const Track = z.strictObject({
@@ -43,6 +47,7 @@ export const Clip = z.strictObject({
 export const Show = z.strictObject({
   showId: Id, showRevision: Revision, label: z.string(),
   tracks: z.array(Track), channels: z.array(Channel).min(1), clips: z.array(Clip),
+  cueMarkers: z.array(z.strictObject({ cueId: Id, label: z.string().min(1).max(100), positionMs: Milliseconds })).max(100).optional(),
 });
 export const Transport = z.discriminatedUnion("status", [
   z.strictObject({ status: z.literal("stopped"), transportRevision: Revision, showRevision: Revision, positionMs: z.literal(0), startServerMs: z.null() }),
@@ -113,6 +118,24 @@ export const JobProgress = z.strictObject({
   progress: z.number().min(0).max(1), message: z.string(),
 });
 
+export const PreparationStatus = z.strictObject({
+  preparationId: Id, domain: z.enum(["transport", "assets", "assignment", "calibration"]),
+  showRevision: Revision, transportRevision: Revision,
+  expectedIds: ParticipantIds, readyIds: ParticipantIds,
+  excluded: z.array(z.strictObject({ deviceId: DeviceId, reason: z.string() })),
+});
+export const CameraUploadReceipt = CameraInput.omit({ videoPath: true }).extend({
+  uploadId: Id, runId: Id, byteSize: z.number().int().positive(), label: z.string(),
+});
+export const CalibrationCreated = z.strictObject({ plan: CalibrationPlan, preparationId: Id });
+export const CalibrationResource = z.strictObject({
+  plan: CalibrationPlan, preparationId: Id,
+  status: z.enum(["created", "armed", "processing", "committed", "discarded"]),
+  startServerMs: Milliseconds.nullable(), uploads: z.array(CameraUploadReceipt),
+  reports: z.array(z.strictObject({ deviceId: DeviceId, completed: z.boolean(), maxFrameLatenessMs: Milliseconds, reason: z.string().nullable() })).default([]),
+});
+export const JobResource = z.strictObject({ progress: JobProgress, diagnostics: z.array(z.string()), result: OtcResult.nullable() });
+
 const pendingBase = { commandId: Id, effectiveServerMs: Milliseconds, supersedesCommandId: Id.nullable() };
 export const PendingAction = z.discriminatedUnion("domain", [
   z.strictObject({ ...pendingBase, domain: z.literal("transport"), transport: Transport }),
@@ -122,10 +145,15 @@ export const PendingAction = z.discriminatedUnion("domain", [
 const snapshotBase = {
   ...SessionIdentity, revision: Revision, serverMs: Milliseconds,
   show: Show, transport: Transport, pendingActions: z.array(PendingAction),
+  mix: z.strictObject({ mixRevision: Revision, masterGain: z.number().min(0).max(1) }).default({ mixRevision: 0, masterGain: 1 }),
 };
 export const AdminSnapshot = z.strictObject({
   ...snapshotBase, role: z.literal("admin"), audienceMap: AudienceMap,
   devices: z.array(DeviceReadiness), assignments: z.array(Assignment),
+  assignmentRevision: Revision.default(0),
+  preparations: z.array(PreparationStatus).default([]),
+  appliedCommandIds: z.array(Id).default([]),
+  calibration: CalibrationResource.nullable().default(null),
 });
 export const ParticipantSnapshot = z.strictObject({
   ...snapshotBase, role: z.literal("participant"), deviceId: DeviceId,
@@ -135,7 +163,7 @@ export const Snapshot = z.discriminatedUnion("role", [AdminSnapshot, Participant
 
 export const AssignmentRequest = z.strictObject({
   ...CommandContext, mapRevision: Revision, deviceIds: ParticipantIds.min(1),
-  channelId: Id.nullable(), effectiveServerMs: Milliseconds,
+  channelId: Id.nullable(), effectiveServerMs: Milliseconds, preparationId: Id.optional(),
 });
 export const TransportRequest = z.strictObject({
   ...CommandContext, action: z.enum(["prepare", "play", "pause", "seek", "stop"]),
@@ -149,4 +177,4 @@ export const PanicRequest = z.strictObject(CommandContext);
 export const CalibrationCreateRequest = z.strictObject({ ...CommandContext, participantIds: ParticipantIds.min(1), palette: Palette, paletteVersion: Id });
 export const CalibrationArmRequest = z.strictObject({ ...CommandContext, runId: Id, preparationId: Id, effectiveServerMs: Milliseconds });
 export const CommitMapRequest = z.strictObject({ ...CommandContext, runId: Id, expectedMapRevision: Revision, jobId: Id });
-export const CreateJobRequest = z.strictObject({ ...CommandContext, runId: Id, uploadIds: z.array(Id).min(1).max(3) });
+export const CreateJobRequest = z.strictObject({ ...CommandContext, runId: Id, uploadIds: z.array(Id).min(1).max(3), evidence: z.enum(["physical", "synthetic"]).default("physical") });

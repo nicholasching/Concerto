@@ -16,6 +16,7 @@ import { Preparations } from "../src/preparations";
 import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
 import { SessionState } from "../src/state";
+import { handleClientMessage } from "../src/messages";
 
 const SESSION = "session-under-test";
 const SECRET = "operator-secret-for-tests";
@@ -60,13 +61,14 @@ const prepared = async () => {
   const clock: ServerClock = { sessionId: SESSION, serverEpoch: EPOCH, nowServerMs: () => serverMs };
   const state = new SessionState();
   const connections = new ConnectionRegistry();
+  const preparations = new Preparations();
   const app = createApp({
     clock, state, connections, operatorSecret: SECRET,
     registry: new DeviceRegistry(),
     store: new CheckpointStore(joinPath(directory, "checkpoint.json")),
     joins: new RateLimiter(100, 100, () => serverMs),
     commands: new CommandLog(),
-    preparations: new Preparations(),
+    preparations,
     assets: new AssetStore(joinPath(directory, "assets")),
     uploads: new AssetStore(joinPath(directory, "uploads")),
     calibrations: new CalibrationRuns(),
@@ -90,12 +92,12 @@ const prepared = async () => {
     sockets.set(deviceId, socket);
     connections.bindParticipant(deviceId, socket);
   }
-  return { app, state, connections, clock, sockets };
+  return { app, state, connections, clock, sockets, preparations };
 };
 
 const assign = (app: Awaited<ReturnType<typeof prepared>>["app"], body: {
   commandId: string; expectedRevision: number; deviceIds: number[]; channelId: string | null;
-  mapRevision?: number; effectiveServerMs?: number;
+  mapRevision?: number; effectiveServerMs?: number; preparationId?: string;
 }) =>
   app.request("/api/assignments", {
     method: "POST",
@@ -120,6 +122,24 @@ const mix = (app: Awaited<ReturnType<typeof prepared>>["app"], body: {
   });
 
 describe("assignments", () => {
+  test("a live switch requires matching preparation and excludes phones missing the new channel", async () => {
+    const context = await prepared();
+    context.state.scheduleTransport({ domain: "transport", commandId: "playing", effectiveServerMs: serverMs,
+      supersedesCommandId: null, transport: { status: "playing", transportRevision: 2, showRevision: 1, positionMs: 0, startServerMs: serverMs } }, [0, 1, 2]);
+    context.state.applyDue(serverMs);
+    const body = { commandId: "switch", expectedRevision: 0, mapRevision: 0, deviceIds: [0, 1], channelId: "melody", effectiveServerMs: serverMs + 5000 };
+    expect((await assign(context.app, body)).status).toBe(409);
+    const response = await context.app.request("/api/assignments/prepare", { method: "POST", headers: { "content-type": "application/json", "x-operator-secret": SECRET },
+      body: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: EPOCH, ...body, commandId: "prepare-switch" }) });
+    const prep = CommandAccepted.parse(await response.json());
+    for (const deviceId of [0, 1]) handleClientMessage({ clock: context.clock, receivedServerMs: serverMs, state: context.state, preparations: context.preparations, deviceId,
+      raw: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: EPOCH, messageId: `ack-${deviceId}`, type: "assignment.ready",
+        payload: { preparationId: prep.preparationId, assignmentRevision: 1, ready: deviceId === 0, reason: deviceId === 0 ? null : "assets-missing" } }) });
+    const accepted = CommandAccepted.parse(await (await assign(context.app, { ...body, preparationId: prep.preparationId })).json());
+    expect(accepted.ready).toBe(1); expect(accepted.excluded).toEqual([{ deviceId: 1, reason: "assets-missing" }]);
+    context.state.applyDue(body.effectiveServerMs); expect(context.state.channelMembers("melody")).toEqual([0]);
+    expect(CommandAccepted.parse(await (await assign(context.app, { ...body, preparationId: prep.preparationId })).json())).toEqual(accepted);
+  });
   test("a phone joins a channel by being assigned, and membership is server-owned", async () => {
     const context = await prepared();
     const effectiveServerMs = serverMs + 5000;
@@ -233,6 +253,15 @@ describe("assignments", () => {
 });
 
 describe("mix", () => {
+  test("empty, missing, or duplicate channel sets cannot corrupt the authoritative show", async () => {
+    const context = await prepared();
+    for (const channels of [[], [show().channels[0]], [show().channels[0], show().channels[0]]]) {
+      const response = await mix(context.app, { commandId: crypto.randomUUID(), expectedRevision: 0, channels });
+      expect(response.status).toBe(400); expect((await response.json()).error.code).toBe("INVALID_MIX");
+    }
+    expect(context.state.pendingActions).toEqual([]);
+    expect(context.state.adminSnapshot(context.clock).show.channels).toHaveLength(2);
+  });
   test("a mix change applies at its moment without touching asset timing", async () => {
     const context = await prepared();
     const effectiveServerMs = serverMs + 5000;

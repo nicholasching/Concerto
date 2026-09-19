@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { AudioContextHost, DecodedBudget, isAudioContextPaused, PlaybackEngine, preloadTracks, type LoadedTrack } from "@orchestra/audio";
-import type { ShowData } from "@orchestra/contracts";
+import { ClientMessage, type ShowData } from "@orchestra/contracts";
+import { ClockSync } from "@orchestra/sync";
 import { CalibrationSession, type CalibrationPhase } from "../lib/calibration";
 import { browserSocket, ParticipantConnection, type ConnectionState } from "../lib/connection";
-import { fixtureClock } from "../lib/fixture-clock";
 import { FlashRenderer } from "../lib/flash-renderer";
 import { unlockWithin } from "../lib/audio-unlock";
 import { browserStorage, joinSession } from "../lib/join";
@@ -13,19 +13,15 @@ import { ShowControl, type PlaybackView } from "../lib/show-control";
 import { participantStatus } from "../lib/status";
 import { CalibrationOverlay } from "./calibration-overlay";
 
-const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-const wsUrl = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8080/ws";
-const sessionId = process.env.NEXT_PUBLIC_SESSION_ID ?? "demo";
+const api = process.env.NEXT_PUBLIC_API_URL ?? (typeof window === "undefined" ? "http://localhost:8080" : `${window.location.protocol}//${window.location.hostname}:8080`);
+const wsUrl = process.env.NEXT_PUBLIC_WS_URL ?? `${api.replace(/^http/, "ws")}/ws`;
 const mock = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCKS === "1";
-// Calibration and playback use only the server clock. Team 1's clock isn't wired in yet, so production has
-// none and answers "clock". Mock mode uses the labelled local fixture clock.
-const serverClock = mock ? fixtureClock : null;
 const timers = { setTimeout: (callback: () => void, ms: number) => window.setTimeout(callback, ms), clearTimeout: (handle: unknown) => window.clearTimeout(handle as number) };
 
 function calibrationLabel(phase: CalibrationPhase, optedOut: boolean): string {
   if (optedOut) return "Calibration: skipped";
   switch (phase.kind) {
-    case "idle": return serverClock ? "Calibration: waiting for the operator" : "Calibration: not available until the server clock is connected";
+    case "idle": return "Calibration: waiting for the operator";
     case "prepared": return "Calibration: ready, waiting for the start";
     case "armed": return "Calibration: running";
     case "finished": return phase.completed ? "Calibration: done" : `Calibration: didn't finish (${phase.reason})`;
@@ -63,6 +59,12 @@ function connectionLabel(state: ConnectionState): string {
 
 export default function Page() {
   const connection = useRef<ParticipantConnection | null>(null);
+  const [serverClock] = useState(() => new ClockSync({ send: payload => {
+    const snapshot = connection.current?.current.snapshot;
+    if (snapshot) connection.current?.send({ protocolVersion: 1, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch,
+      messageId: crypto.randomUUID(), type: "clock.probe", payload });
+  } }));
+  const [clockQuality, setClockQuality] = useState(serverClock.quality());
   const host = useRef<AudioContextHost | null>(null);
   const cache = useRef(new Map<string, LoadedTrack>());
   const budget = useRef(new DecodedBudget());
@@ -99,7 +101,7 @@ export default function Page() {
       },
       facts: () => ({
         audioRunning: host.current?.state === "running",
-        clockUsable: serverClock !== null,
+        clockUsable: document.visibilityState === "visible" && serverClock.quality().ready,
         verified: (trackId, sha256) => cache.current.get(trackId)?.sha256 === sha256,
       }),
       preload: async showToLoad => {
@@ -113,17 +115,19 @@ export default function Page() {
     showControl.current = control;
     const client = new ParticipantConnection({
       wsUrl,
-      join: () => joinSession({ api, sessionId, storage: browserStorage() }),
+      join: () => joinSession({ api, sessionId: new URLSearchParams(window.location.search).get("session") ?? process.env.NEXT_PUBLIC_SESSION_ID ?? (mock ? "demo" : "dev-session"), storage: browserStorage() }),
       openSocket: browserSocket,
       onChange: state => {
         // A run can't survive losing the socket or a server restart.
-        if (state.status.kind !== "connected") { session.abort("disconnected"); control.disconnected(); }
+        if (state.status.kind !== "connected") { session.abort("disconnected"); control.disconnected(); serverClock.stop(); }
+        else if (state.snapshot) serverClock.start(state.snapshot.serverEpoch);
         setConn(state);
       },
       onMessage: message => {
-        if (message.type === "calibration.prepare") {
-          session.onPrepare(message, { foreground: document.visibilityState === "visible", clockUsable: serverClock !== null, optedOut: optedOutRef.current });
-        } else if (message.type === "calibration.arm" && serverClock) {
+        if (message.type === "clock.reply") serverClock.accept({ ...message.payload, serverEpoch: message.serverEpoch });
+        else if (message.type === "calibration.prepare") {
+          session.onPrepare(message, { foreground: document.visibilityState === "visible", clockUsable: serverClock.quality().ready, optedOut: optedOutRef.current });
+        } else if (message.type === "calibration.arm" && serverClock.quality().ready) {
           session.onArm(message, serverClock.nowServerMs());
         } else {
           control.handle(message);
@@ -136,7 +140,7 @@ export default function Page() {
       const visible = document.visibilityState === "visible";
       setForeground(visible);
       if (!visible) session.abort("hidden");
-      if (visible) client.wake();
+      if (visible) { serverClock.refresh(); client.wake(); }
     };
     const onOnline = () => client.wake();
     onVisibility();
@@ -147,6 +151,7 @@ export default function Page() {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("online", onOnline);
       client.stop();
+      serverClock.stop();
     };
   }, []);
 
@@ -162,12 +167,13 @@ export default function Page() {
   }, [connected, conn.snapshot?.serverEpoch]);
   useEffect(() => {
     if (!conn.identity || !connected) return;
-    reporter.current?.update(buildReadiness(conn.identity.deviceId, { connected, foreground, clock: null, audioState, verifiedHashes }));
-  }, [conn.identity, connected, foreground, audioState, verifiedHashes, conn.snapshot?.serverEpoch]);
+    reporter.current?.update(buildReadiness(conn.identity.deviceId, { connected, foreground, clock: clockQuality, audioState, verifiedHashes }));
+  }, [conn.identity, connected, foreground, clockQuality, audioState, verifiedHashes, conn.snapshot?.serverEpoch]);
   useEffect(() => () => reporter.current?.dispose(), []);
 
   // Preload the show once audio is unlocked; only hash-verified tracks count.
   const show = conn.snapshot?.show;
+  const showKey = JSON.stringify([show?.showId, show?.showRevision, show?.tracks]);
   useEffect(() => {
     const audio = host.current;
     if (!show || audioState !== "running" || !audio) return;
@@ -179,40 +185,40 @@ export default function Page() {
       setAssetNote(failures.length ? `Failed: ${failures.map(failure => failure.message).join("; ")}` : null);
     });
     return () => { cancelled = true; };
-  }, [show, audioState]);
+  }, [showKey, audioState]);
 
   // Every new authoritative snapshot rebuilds playback state (reconnect, late join).
   useEffect(() => {
-    if (conn.snapshot) showControl.current?.applySnapshot(conn.snapshot);
-  }, [conn.snapshot]);
+    if (connected && conn.snapshot) showControl.current?.applySnapshot(conn.snapshot);
+  }, [conn.snapshot, connected]);
 
   // The engine exists only while audio runs and a server clock exists. It is rebuilt when verified
   // tracks change, so a finished preload is picked up; a resumed context gets a fresh engine too.
   useEffect(() => {
     const audio = host.current;
     const control = showControl.current;
-    if (!audio || !control || audioState !== "running" || !serverClock) return;
+    if (!audio || !control || audioState !== "running" || !connected || !clockQuality.ready) return;
     const engine = new PlaybackEngine({ ctx: audio.context(), output: audio.masterGain, clock: serverClock, buffer: trackId => cache.current.get(trackId)?.buffer });
     control.attach(engine);
     const housekeeping = window.setInterval(() => engine.tick(), 1000);
     return () => { window.clearInterval(housekeeping); control.attach(null); engine.dispose(); };
-  }, [audioState, verifiedHashes]);
+  }, [audioState, verifiedHashes, connected, clockQuality.ready, conn.snapshot?.serverEpoch]);
 
   // Refresh the playback display (playhead, countdowns, received commands) whether or not audio runs.
   useEffect(() => {
-    const refresh = window.setInterval(() => setTick(value => value + 1), 250);
+    const refresh = window.setInterval(() => { setTick(value => value + 1); setClockQuality(serverClock.quality()); }, 250);
     return () => window.clearInterval(refresh);
   }, []);
 
   // Run the flash only while armed. The renderer paints the overlay directly, one colour per frame.
   useEffect(() => {
-    if (phase.kind !== "armed" || !serverClock) return;
+    if (phase.kind !== "armed" || !clockQuality.ready) return;
     const session = calibration.current!;
     let wakeLock: WakeLockSentinel | null = null;
     navigator.wakeLock?.request("screen").then(lock => { wakeLock = lock; }, () => {});
     const renderer = new FlashRenderer({
       clock: serverClock,
-      clockUsable: () => serverClock !== null,
+      clockUsable: () => serverClock.quality().ready,
       run: phase.run,
       packet: phase.packet,
       frames: { request: callback => requestAnimationFrame(callback), cancel: handle => cancelAnimationFrame(handle as number) },
@@ -246,7 +252,7 @@ export default function Page() {
   }
 
   const identity = conn.identity;
-  const readiness = identity ? buildReadiness(identity.deviceId, { connected, foreground, clock: null, audioState, verifiedHashes }) : null;
+  const readiness = identity ? buildReadiness(identity.deviceId, { connected, foreground, clock: clockQuality, audioState, verifiedHashes }) : null;
   const tracks = show?.tracks ?? [];
   const assetsVerified = tracks.length > 0 && tracks.every(track => verifiedHashes[track.trackId] === track.sha256);
   const checks: [string, boolean][] = readiness ? [
@@ -270,18 +276,26 @@ export default function Page() {
       {(kind === "gave-up" || kind === "replaced") && <button type="button" onClick={() => connection.current?.retry()}>{kind === "replaced" ? "Use this tab instead" : "Tap to reconnect"}</button>}
       {conn.snapshot && readiness && <p>{participantStatus({ ...conn.snapshot, readiness })}</p>}
       <ul className="checks">{checks.map(([label, ok]) => <li key={label} className={ok ? "ok" : "no"}>{ok ? "✓" : "✗"} {label}</li>)}</ul>
-      <p>The clock sync comes from Team 1 and isn&apos;t connected yet, so &quot;Clock synced&quot; stays off.</p>
+      <p>Keep this page open and your phone volume up. Calibration uses an eleven-second color pattern; you can skip it and choose your column.</p>
+      {clockQuality.ready && <p>Clock uncertainty: {clockQuality.uncertaintyMs?.toFixed(1)} ms</p>}
       {identity && audioState !== "running" && <button type="button" onClick={enableSound}>{isAudioContextPaused(audioState) ? "Tap to resume sound" : "Enable sound"}</button>}
       {audioNote && <p role="alert">{audioNote}</p>}
       {assetNote && <p>{assetNote}</p>}
       <p>{calibrationLabel(phase, optedOut)}</p>
       {identity && phase.kind !== "armed" && <button type="button" onClick={toggleSkip}>{optedOut ? "Take part in calibration" : "Skip calibration"}</button>}
+      {connected && phase.kind !== "armed" && <label>My column (facing the stage)
+        <select aria-label="My column" value={conn.snapshot?.location.mappingMode === "manual-column" ? conn.snapshot.location.column ?? "" : ""} onChange={event => {
+          const snapshot = connection.current?.current.snapshot;
+          if (snapshot) connection.current?.send(ClientMessage.parse({ protocolVersion: 1, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch,
+            messageId: crypto.randomUUID(), type: "participant.column", payload: { column: event.target.value || null } }));
+        }}><option value="">No manual choice</option><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select>
+      </label>}
     </section>
     {playback && <section>
       <h2><span className="swatch" style={{ background: playback.color ?? "transparent" }} /> Channel: {playback.channel}</h2>
       <p className="status">{playback.transport}</p>
       {playback.pending.map(line => <p key={line}>{line}</p>)}
-      {!serverClock && <p>Playback needs the server clock from Team 1, so this phone stays silent for now.</p>}
+      {!clockQuality.ready && <p>Synchronizing with the show. Sound stays off until the clock is ready.</p>}
       {serverClock && audioState !== "running" && <p>Enable sound to play your part.</p>}
     </section>}
     {phase.kind === "armed" && <CalibrationOverlay surface={surface} text={surfaceText} onSkip={toggleSkip} />}

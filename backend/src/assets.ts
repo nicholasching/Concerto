@@ -3,6 +3,7 @@ import { mkdir, rename, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 
 export const assetsPath = () => process.env.ASSETS_PATH ?? "runtime/assets";
+export class UploadTooLarge extends Error {}
 
 // IDs are server-assigned, but the id in a GET comes from the network, so no path is ever built
 // from client input without passing this first.
@@ -20,7 +21,7 @@ export class AssetStore {
    * one piece. The bytes land under a temporary name and are renamed only once the stream ends,
    * so an interrupted upload cannot be mistaken for a complete asset.
    */
-  async write(assetId: string, body: ReadableStream<Uint8Array>): Promise<{ sha256: string; byteSize: number }> {
+  async write(assetId: string, body: ReadableStream<Uint8Array>, maxBytes = 1024 * 1024 * 1024): Promise<{ sha256: string; byteSize: number }> {
     const target = this.path(assetId);
     if (!target) throw new Error(`Unsafe asset id: ${assetId}`);
     await mkdir(this.directory, { recursive: true });
@@ -36,9 +37,11 @@ export class AssetStore {
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
-        hash.update(value);
         byteSize += value.byteLength;
+        if (byteSize > maxBytes) { await reader.cancel(); throw new UploadTooLarge("Upload exceeds the declared size or file limit."); }
+        hash.update(value);
         sink.write(value);
+        await sink.flush();
       }
       await sink.end();
     } catch (cause) {

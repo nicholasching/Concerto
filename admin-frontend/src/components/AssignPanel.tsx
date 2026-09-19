@@ -4,20 +4,20 @@ import { useAdapter } from "../lib/useSnapshot";
 import { MapPanel } from "./MapPanel";
 import type { AdminSnapshotData } from "@orchestra/contracts";
 import type { DeviceSelection } from "@orchestra/selection";
-import { nowServerMs } from "../lib/clock";
+import { futureServerMs } from "../lib/clock";
 
 export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData; refresh: () => Promise<void> }) {
   const adapter = useAdapter();
   const [selected, setSelected] = useState<DeviceSelection | null>(null);
   const [channelId, setChannelId] = useState<string>(snapshot.show.channels[0]?.channelId ?? "");
-  const [effectiveDelay, setEffectiveDelay] = useState(3);
+  const [effectiveDelay, setEffectiveDelay] = useState(4);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [undo, setUndo] = useState<Map<string | null, number[]> | null>(null);
 
   function futureMs(delaySeconds: number) {
     // Schedule relative to the server clock; the harness applies when serverMs reaches it.
-    return nowServerMs() + Math.max(3, delaySeconds) * 1000;
+    return futureServerMs(delaySeconds);
   }
 
   async function assign(channel: string | null, delaySeconds: number, selection: DeviceSelection | null, rememberPrevious = true): Promise<boolean> {
@@ -33,7 +33,7 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
       }
       if (rememberPrevious) setUndo(previous);
       const result = await adapter.sendAssignment({ deviceIds, channelId: channel, mapRevision, effectiveServerMs: futureMs(delaySeconds) });
-      setStatus(`Sent assignment of ${deviceIds.length} phones to ${channel ?? "(clear)"} — pending. command ${result.commandId.slice(0, 8)}.`);
+      setStatus(`Scheduled ${result.ready ?? deviceIds.length} phones to ${channel ?? "(clear)"}. Excluded: ${result.excluded?.map(item => `${item.deviceId}: ${item.reason}`).join(", ") || "none"}.`);
       await refresh();
       return true;
     } catch (e) {
@@ -68,6 +68,14 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
         drawable
         onSelection={setSelected}
       />
+      <div className="actions">{(["left", "center", "right"] as const).map(column => <button key={column} onClick={() => setSelected({ mapRevision: snapshot.audienceMap.mapRevision,
+        deviceIds: snapshot.audienceMap.locations.filter(location => location.column === column && (location.status === "localized" || location.status === "coarse")).map(location => location.deviceId) })}>Select {column} column (includes manual choices)</button>)}</div>
+      <details><summary>Phones without a full position</summary>{snapshot.audienceMap.locations.filter(location => location.status !== "localized").map(location => <label key={location.deviceId} style={{ display: "block" }}>
+        <input type="checkbox" checked={selected?.deviceIds.includes(location.deviceId) ?? false} onChange={e => setSelected({ mapRevision: snapshot.audienceMap.mapRevision,
+          deviceIds: e.target.checked ? [...new Set([...(selected?.deviceIds ?? []), location.deviceId])] : (selected?.deviceIds ?? []).filter(id => id !== location.deviceId) })} />
+        Device {location.deviceId}: {location.column ?? "unknown column"} · {location.status} · {location.mappingMode}
+      </label>)}</details>
+      <p>Selection: {selected?.deviceIds.length ?? 0} phones, map revision {selected?.mapRevision ?? "—"}. {selected && selected.mapRevision !== snapshot.audienceMap.mapRevision && "Map changed: select again."}</p>
       <div className="actions">
         <label>Channel
           <select value={channelId} onChange={e => setChannelId(e.target.value)}>
@@ -76,7 +84,7 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
         </label>
         <span className="swatch" style={{ background: channelColor }} />
         <label>Apply in
-        <input type="number" min={3} value={effectiveDelay} onChange={e => setEffectiveDelay(Math.max(3, Number(e.target.value)))} /> seconds
+        <input type="number" min={4} value={effectiveDelay} onChange={e => setEffectiveDelay(Math.max(4, Number(e.target.value)))} /> seconds after preparation
         </label>
         <button onClick={() => assign(channelId, effectiveDelay, selected)}>Assign {selected?.deviceIds.length ?? 0} phones</button>
         <button onClick={() => assign(null, effectiveDelay, selected)}>Clear assignment</button>

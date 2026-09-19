@@ -29,6 +29,8 @@ function pointInPolygon(point: SelectionPoint, polygon: SelectionPoint[]): boole
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const xi = polygon[i].x, yi = polygon[i].y;
     const xj = polygon[j].x, yj = polygon[j].y;
+    const cross = (point.x - xi) * (yj - yi) - (point.y - yi) * (xj - xi);
+    if (Math.abs(cross) <= 1e-10 && point.x >= Math.min(xi, xj) && point.x <= Math.max(xi, xj) && point.y >= Math.min(yi, yj) && point.y <= Math.max(yi, yj)) return true;
     const intersects = ((yi > point.y) !== (yj > point.y)) && (point.x <= (xj - xi) * (point.y - yi) / (yj - yi) + xi);
     if (intersects) inside = !inside;
   }
@@ -56,13 +58,13 @@ export const selectDevices: SelectDevices = (locations, polygon, mapRevision, op
   for (const location of locations) {
     const point = locationPoint(location);
     if (!point) {
-      if (!includeLocalizedOnly && location.deviceId !== undefined) ids.push(location.deviceId);
       continue;
     }
     if (pointInPolygon(point, polygon)) ids.push(location.deviceId);
   }
   // Deduplicate while preserving discovery order. IDs are unique per location, but guard anyway.
   const seen = new Set<number>();
+  void includeLocalizedOnly; // A region cannot locate a phone with null coordinates.
   const unique = ids.filter(id => seen.has(id) ? false : (seen.add(id), true));
   return { mapRevision, deviceIds: unique };
 };

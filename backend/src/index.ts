@@ -45,6 +45,8 @@ if (restored) {
   for (const device of restored.devices) state.register(device.deviceId);
   if (restored.show) state.restoreShow(restored.show);
   if (restored.map) state.restoreMap(restored.map, restored.committedRunTag);
+  state.restoreAssignments(restored.assignments);
+  calibrations.restoreNextTag(Math.max(restored.nextRunTag, (restored.committedRunTag ?? -1) + 1));
 }
 if (!process.env.OPERATOR_SECRET) {
   console.warn("OPERATOR_SECRET is unset: every operator request will be refused.");
@@ -58,6 +60,7 @@ const app = createApp({
 const server = Bun.serve<SocketData, string>({
   hostname: process.env.HOST ?? "127.0.0.1",
   port,
+  maxRequestBodySize: 1024 * 1024 * 1024,
   fetch(request, server) {
     const url = new URL(request.url);
     if (url.pathname !== "/ws") return app.fetch(request);
@@ -100,14 +103,22 @@ const server = Bun.serve<SocketData, string>({
       preparations.excludeEverywhere(ws.data.deviceId, "disconnected before acknowledging");
       telemetry.mark();
     },
-    message(ws, raw) {
+    async message(ws, raw) {
       const receivedServerMs = clock.nowServerMs();
-      if (ws.data.role === "operator") return;
+      if (ws.data.role === "operator") {
+        try { if (JSON.parse(String(raw)).type !== "clock.probe") return; } catch { return; }
+        const reply = handleClientMessage({ raw: String(raw), receivedServerMs, clock, deviceId: -1, state });
+        if (reply.type === "clock.reply") ws.send(JSON.stringify(reply));
+        return;
+      }
       if (connections.participantSocket(ws.data.deviceId) !== ws) return;
+      const mapRevision = state.mapRevision;
       const reply = handleClientMessage({
         raw: String(raw), receivedServerMs, clock, deviceId: ws.data.deviceId, state, preparations, calibrations,
       });
       if (reply.type !== "clock.reply") telemetry.mark();
+      if (mapRevision !== state.mapRevision) await store.save(registry.toCheckpoint(clock.sessionId, state.durableShow,
+        state.audienceMap, state.lastCommittedRunTag, state.durableAssignments, calibrations.nextTag));
       ws.send(JSON.stringify(reply));
     },
   },
@@ -132,6 +143,7 @@ setInterval(() => {
   const before = state.revision;
   state.applyDue(now);
   if (state.revision !== before) telemetry.mark();
+  telemetry.mark();
   if (connections.operatorCount === 0 || !telemetry.due(now)) return;
   connections.broadcastToOperators(JSON.stringify({
     protocolVersion: 1, sessionId: clock.sessionId, serverEpoch: clock.serverEpoch,

@@ -17,16 +17,18 @@ CASES = ("clean", "degraded", "wrong-tag", "duplicates", "crossing", "rotated", 
          "perspective", "perspective-undersized")
 
 
-def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, height=360, seed=7):
+def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, height=360, seed=7, manifest_path=None):
     if case not in CASES or not 1 <= count <= 2048 or fps not in (24, 30, 60):
         raise ValueError("Unsupported fixture case/count/FPS")
     if min(width, height) < 120 or width % 2 or height % 2:
         raise ValueError("Fixture dimensions must be even and at least 120 pixels")
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    manifest = copy.deepcopy(json.loads((ROOT / "fixtures/otc/clean-30/manifest.json").read_text()))
-    manifest["runId"] = f"synthetic-{case}-{seed}"
-    ids = ([0, 2047, 1024, 1] + [i for i in range(2, 2047) if i != 1024])[:count]
+    manifest = copy.deepcopy(json.loads((Path(manifest_path) if manifest_path else ROOT / "fixtures/otc/clean-30/manifest.json").read_text()))
+    if not manifest_path:
+        manifest["runId"] = f"synthetic-{case}-{seed}"
+    ids = manifest["participantIds"] if manifest_path else ([0, 2047, 1024, 1] + [i for i in range(2, 2047) if i != 1024])[:count]
+    count = len(ids)
     manifest["participantIds"] = ids
     words = json.loads((ROOT / "packages/contracts/generated/otc-codebook.json").read_text())
     rng = np.random.default_rng(seed)
@@ -176,6 +178,7 @@ if __name__ == "__main__":
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=360)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--manifest-path", type=Path, help="Use a live test run's identities and tag; generated clips remain synthetic.")
     args = parser.parse_args()
     generate_capture(**vars(args))
     print(json.dumps({"manifest": str(args.output_dir / "manifest.json"),
