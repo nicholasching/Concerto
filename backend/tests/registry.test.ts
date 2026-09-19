@@ -9,6 +9,8 @@ import type { ServerClock } from "../src/clock";
 import { DeviceRegistry, MAX_DEVICES } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
 import { CommandLog } from "../src/commands";
+import { ConnectionRegistry } from "../src/connections";
+import { Preparations } from "../src/preparations";
 import { SessionState } from "../src/state";
 
 const SESSION = "session-under-test";
@@ -37,6 +39,8 @@ const harness = (options: { capacity?: number; refillPerSecond?: number } = {}) 
     joins: new RateLimiter(options.capacity ?? 100, options.refillPerSecond ?? 100, () => serverMs),
     state: new SessionState(),
     commands: new CommandLog(),
+    connections: new ConnectionRegistry(),
+    preparations: new Preparations(),
   });
   return { app, registry, store, clock: serverClock };
 };

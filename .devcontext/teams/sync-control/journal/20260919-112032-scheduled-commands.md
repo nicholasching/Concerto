@@ -156,7 +156,61 @@ succeeded returns its original result even though the revision it expected has s
 `tsc` rejected an untyped `CommandLog.get` call in a test where the generic defaulted to `unknown`.
 Caught by the gate before commit. Typed the call rather than loosening the signature.
 
+### Step 3B implemented
+
+- `backend/src/barriers.ts`: a `Barrier` per preparation, holding expected, ready and excluded sets.
+- `backend/src/preparations.ts`: one active preparation per domain. Starting a new one discards the
+  old barrier, which is precisely what stops a late acknowledgement from satisfying the current one.
+- `backend/src/transport.ts`: the transport state transitions, with `startServerMs` always the
+  scheduled future moment.
+- `backend/src/state.ts`: pending actions per domain, and `applyDue(now)` promoting a pending action
+  when its moment arrives. Called by the scheduler interval and before each command.
+- `POST /api/transport` with prepare, play, pause, seek and stop.
+
+Decisions taken while implementing:
+
+1. **Only `play` is gated on readiness.** Stop, pause and seek schedule directly. Requiring a
+   barrier before stopping would mean a phone that is not answering could delay a stop, which is
+   the opposite of what a stop is for.
+2. **All transport changes are scheduled, including stop.** One rule to reason about, and a stop
+   lands at the same moment everywhere rather than smearing across the hall. Panic, which is
+   immediate by design, arrives in slice 5 and is deliberately a different mechanism.
+3. **A command from a previous epoch is refused** with a retryable `STALE_EPOCH`. Its effective
+   time was computed against a clock origin that no longer exists.
+4. **Saving a show advances the transport revision**, because the transport now points at a new
+   show revision. An operator must re-read after saving rather than reusing the revision it had.
+   Recorded in the handoff; this caught out my own live check before it caught out Team 4.
+
+### Checks run
+
+- `bun test backend/tests` - 68 pass, 0 fail.
+- `bun run gate:sync` - PASS, 98 tests across backend, sync and testkit; backend bundle built.
+- Live end-to-end against the running server, two phones with sockets: show saved; prepare
+  delivered `transport.prepare` to both; only Alice acknowledged; a cue 500 ms out was refused with
+  `INSUFFICIENT_LEAD_TIME`; a cue 4 s out was accepted; `transport.commit` reached Alice and not
+  silent Bob; Bob's snapshot still contained the pending cue with the same effective time; after the
+  moment passed the transport was playing with `startServerMs` exactly equal to the scheduled time
+  and the pending action cleared. Loopback, one machine, no audio.
+
+### Failures encountered
+
+- The live check sent `expectedRevision: 0` for the transport after saving a show, and the server
+  refused it. The server was right: the show save had advanced the transport revision. Fixed the
+  check to read the current revision from a snapshot. Third harness bug of the day that first
+  looked like a server bug.
+- `tsc` and ESLint each caught one mistake before commit: a duplicated import introduced by a
+  scripted edit, and a type alias left unused after refactoring.
+
+### Known gap, needs a contract decision
+
+The frozen snapshot has nowhere to report ready, expected and excluded counts to the operator.
+The server tracks them, but `AdminSnapshot` has no field for them, so Team 4 cannot render
+"1,420 ready, 80 not answering" today. The commit path does not need it: the server always runs
+the ready subset and the operator decides when. Exposing the counts needs either a field on
+`AdminSnapshot` or a new server message, which is a captain-owned contract change and needs Team 4
+in the conversation. Raised in the handoff; not invented unilaterally.
+
 ## Next action
 
-Step 3B: preparation barriers and scheduled transport, including ready/expected/excluded counts and
-the three-second minimum lead time.
+Step 3C: assignments, server-owned channel membership and mix, including the rule that a mix change
+cannot cancel an accepted transport start.

@@ -32,6 +32,43 @@ that device's claimed readiness, so an operator never reads a vanished phone as 
 The session starts with a **placeholder show**: one channel, no tracks, no clips, `showRevision` 0.
 Team 4's first saved show replaces it wholesale; it is not content to build on.
 
+## Commands and cues
+
+```text
+PUT  /api/show        header x-operator-secret   stopped transport only
+POST /api/transport   header x-operator-secret   action prepare | play | pause | seek | stop
+```
+
+Every command carries `commandId`, `expectedRevision` and the current `serverEpoch`.
+
+1. **`expectedRevision` is the revision of the domain you are changing**, not the snapshot's
+   top-level `revision`. A show save names the current `showRevision`; a transport command names
+   the current `transportRevision`. The top-level revision moves every time any phone reports its
+   status, so comparing against it would refuse every command in a full hall. See the
+   [ADR](../../decisions/20260919-112032-sync-control-expected-revision.md).
+2. **Saving a show advances the transport revision.** Re-read the snapshot after a save instead of
+   reusing the revision you had.
+3. **Retry with the same `commandId`** and you get the original result, applied once. Use a new ID
+   only when you mean a new command.
+4. **A command from a previous epoch is refused** with a retryable `STALE_EPOCH`. Resynchronize and
+   reissue rather than retrying blindly.
+5. **Cues must be at least 3000 ms in the future** (configurable, `INSUFFICIENT_LEAD_TIME` below
+   that). Schedule against `effectiveServerMs` using the estimator's clock, never against arrival.
+
+Starting playback requires a preparation: send `prepare`, let phones answer `transport.ready`
+naming that exact `preparationId` with matching show and transport revisions, then send `play`.
+Only phones that acknowledged receive the start cue. Stop, pause and seek need no preparation, so a
+silent phone can never delay a stop. The server never fires on a timeout; the operator decides when,
+and the ready subset is what runs.
+
+A phone that missed a broadcast is not stranded: the same cue is in `pendingActions` in its
+snapshot, with the same `effectiveServerMs`.
+
+**Open contract gap for the captain and Team 4:** the server tracks ready, expected and excluded
+counts per preparation, but `AdminSnapshot` has no field to report them, so the console cannot show
+"1,420 ready, 80 not answering" yet. This needs a schema addition or a new server message agreed
+with the captain. Committing does not depend on it.
+
 ## What Teams 2 and 4 can consume now
 
 `@orchestra/sync` exports `ClockEstimator`, which implements the existing `SynchronizedClock`

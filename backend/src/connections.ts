@@ -29,6 +29,19 @@ export class ConnectionRegistry {
     return this.participants.get(deviceId);
   }
 
+  // A device with no open socket is simply skipped: it learns the same state from its snapshot
+  // when it reconnects, so a missed broadcast is not a missed cue.
+  sendToParticipants(deviceIds: Iterable<number>, message: string): number {
+    let delivered = 0;
+    for (const deviceId of deviceIds) {
+      const socket = this.participants.get(deviceId);
+      if (!socket) continue;
+      socket.send(message);
+      delivered++;
+    }
+    return delivered;
+  }
+
   addOperator(socket: ClientSocket): void {
     this.operators.add(socket);
   }

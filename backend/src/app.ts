@@ -1,15 +1,21 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import {
-  ApiError, CommandAccepted, JoinRequest, JoinResponse, PROTOCOL_VERSION, SaveShowRequest,
+  ApiError, CommandAccepted, JoinRequest, JoinResponse, PROTOCOL_VERSION, SaveShowRequest, TransportRequest,
 } from "@orchestra/contracts";
 import { matchesOperatorSecret } from "./auth";
+import { Barrier } from "./barriers";
 import type { ServerClock } from "./clock";
 import type { CheckpointStore } from "./checkpoint";
 import type { CommandLog } from "./commands";
+import type { ConnectionRegistry } from "./connections";
+import type { Preparations } from "./preparations";
 import type { DeviceRegistry } from "./registry";
 import type { RateLimiter } from "./rate-limit";
 import type { SessionState } from "./state";
+import { nextTransport, positionAt } from "./transport";
+
+export const DEFAULT_LEAD_TIME_MS = 3000;
 
 export interface AppDeps {
   clock: ServerClock;
@@ -18,11 +24,25 @@ export interface AppDeps {
   joins: RateLimiter;
   state: SessionState;
   commands: CommandLog;
+  connections: ConnectionRegistry;
+  preparations: Preparations;
   operatorSecret?: string;
+  leadTimeMs?: number;
 }
 
 const apiError = (code: string, message: string, retryable = false) =>
   ApiError.parse({ protocolVersion: PROTOCOL_VERSION, error: { code, message, retryable, owner: "sync-control" } });
+
+const envelope = (clock: ServerClock) => ({
+  protocolVersion: PROTOCOL_VERSION, sessionId: clock.sessionId, serverEpoch: clock.serverEpoch,
+  messageId: crypto.randomUUID(),
+});
+
+const accepted = (clock: ServerClock, commandId: string, revision: number) =>
+  CommandAccepted.parse({
+    protocolVersion: PROTOCOL_VERSION, sessionId: clock.sessionId, serverEpoch: clock.serverEpoch,
+    commandId, revision,
+  });
 
 export function createApp(deps: AppDeps) {
   const app = new Hono();
@@ -112,15 +132,103 @@ export function createApp(deps: AppDeps) {
 
     const saved = deps.state.saveShow(body.data.show);
     await persist();
-    const accepted = CommandAccepted.parse({
-      protocolVersion: PROTOCOL_VERSION,
-      sessionId: deps.clock.sessionId,
-      serverEpoch: deps.clock.serverEpoch,
-      commandId: body.data.commandId,
-      revision: saved.showRevision,
+    const ack = accepted(deps.clock, body.data.commandId, saved.showRevision);
+    deps.commands.remember(body.data.commandId, ack);
+    return c.json(ack);
+  });
+
+  app.post("/api/transport", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Transport control requires the operator secret."), 401);
+    }
+    const body = TransportRequest.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(apiError("INVALID_REQUEST", "Transport request did not match the protocol v1 schema."), 400);
+    const request = body.data;
+    if (request.sessionId !== deps.clock.sessionId) {
+      return c.json(apiError("WRONG_SESSION", "This server is not serving that concert session."), 404);
+    }
+    // A command minted under a previous epoch was scheduled against a clock origin that no
+    // longer exists; its effective time means nothing now.
+    if (request.serverEpoch !== deps.clock.serverEpoch) {
+      return c.json(apiError("STALE_EPOCH", "The server restarted; resynchronize and reissue this command.", true), 409);
+    }
+
+    const replayed = deps.commands.get<unknown>(request.commandId);
+    if (replayed) return c.json(replayed);
+
+    const now = deps.clock.nowServerMs();
+    deps.state.applyDue(now);
+    if (request.expectedRevision !== deps.state.transport.transportRevision) {
+      return c.json(apiError(
+        "REVISION_CONFLICT",
+        `Transport is at revision ${deps.state.transport.transportRevision}; reload before commanding.`,
+      ), 409);
+    }
+    if (request.showRevision !== deps.state.showRevision) {
+      return c.json(apiError("STALE_SHOW", `Show is at revision ${deps.state.showRevision}.`), 409);
+    }
+
+    if (request.action === "prepare") {
+      const barrier = new Barrier(
+        crypto.randomUUID(), deps.state.showRevision, deps.state.transport.transportRevision,
+        deps.state.connectedDeviceIds(),
+      );
+      deps.preparations.start("transport", barrier);
+      deps.connections.sendToParticipants(deps.state.connectedDeviceIds(), JSON.stringify({
+        ...envelope(deps.clock), type: "transport.prepare", revision: deps.state.revision,
+        payload: {
+          preparationId: barrier.preparationId, showRevision: barrier.showRevision,
+          transportRevision: barrier.transportRevision,
+        },
+      }));
+      const ack = accepted(deps.clock, request.commandId, deps.state.transport.transportRevision);
+      deps.commands.remember(request.commandId, ack);
+      return c.json(ack);
+    }
+
+    const leadTimeMs = deps.leadTimeMs ?? DEFAULT_LEAD_TIME_MS;
+    if (request.effectiveServerMs < now + leadTimeMs) {
+      return c.json(apiError(
+        "INSUFFICIENT_LEAD_TIME",
+        `A cue must be at least ${leadTimeMs} ms in the future; phones need time to schedule it.`,
+      ), 409);
+    }
+
+    // Starting playback is the only action gated on readiness. Stopping or pausing must never
+    // wait for a phone that is not answering.
+    const barrier = deps.preparations.current("transport");
+    if (request.action === "play") {
+      if (!barrier || barrier.showRevision !== deps.state.showRevision
+        || barrier.transportRevision !== deps.state.transport.transportRevision) {
+        return c.json(apiError("NOT_PREPARED", "Prepare this show and transport revision before starting playback."), 409);
+      }
+      if (barrier.readyDevices().length === 0) {
+        return c.json(apiError("NOBODY_READY", "No device has acknowledged this preparation."), 409);
+      }
+    }
+
+    const transport = nextTransport({
+      current: deps.state.transport, action: request.action, showRevision: deps.state.showRevision,
+      positionMs: request.action === "play" || request.action === "seek"
+        ? request.positionMs
+        : positionAt(deps.state.transport, request.effectiveServerMs),
+      effectiveServerMs: request.effectiveServerMs,
     });
-    deps.commands.remember(body.data.commandId, accepted);
-    return c.json(accepted);
+
+    const superseded = deps.state.schedule({
+      domain: "transport", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
+      supersedesCommandId: null, transport,
+    });
+    const recipients = request.action === "play" && barrier ? barrier.readyDevices() : deps.state.connectedDeviceIds();
+    deps.connections.sendToParticipants(recipients, JSON.stringify({
+      ...envelope(deps.clock), type: "transport.commit", revision: deps.state.revision,
+      effectiveServerMs: request.effectiveServerMs,
+      payload: { domain: "transport", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs, supersedesCommandId: superseded, transport },
+    }));
+    if (request.action !== "play") deps.preparations.clear("transport");
+    const ack = accepted(deps.clock, request.commandId, transport.transportRevision);
+    deps.commands.remember(request.commandId, ack);
+    return c.json(ack);
   });
 
   app.all("/api/*", c => c.json(apiError(

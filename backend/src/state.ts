@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  AdminSnapshot, Assignment, DeviceReadiness, Location, ParticipantSnapshot, PROTOCOL_VERSION, Show, Transport,
+  AdminSnapshot, Assignment, DeviceReadiness, Location, ParticipantSnapshot, PendingAction, PROTOCOL_VERSION, Show, Transport,
   type AdminSnapshotData, type ParticipantSnapshotData, type ShowData,
 } from "@orchestra/contracts";
 import type { ServerClock } from "./clock";
@@ -8,6 +8,7 @@ import type { ServerClock } from "./clock";
 type DeviceReadinessData = z.infer<typeof DeviceReadiness>;
 type AssignmentData = z.infer<typeof Assignment>;
 type LocationData = z.infer<typeof Location>;
+type PendingActionData = z.infer<typeof PendingAction>;
 
 // Every snapshot must carry a show holding at least one channel, so a session starts with an
 // obviously empty placeholder. Team 4's first saved show replaces it wholesale.
@@ -39,6 +40,7 @@ export class SessionState {
   private revisionCounter = 0;
   private savedShow: ShowData | null = null;
   private transportState = stoppedTransport(0, 0);
+  private readonly pending = new Map<PendingActionData["domain"], PendingActionData>();
   private readonly readiness = new Map<number, DeviceReadinessData>();
   private readonly assignments = new Map<number, AssignmentData>();
   private readonly locations = new Map<number, LocationData>();
@@ -78,6 +80,35 @@ export class SessionState {
     this.transportState = stoppedTransport(0, this.savedShow.showRevision);
   }
 
+  get pendingActions(): PendingActionData[] {
+    return [...this.pending.values()];
+  }
+
+  pendingIn(domain: PendingActionData["domain"]): PendingActionData | undefined {
+    return this.pending.get(domain);
+  }
+
+  // One pending change per domain. A replacement cancels the previous change in that domain and
+  // says which command it superseded; an unrelated domain is untouched, so a mix update cannot
+  // cancel a transport start that was already accepted.
+  schedule(action: PendingActionData): string | null {
+    const superseded = this.pending.get(action.domain)?.commandId ?? null;
+    this.pending.set(action.domain, PendingAction.parse({ ...action, supersedesCommandId: superseded }));
+    this.revisionCounter++;
+    return superseded;
+  }
+
+  // Promotes any pending action whose moment has arrived. Called from the scheduler and before
+  // building a snapshot, so a reader never sees a pending action whose time has already passed.
+  applyDue(nowServerMs: number): void {
+    for (const [domain, action] of [...this.pending]) {
+      if (action.effectiveServerMs > nowServerMs) continue;
+      if (action.domain === "transport") this.transportState = action.transport;
+      this.pending.delete(domain);
+      this.revisionCounter++;
+    }
+  }
+
   register(deviceId: number): void {
     if (this.readiness.has(deviceId)) return;
     this.readiness.set(deviceId, defaultReadiness(deviceId));
@@ -104,11 +135,17 @@ export class SessionState {
     return this.readiness.get(deviceId);
   }
 
+  // Only connected phones are expected to answer a preparation. An operator console is not a
+  // device and is never counted as one.
+  connectedDeviceIds(): number[] {
+    return [...this.readiness.values()].filter(device => device.connected).map(device => device.deviceId);
+  }
+
   private base(clock: ServerClock) {
     return {
       protocolVersion: PROTOCOL_VERSION, sessionId: clock.sessionId, serverEpoch: clock.serverEpoch,
       revision: this.revisionCounter, serverMs: clock.nowServerMs(),
-      show: this.show, transport: this.transportState, pendingActions: [],
+      show: this.show, transport: this.transportState, pendingActions: this.pendingActions,
     };
   }
 

@@ -5,6 +5,8 @@ import { CheckpointStore } from "../src/checkpoint";
 import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
 import { CommandLog } from "../src/commands";
+import { ConnectionRegistry } from "../src/connections";
+import { Preparations } from "../src/preparations";
 import { SessionState } from "../src/state";
 
 const app = () =>
@@ -15,6 +17,8 @@ const app = () =>
     joins: new RateLimiter(10, 10, () => 1_000_000),
     state: new SessionState(),
     commands: new CommandLog(),
+    connections: new ConnectionRegistry(),
+    preparations: new Preparations(),
   });
 
 test("health identifies a foundation, not a running concert", async () => {

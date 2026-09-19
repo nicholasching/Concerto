@@ -7,6 +7,8 @@ import { createApp } from "../src/app";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
 import { CommandLog } from "../src/commands";
+import { ConnectionRegistry } from "../src/connections";
+import { Preparations } from "../src/preparations";
 import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
 import { SessionState } from "../src/state";
@@ -32,6 +34,8 @@ const harness = () => {
   const app = createApp({
     clock, registry, state, store, operatorSecret: SECRET,
     commands: new CommandLog(),
+    connections: new ConnectionRegistry(),
+    preparations: new Preparations(),
     joins: new RateLimiter(100, 100, () => serverMs),
   });
   return { app, state, store, registry };

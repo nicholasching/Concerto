@@ -1,5 +1,6 @@
 import { PROTOCOL_VERSION, ClientMessage, type ServerMessageData } from "@orchestra/contracts";
 import type { ServerClock } from "./clock";
+import type { Preparations } from "./preparations";
 import type { SessionState } from "./state";
 
 const envelope = (clock: ServerClock) => ({
@@ -27,8 +28,9 @@ export const handleClientMessage = (input: {
   clock: ServerClock;
   deviceId: number;
   state: SessionState;
+  preparations?: Preparations;
 }): ServerMessageData => {
-  const { raw, receivedServerMs, clock, deviceId, state } = input;
+  const { raw, receivedServerMs, clock, deviceId, state, preparations } = input;
 
   let parsed: unknown;
   try {
@@ -59,6 +61,25 @@ export const handleClientMessage = (input: {
       return error(clock, "DEVICE_MISMATCH", "A socket may only report status for the device it authenticated as.");
     }
     state.applyStatus(deviceId, message.data.payload);
+    const snapshot = state.participantSnapshot(deviceId, clock);
+    if (!snapshot) return error(clock, "UNKNOWN_DEVICE", "This device is not registered in the current session.");
+    return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };
+  }
+
+  if (message.data.type === "transport.ready") {
+    const barrier = preparations?.current("transport");
+    const payload = message.data.payload;
+    // An acknowledgement that names a superseded preparation, or revisions the barrier was not
+    // issued for, is ignored. It must not be able to satisfy the current barrier late.
+    const counted = barrier?.acknowledge({
+      deviceId,
+      preparationId: payload.preparationId,
+      ready: payload.ready,
+      reason: payload.reason,
+      showRevision: payload.showRevision,
+      transportRevision: payload.transportRevision,
+    }) ?? false;
+    if (!counted) return error(clock, "STALE_PREPARATION", "This acknowledgement does not match the current preparation.");
     const snapshot = state.participantSnapshot(deviceId, clock);
     if (!snapshot) return error(clock, "UNKNOWN_DEVICE", "This device is not registered in the current session.");
     return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };

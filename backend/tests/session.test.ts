@@ -12,6 +12,7 @@ import { handleClientMessage } from "../src/messages";
 import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
 import { CommandLog } from "../src/commands";
+import { Preparations } from "../src/preparations";
 import { SessionState } from "../src/state";
 
 const SESSION = "session-under-test";
@@ -34,6 +35,8 @@ const harness = () => {
   const app = createApp({
     clock, registry, state, operatorSecret: SECRET,
     commands: new CommandLog(),
+    connections: new ConnectionRegistry(),
+    preparations: new Preparations(),
     store: new CheckpointStore(joinPath(directory, "checkpoint.json")),
     joins: new RateLimiter(100, 100, () => serverMs),
   });

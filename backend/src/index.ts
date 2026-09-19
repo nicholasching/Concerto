@@ -5,6 +5,7 @@ import { createServerClock } from "./clock";
 import { CommandLog } from "./commands";
 import { ConnectionRegistry, OperatorTelemetry } from "./connections";
 import { handleClientMessage } from "./messages";
+import { Preparations } from "./preparations";
 import { DeviceRegistry } from "./registry";
 import { JOIN_LIMIT, RateLimiter } from "./rate-limit";
 import { SessionState } from "./state";
@@ -20,6 +21,7 @@ const store = new CheckpointStore(checkpointPath());
 const joins = new RateLimiter(JOIN_LIMIT.capacity, JOIN_LIMIT.refillPerSecond, clock.nowServerMs);
 const connections = new ConnectionRegistry();
 const telemetry = new OperatorTelemetry();
+const preparations = new Preparations();
 
 const restored = await store.read();
 if (restored) {
@@ -34,7 +36,10 @@ if (!process.env.OPERATOR_SECRET) {
   console.warn("OPERATOR_SECRET is unset: every operator request will be refused.");
 }
 
-const app = createApp({ clock, registry, store, joins, state, commands, operatorSecret: process.env.OPERATOR_SECRET });
+const app = createApp({
+  clock, registry, store, joins, state, commands, connections, preparations,
+  operatorSecret: process.env.OPERATOR_SECRET,
+});
 
 const server = Bun.serve<SocketData, string>({
   hostname: process.env.HOST ?? "127.0.0.1",
@@ -69,13 +74,14 @@ const server = Bun.serve<SocketData, string>({
       if (ws.data.role === "operator") return connections.removeOperator(ws);
       if (!connections.releaseParticipant(ws.data.deviceId, ws)) return;
       state.setConnected(ws.data.deviceId, false);
+      preparations.excludeEverywhere(ws.data.deviceId, "disconnected before acknowledging");
       telemetry.mark();
     },
     message(ws, raw) {
       const receivedServerMs = clock.nowServerMs();
       if (ws.data.role === "operator") return;
       const reply = handleClientMessage({
-        raw: String(raw), receivedServerMs, clock, deviceId: ws.data.deviceId, state,
+        raw: String(raw), receivedServerMs, clock, deviceId: ws.data.deviceId, state, preparations,
       });
       if (reply.type !== "clock.reply") telemetry.mark();
       ws.send(JSON.stringify(reply));
@@ -86,7 +92,12 @@ const server = Bun.serve<SocketData, string>({
 // Coalesced operator updates: state churn from probes and joins never becomes one broadcast
 // per event.
 setInterval(() => {
-  if (connections.operatorCount === 0 || !telemetry.due(clock.nowServerMs())) return;
+  const now = clock.nowServerMs();
+  // Scheduled changes become effective on time even when nothing is being read.
+  const before = state.revision;
+  state.applyDue(now);
+  if (state.revision !== before) telemetry.mark();
+  if (connections.operatorCount === 0 || !telemetry.due(now)) return;
   connections.broadcastToOperators(JSON.stringify({
     protocolVersion: 1, sessionId: clock.sessionId, serverEpoch: clock.serverEpoch,
     messageId: crypto.randomUUID(), type: "state.snapshot",
