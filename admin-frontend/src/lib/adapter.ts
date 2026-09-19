@@ -20,10 +20,11 @@ export class AdapterError extends Error {
 export interface PendingCommand {
   commandId: string;
   domain: "assignment" | "transport" | "mix" | "calibration" | "panic";
-  status: "pending" | "accepted" | "scheduled" | "effective" | "error" | "obsolete";
+  status: "pending" | "accepted" | "scheduled" | "effective" | "cancelled" | "error" | "obsolete";
   error?: string;
   sentAt: number;
   sentRevision: number;
+  effectiveServerMs?: number;
 }
 
 export interface AssignmentArgs { deviceIds: number[]; channelId: string | null; mapRevision: number; effectiveServerMs: number; }
@@ -77,15 +78,25 @@ export function createAdapter(baseUrl: string, fetcher: Fetcher = fetch) {
     // pending action can establish scheduling; its later disappearance establishes effectiveness.
     for (const [, cmd] of pending) {
       if (cmd.status === "pending" || cmd.status === "accepted" || cmd.status === "scheduled") {
-        if (data.pendingActions.some(action => action.commandId === cmd.commandId)) cmd.status = "scheduled";
-        else if (cmd.status === "scheduled") cmd.status = "effective";
+        if (data.pendingActions.some(action => action.commandId === cmd.commandId)) {
+          cmd.status = "scheduled";
+        } else if (cmd.status === "scheduled") {
+          // Absence is not execution evidence: a superseding command or panic also removes it.
+          // Before its scheduled time it is definitely cancelled; after that it remains accepted
+          // until a command-specific effective receipt exists in the producer contract.
+          const superseded = data.pendingActions.some(action => action.supersedesCommandId === cmd.commandId);
+          cmd.status = superseded || (cmd.effectiveServerMs !== undefined && data.serverMs < cmd.effectiveServerMs)
+            ? "cancelled"
+            : "accepted";
+        }
       }
     }
     return data;
   }
 
   async function sendJson<T>(path: string, body: Record<string, unknown>, commandId: string, domain: PendingCommand["domain"], sentRevision: number, validateAccepted = true): Promise<T> {
-    const cmd: PendingCommand = { commandId, domain, status: "pending", sentAt: Date.now(), sentRevision };
+    const effectiveServerMs = typeof body.effectiveServerMs === "number" ? body.effectiveServerMs : undefined;
+    const cmd: PendingCommand = { commandId, domain, status: "pending", sentAt: Date.now(), sentRevision, effectiveServerMs };
     pending.set(commandId, cmd);
     try {
       const response = await safeFetch(`${baseUrl}${path}`, {
@@ -93,7 +104,14 @@ export function createAdapter(baseUrl: string, fetcher: Fetcher = fetch) {
       });
       if (!response.ok) { cmd.status = "error"; await parseError(response); }
       const result = await response.json();
-      if (validateAccepted) CommandAccepted.parse(result);
+      if (validateAccepted) {
+        const accepted = CommandAccepted.parse(result);
+        if (accepted.commandId !== commandId || accepted.sessionId !== body.sessionId || accepted.serverEpoch !== body.serverEpoch ||
+          session.sessionId !== accepted.sessionId || session.serverEpoch !== accepted.serverEpoch || cmd.status === "obsolete") {
+          cmd.status = "obsolete";
+          throw new AdapterError("STALE_EPOCH", "Command response belongs to a superseded session epoch.", false, 409);
+        }
+      }
       cmd.status = "accepted";
       return result as T;
     } catch (error) {

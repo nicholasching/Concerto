@@ -87,7 +87,9 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   }
 
   const doneCount = slots.filter(s => s.status === "done").length;
-  const canProcess = runId !== null && doneCount > 0 && !jobId;
+  const terminalJob = progress?.stage === "failed" || progress?.stage === "cancelled";
+  // A failed/cancelled job must not strand successful uploads. The same upload set can be retried.
+  const canProcess = runId !== null && doneCount > 0 && (!jobId || terminalJob);
   const canCommit = progress?.stage === "complete";
 
   return (
@@ -120,7 +122,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
           ))}
         </div>
         <div className="actions">
-          <button disabled={!canProcess} onClick={process}>Process{doneCount > 0 ? ` (${doneCount} upload${doneCount === 1 ? "" : "s"})` : ""}</button>
+          <button disabled={!canProcess} onClick={process}>{terminalJob ? "Retry processing" : "Process"}{doneCount > 0 ? ` (${doneCount} upload${doneCount === 1 ? "" : "s"})` : ""}</button>
           {jobId && progress && (
             <div className="progress">
               <p>Job <code>{jobId}</code> — {progress.stage}: {Math.round(progress.progress * 100)}% — {progress.message}</p>

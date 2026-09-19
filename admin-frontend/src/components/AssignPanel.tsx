@@ -6,7 +6,7 @@ import type { AdminSnapshotData } from "@orchestra/contracts";
 import type { DeviceSelection } from "@orchestra/selection";
 import { nowServerMs } from "../lib/clock";
 
-export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData; refresh: () => void }) {
+export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData; refresh: () => Promise<void> }) {
   const adapter = useAdapter();
   const [selected, setSelected] = useState<DeviceSelection | null>(null);
   const [channelId, setChannelId] = useState<string>(snapshot.show.channels[0]?.channelId ?? "");
@@ -20,8 +20,8 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
     return nowServerMs() + Math.max(3, delaySeconds) * 1000;
   }
 
-  async function assign(channel: string | null, delaySeconds: number, selection: DeviceSelection | null) {
-    if (!selection || selection.deviceIds.length === 0) { setError("Draw a selection on the map first."); return; }
+  async function assign(channel: string | null, delaySeconds: number, selection: DeviceSelection | null, rememberPrevious = true): Promise<boolean> {
+    if (!selection || selection.deviceIds.length === 0) { setError("Draw a selection on the map first."); return false; }
     const { deviceIds, mapRevision } = selection;
     setError(null); setStatus(null);
     try {
@@ -31,21 +31,26 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
         const prior = snapshot.assignments.find(a => a.deviceId === deviceId)?.channelId ?? null;
         previous.set(prior, [...(previous.get(prior) ?? []), deviceId]);
       }
-      setUndo(previous);
+      if (rememberPrevious) setUndo(previous);
       const result = await adapter.sendAssignment({ deviceIds, channelId: channel, mapRevision, effectiveServerMs: futureMs(delaySeconds) });
       setStatus(`Sent assignment of ${deviceIds.length} phones to ${channel ?? "(clear)"} — pending. command ${result.commandId.slice(0, 8)}.`);
-      refresh();
+      await refresh();
+      return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg.includes("STALE_MAP") ? "The map changed during selection. The snapshot has been refreshed — redraw and try again." : msg);
-      refresh();
+      await refresh();
+      return false;
     }
   }
 
   async function doUndo() {
     if (!undo || !selected) return;
-    for (const [channelId, deviceIds] of undo) await assign(channelId, effectiveDelay, { ...selected, deviceIds });
-    setUndo(null);
+    const remaining = new Map<string | null, number[]>();
+    for (const [channelId, deviceIds] of undo) {
+      if (!await assign(channelId, effectiveDelay, { ...selected, deviceIds }, false)) remaining.set(channelId, deviceIds);
+    }
+    setUndo(remaining.size === 0 ? null : remaining);
   }
 
   const channelColor = snapshot.show.channels.find(c => c.channelId === channelId)?.color ?? "#888";

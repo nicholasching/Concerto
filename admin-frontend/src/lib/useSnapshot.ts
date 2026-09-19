@@ -14,7 +14,7 @@ export interface SnapshotState {
   snapshot: AdminSnapshotData | null;
   error: string | null;
   loading: boolean;
-  refresh: () => void;
+  refresh: () => Promise<void>;
 }
 
 // Polls the snapshot through the adapter and keeps the console clock synced to the server's ms.
@@ -44,6 +44,6 @@ export function useSnapshot(intervalMs = 1000): SnapshotState {
   }, [refresh, intervalMs, tick]);
 
   // Re-render-friendly refresh that also bumps pending state.
-  const forceRefresh = useCallback(() => { setTick(t => t + 1); void refresh(); }, [refresh]);
+  const forceRefresh = useCallback(async () => { setTick(t => t + 1); await refresh(); }, [refresh]);
   return { snapshot, error, loading, refresh: forceRefresh };
 }

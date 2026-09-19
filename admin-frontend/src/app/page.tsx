@@ -64,9 +64,9 @@ export default function Page() {
         ) : <NotDetectedSection label="Session" />
       )}
 
-      {tab === "calibration" && (
+      <div hidden={tab !== "calibration"}>
         <CalibrationPanel refresh={refresh} snapshot={snapshot} />
-      )}
+      </div>
 
       {tab === "review" && (
         snapshot ? (

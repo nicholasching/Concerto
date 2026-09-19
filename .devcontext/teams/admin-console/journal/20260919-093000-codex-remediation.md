@@ -37,3 +37,12 @@ Address the admin-owned defects recorded in `../../evidence/admin-console/202609
 - R6--R8/R12/R13 require the producer-owned calibration resource/result contract: frozen `CommandAccepted` does not supply a run/preparation/job identity, and the current contract offers no candidate-result retrieval route. Team 1/captain must approve that boundary before the consumer can implement prepare/ready/arm, resumable jobs, or candidate-map approval.
 - R11 requires Team 1's shared `SynchronizedClock`; the interim snapshot-receipt offset is not adequate concert synchronization evidence.
 - After that agreement, implement calibration persistence/retry/review and add browser-level workflow coverage; physical camera/phone evidence remains pending.
+
+## Follow-up remediation
+
+- F1: removal of a scheduled command no longer becomes `effective` merely because it disappeared. Before its effective time it is marked `cancelled`; after that time it remains `accepted` without a producer-supplied, command-specific effective receipt.
+- F2: undo awaits each authoritative refresh before restoring the next channel group and keeps any failed groups available for retry instead of clearing the full undo state.
+- F3: a mutation response must match its command/session/epoch and cannot revive an obsolete command after an epoch replacement.
+- R12/R13 (independent portion): calibration stays mounted while other tabs are viewed, and failed/cancelled jobs can retry processing with their successful uploads retained.
+
+Verification: `bun run gate:admin` passed again after this slice. The producer contract and shared-clock blockers above remain unchanged.
