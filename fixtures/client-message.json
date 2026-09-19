@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "sessionId": "demo",
+  "serverEpoch": "fixture-epoch",
+  "messageId": "probe-0",
+  "type": "clock.probe",
+  "payload": {
+    "probeGroupId": 0,
+    "probeGroupIndex": 0,
+    "t0": 90000
+  }
+}

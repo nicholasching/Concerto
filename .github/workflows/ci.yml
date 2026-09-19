@@ -1,0 +1,34 @@
+name: Foundation and team gates
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  team:
+    name: ${{ matrix.team }} gate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        team: [sync, client, otc, admin]
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - uses: actions/setup-python@v5
+        if: matrix.team == 'otc'
+        with:
+          python-version: "3.13"
+      - run: bun install --frozen-lockfile
+      - run: bun run setup:python
+        if: matrix.team == 'otc'
+      - run: bun run gate:${{ matrix.team }}

@@ -1,0 +1,21 @@
+# Glossary
+
+- **Session:** one concert's identity namespace, device registry, show, and calibration runs.
+- **Device ID:** sequential optical identifier from 0 through 2047; stable during the session and separate from authentication.
+- **Server epoch:** unique identity of a server clock lifetime; invalidates old schedules after restart.
+- **Server milliseconds:** time from the server's monotonic-backed clock, interpreted only within its epoch.
+- **Track:** an immutable audio asset with a content hash and timing metadata.
+- **Channel:** a logical musical lane assigned to a subset of phones.
+- **Show:** the prepared shared timeline of clips across channels.
+- **Clip:** a bounded portion of a track placed at an explicit time on a channel.
+- **Assignment:** the server-confirmed mapping from a device to its active channel.
+- **OTC:** optical temporal coding; screens transmit identity through a timed color sequence.
+- **Run:** one frozen calibration participant set, packet, scheduled start, and associated camera recordings.
+- **Run tag:** the packet's short run-disambiguation field; not a credential or full run ID.
+- **Codeword:** the 16 transmitted error-checking bits encoding an 11-bit device ID.
+- **Erasure:** a symbol without adequate evidence to decide 0 or 1.
+- **Observation:** one tracked screen's identity/position evidence in a camera view.
+- **Localized/coarse/ambiguous/unseen:** distinct result states; unknown coordinates are null, never an invented point.
+- **Canonical audience map:** stage at top; x increases from audience-left to audience-right while facing the stage, y increases toward the back.
+- **Map revision:** a committed location snapshot; selection and assignment refer to its exact version.
+- **Readiness:** separate connection, sync, visibility, unlocked audio, decoded assets, and prepared-command state.

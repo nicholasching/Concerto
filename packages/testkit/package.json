@@ -1,0 +1,7 @@
+{
+  "name": "@orchestra/testkit",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts", "./mock-server": "./src/mock-server.ts" },
+  "dependencies": { "@orchestra/contracts": "workspace:*", "@orchestra/sync": "workspace:*", "hono": "4.12.23" }
+}

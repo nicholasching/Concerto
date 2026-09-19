@@ -1,0 +1,119 @@
+{
+  "showId": "foundation-show",
+  "showRevision": 1,
+  "label": "Synthetic four-channel fixture",
+  "tracks": [
+    {
+      "trackId": "tone-0",
+      "label": "Percussion test tone",
+      "url": "/api/assets/tone-0",
+      "sha256": "2ef802bfb6be4b718d12275994fefc72cf3bcb96abe87849747a4b529f7133ee",
+      "byteSize": 256044,
+      "durationMs": 8000,
+      "sampleRateHz": 16000,
+      "channels": 1
+    },
+    {
+      "trackId": "tone-1",
+      "label": "Bass test tone",
+      "url": "/api/assets/tone-1",
+      "sha256": "02faf8b9d6bc1dfe563f6a401db901359763b4426ef447454631c8f6a54373a5",
+      "byteSize": 256044,
+      "durationMs": 8000,
+      "sampleRateHz": 16000,
+      "channels": 1
+    },
+    {
+      "trackId": "tone-2",
+      "label": "Harmony test tone",
+      "url": "/api/assets/tone-2",
+      "sha256": "3f88642fca03098a80eaff3fbc1975c46b15c7962e247f3978c969ae6a930161",
+      "byteSize": 256044,
+      "durationMs": 8000,
+      "sampleRateHz": 16000,
+      "channels": 1
+    },
+    {
+      "trackId": "tone-3",
+      "label": "Melody test tone",
+      "url": "/api/assets/tone-3",
+      "sha256": "946d5720435a611ccc098f01af83cb242b16718493e4707eabde4b6e6bbfa852",
+      "byteSize": 256044,
+      "durationMs": 8000,
+      "sampleRateHz": 16000,
+      "channels": 1
+    }
+  ],
+  "channels": [
+    {
+      "channelId": "channel-0",
+      "label": "Percussion",
+      "color": "#f59e0b",
+      "gain": 0.3,
+      "mute": false,
+      "solo": false
+    },
+    {
+      "channelId": "channel-1",
+      "label": "Bass",
+      "color": "#34d399",
+      "gain": 0.3,
+      "mute": false,
+      "solo": false
+    },
+    {
+      "channelId": "channel-2",
+      "label": "Harmony",
+      "color": "#a78bfa",
+      "gain": 0.3,
+      "mute": false,
+      "solo": false
+    },
+    {
+      "channelId": "channel-3",
+      "label": "Melody",
+      "color": "#38bdf8",
+      "gain": 0.3,
+      "mute": false,
+      "solo": false
+    }
+  ],
+  "clips": [
+    {
+      "clipId": "clip-0",
+      "channelId": "channel-0",
+      "trackId": "tone-0",
+      "timelineStartMs": 0,
+      "sourceOffsetMs": 0,
+      "durationMs": 8000,
+      "gain": 1
+    },
+    {
+      "clipId": "clip-1",
+      "channelId": "channel-1",
+      "trackId": "tone-1",
+      "timelineStartMs": 0,
+      "sourceOffsetMs": 0,
+      "durationMs": 8000,
+      "gain": 1
+    },
+    {
+      "clipId": "clip-2",
+      "channelId": "channel-2",
+      "trackId": "tone-2",
+      "timelineStartMs": 0,
+      "sourceOffsetMs": 0,
+      "durationMs": 8000,
+      "gain": 1
+    },
+    {
+      "clipId": "clip-3",
+      "channelId": "channel-3",
+      "trackId": "tone-3",
+      "timelineStartMs": 0,
+      "sourceOffsetMs": 0,
+      "durationMs": 8000,
+      "gain": 1
+    }
+  ]
+}

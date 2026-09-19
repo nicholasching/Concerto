@@ -1,0 +1,6 @@
+{
+  "name": "@orchestra/backend",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@orchestra/contracts": "workspace:*", "@orchestra/sync": "workspace:*", "hono": "4.12.23" }
+}

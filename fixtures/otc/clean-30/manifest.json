@@ -1,0 +1,129 @@
+{
+  "protocolVersion": 1,
+  "sessionId": "demo",
+  "serverEpoch": "fixture-epoch",
+  "runId": "fixture-run",
+  "runTag": 37,
+  "participantIds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29
+  ],
+  "packetVersion": "otc-v1",
+  "codebookVersion": "hamming16-11-v1",
+  "paletteVersion": "amber-blue-v1",
+  "palette": {
+    "zero": "#FFB000",
+    "one": "#0066FF",
+    "neutral": "#111111"
+  },
+  "symbolMs": 200,
+  "startServerMs": 100000,
+  "cameras": [
+    {
+      "cameraId": "camera-left",
+      "primaryColumn": "left",
+      "videoPath": "runtime/captures/left.mp4",
+      "sha256": "b385ee0bc5f34dad793e1c2bf351a58e487072b12aa2e3fff31d769fccb51e7c",
+      "rotationDegrees": 0,
+      "exclusionRois": [],
+      "anchors": [
+        {
+          "x": 100,
+          "y": 2000
+        },
+        {
+          "x": 3700,
+          "y": 2000
+        },
+        {
+          "x": 2800,
+          "y": 200
+        },
+        {
+          "x": 1000,
+          "y": 200
+        }
+      ]
+    },
+    {
+      "cameraId": "camera-center",
+      "primaryColumn": "center",
+      "videoPath": "runtime/captures/center.mp4",
+      "sha256": "b7eba95a4afe9aee2e76aaa9369c68a2ec73b9958056c0b43b624161188bc5bd",
+      "rotationDegrees": 0,
+      "exclusionRois": [],
+      "anchors": [
+        {
+          "x": 100,
+          "y": 2000
+        },
+        {
+          "x": 3700,
+          "y": 2000
+        },
+        {
+          "x": 2800,
+          "y": 200
+        },
+        {
+          "x": 1000,
+          "y": 200
+        }
+      ]
+    },
+    {
+      "cameraId": "camera-right",
+      "primaryColumn": "right",
+      "videoPath": "runtime/captures/right.mp4",
+      "sha256": "1159ab20bc80df9751c0dd17783633cac3f062acf6fe5ff21f33eef38eca89d5",
+      "rotationDegrees": 0,
+      "exclusionRois": [],
+      "anchors": [
+        {
+          "x": 100,
+          "y": 2000
+        },
+        {
+          "x": 3700,
+          "y": 2000
+        },
+        {
+          "x": 2800,
+          "y": 200
+        },
+        {
+          "x": 1000,
+          "y": 200
+        }
+      ]
+    }
+  ]
+}

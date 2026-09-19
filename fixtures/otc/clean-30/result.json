@@ -1,0 +1,900 @@
+{
+  "protocolVersion": 1,
+  "sessionId": "demo",
+  "serverEpoch": "fixture-epoch",
+  "runId": "fixture-run",
+  "runTag": 37,
+  "evidence": "synthetic",
+  "decoderVersion": "fixture-only",
+  "inputHashes": [
+    {
+      "cameraId": "camera-left",
+      "sha256": "b385ee0bc5f34dad793e1c2bf351a58e487072b12aa2e3fff31d769fccb51e7c"
+    },
+    {
+      "cameraId": "camera-center",
+      "sha256": "b7eba95a4afe9aee2e76aaa9369c68a2ec73b9958056c0b43b624161188bc5bd"
+    },
+    {
+      "cameraId": "camera-right",
+      "sha256": "1159ab20bc80df9751c0dd17783633cac3f062acf6fe5ff21f33eef38eca89d5"
+    }
+  ],
+  "observations": [
+    {
+      "cameraId": "camera-left",
+      "trackId": "screen-0",
+      "deviceId": 0,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 200
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-center",
+      "trackId": "screen-1",
+      "deviceId": 1,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 200
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-right",
+      "trackId": "screen-2",
+      "deviceId": 2,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 200
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-left",
+      "trackId": "screen-3",
+      "deviceId": 3,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 380
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-center",
+      "trackId": "screen-4",
+      "deviceId": 4,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 380
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-right",
+      "trackId": "screen-5",
+      "deviceId": 5,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 380
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-left",
+      "trackId": "screen-6",
+      "deviceId": 6,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 560
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-center",
+      "trackId": "screen-7",
+      "deviceId": 7,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 560
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-right",
+      "trackId": "screen-8",
+      "deviceId": 8,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 560
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-left",
+      "trackId": "screen-9",
+      "deviceId": 9,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 740
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-center",
+      "trackId": "screen-10",
+      "deviceId": 10,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 740
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-right",
+      "trackId": "screen-11",
+      "deviceId": 11,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 740
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-left",
+      "trackId": "screen-12",
+      "deviceId": 12,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 920
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-center",
+      "trackId": "screen-13",
+      "deviceId": 13,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 920
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-right",
+      "trackId": "screen-14",
+      "deviceId": 14,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 920
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-left",
+      "trackId": "screen-15",
+      "deviceId": 15,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1100
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-center",
+      "trackId": "screen-16",
+      "deviceId": 16,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1100
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-right",
+      "trackId": "screen-17",
+      "deviceId": 17,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1100
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-left",
+      "trackId": "screen-18",
+      "deviceId": 18,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1280
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-center",
+      "trackId": "screen-19",
+      "deviceId": 19,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1280
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-right",
+      "trackId": "screen-20",
+      "deviceId": 20,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1280
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-left",
+      "trackId": "screen-21",
+      "deviceId": 21,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1460
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-center",
+      "trackId": "screen-22",
+      "deviceId": 22,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1460
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-right",
+      "trackId": "screen-23",
+      "deviceId": 23,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1460
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-left",
+      "trackId": "screen-24",
+      "deviceId": 24,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1640
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-center",
+      "trackId": "screen-25",
+      "deviceId": 25,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1640
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-right",
+      "trackId": "screen-26",
+      "deviceId": 26,
+      "status": "accepted",
+      "centerPx": {
+        "x": 1900,
+        "y": 1640
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": []
+    },
+    {
+      "cameraId": "camera-left",
+      "trackId": "reflection-0",
+      "deviceId": 0,
+      "status": "rejected",
+      "centerPx": {
+        "x": 3800,
+        "y": 10
+      },
+      "firstPtsMs": 0,
+      "lastPtsMs": 11000,
+      "decodeScore": 0.98,
+      "correctedBits": 0,
+      "erasedBits": 0,
+      "reasons": [
+        "duplicate-reflection"
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "deviceId": 0,
+      "column": "left",
+      "sourceCameraIds": [
+        "camera-left"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.16666666666666666,
+      "y": 0.09090909090909091,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 1,
+      "column": "center",
+      "sourceCameraIds": [
+        "camera-center"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.5,
+      "y": 0.09090909090909091,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 2,
+      "column": "right",
+      "sourceCameraIds": [
+        "camera-right"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.8333333333333334,
+      "y": 0.09090909090909091,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 3,
+      "column": "left",
+      "sourceCameraIds": [
+        "camera-left"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.16666666666666666,
+      "y": 0.18181818181818182,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 4,
+      "column": "center",
+      "sourceCameraIds": [
+        "camera-center"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.5,
+      "y": 0.18181818181818182,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 5,
+      "column": "right",
+      "sourceCameraIds": [
+        "camera-right"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.8333333333333334,
+      "y": 0.18181818181818182,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 6,
+      "column": "left",
+      "sourceCameraIds": [
+        "camera-left"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.16666666666666666,
+      "y": 0.2727272727272727,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 7,
+      "column": "center",
+      "sourceCameraIds": [
+        "camera-center"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.5,
+      "y": 0.2727272727272727,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 8,
+      "column": "right",
+      "sourceCameraIds": [
+        "camera-right"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.8333333333333334,
+      "y": 0.2727272727272727,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 9,
+      "column": "left",
+      "sourceCameraIds": [
+        "camera-left"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.16666666666666666,
+      "y": 0.36363636363636365,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 10,
+      "column": "center",
+      "sourceCameraIds": [
+        "camera-center"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.5,
+      "y": 0.36363636363636365,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 11,
+      "column": "right",
+      "sourceCameraIds": [
+        "camera-right"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.8333333333333334,
+      "y": 0.36363636363636365,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 12,
+      "column": "left",
+      "sourceCameraIds": [
+        "camera-left"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.16666666666666666,
+      "y": 0.45454545454545453,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 13,
+      "column": "center",
+      "sourceCameraIds": [
+        "camera-center"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.5,
+      "y": 0.45454545454545453,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 14,
+      "column": "right",
+      "sourceCameraIds": [
+        "camera-right"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.8333333333333334,
+      "y": 0.45454545454545453,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 15,
+      "column": "left",
+      "sourceCameraIds": [
+        "camera-left"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.16666666666666666,
+      "y": 0.5454545454545454,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 16,
+      "column": "center",
+      "sourceCameraIds": [
+        "camera-center"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.5,
+      "y": 0.5454545454545454,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 17,
+      "column": "right",
+      "sourceCameraIds": [
+        "camera-right"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.8333333333333334,
+      "y": 0.5454545454545454,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 18,
+      "column": "left",
+      "sourceCameraIds": [
+        "camera-left"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.16666666666666666,
+      "y": 0.6363636363636364,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 19,
+      "column": "center",
+      "sourceCameraIds": [
+        "camera-center"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.5,
+      "y": 0.6363636363636364,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 20,
+      "column": "right",
+      "sourceCameraIds": [
+        "camera-right"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.8333333333333334,
+      "y": 0.6363636363636364,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 21,
+      "column": "left",
+      "sourceCameraIds": [
+        "camera-left"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.16666666666666666,
+      "y": 0.7272727272727273,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 22,
+      "column": "center",
+      "sourceCameraIds": [
+        "camera-center"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.5,
+      "y": 0.7272727272727273,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 23,
+      "column": "right",
+      "sourceCameraIds": [
+        "camera-right"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.8333333333333334,
+      "y": 0.7272727272727273,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 24,
+      "column": "left",
+      "sourceCameraIds": [
+        "camera-left"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.16666666666666666,
+      "y": 0.8181818181818182,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 25,
+      "column": "center",
+      "sourceCameraIds": [
+        "camera-center"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.5,
+      "y": 0.8181818181818182,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 26,
+      "column": "right",
+      "sourceCameraIds": [
+        "camera-right"
+      ],
+      "decodeScore": 0.98,
+      "mappingResidualPx": 1,
+      "status": "localized",
+      "x": 0.8333333333333334,
+      "y": 0.8181818181818182,
+      "mappingMode": "manual-anchors"
+    },
+    {
+      "deviceId": 27,
+      "column": "left",
+      "sourceCameraIds": [],
+      "decodeScore": null,
+      "mappingResidualPx": null,
+      "status": "coarse",
+      "x": null,
+      "y": null,
+      "mappingMode": "manual-column"
+    },
+    {
+      "deviceId": 28,
+      "column": "center",
+      "sourceCameraIds": [],
+      "decodeScore": null,
+      "mappingResidualPx": null,
+      "status": "ambiguous",
+      "x": null,
+      "y": null,
+      "mappingMode": "none"
+    },
+    {
+      "deviceId": 29,
+      "column": "right",
+      "sourceCameraIds": [],
+      "decodeScore": null,
+      "mappingResidualPx": null,
+      "status": "unseen",
+      "x": null,
+      "y": null,
+      "mappingMode": "none"
+    }
+  ],
+  "cameras": [
+    {
+      "cameraId": "camera-left",
+      "frameWidth": 3840,
+      "frameHeight": 2160,
+      "phasePtsMs": 0,
+      "acceptedTracks": 9,
+      "rejectedTracks": 1,
+      "messages": [
+        "Synthetic fixture; no captured video."
+      ]
+    },
+    {
+      "cameraId": "camera-center",
+      "frameWidth": 3840,
+      "frameHeight": 2160,
+      "phasePtsMs": 0,
+      "acceptedTracks": 9,
+      "rejectedTracks": 0,
+      "messages": [
+        "Synthetic fixture; no captured video."
+      ]
+    },
+    {
+      "cameraId": "camera-right",
+      "frameWidth": 3840,
+      "frameHeight": 2160,
+      "phasePtsMs": 0,
+      "acceptedTracks": 9,
+      "rejectedTracks": 0,
+      "messages": [
+        "Synthetic fixture; no captured video."
+      ]
+    }
+  ],
+  "warnings": [
+    "Synthetic hand-authored observations. MP4 paths and video hashes are placeholders, not recordings."
+  ],
+  "processingMs": 0
+}

@@ -1,0 +1,7 @@
+{
+  "name": "@orchestra/selection",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@orchestra/contracts": "workspace:*" }
+}

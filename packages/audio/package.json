@@ -1,0 +1,7 @@
+{
+  "name": "@orchestra/audio",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@orchestra/contracts": "workspace:*", "@orchestra/sync": "workspace:*" }
+}

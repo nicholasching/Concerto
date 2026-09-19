@@ -1,0 +1,31 @@
+# Audience Orchestra development context
+
+Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage/status/handoff and relevant decisions before coding.
+
+## Current checkpoint
+
+- Software foundation is verified and ready for four teams. Canonical baseline: Git tag `foundation-v1`; resolve its SHA with `git rev-parse foundation-v1` and record it in your first journal. The immutable tag avoids embedding its own commit hash inside itself.
+- Four local feature branches start at that baseline. Remote publication is separate; see root README.
+- Contracts, exhaustive codebook, fixture harnesses, application shells, Python boundary CLI, gates and CI configuration exist. NTP, concert APIs, sound, flashing, video localization, interactive console, load/e2e and physical evidence remain assigned work.
+- BeatSync remains unchanged. Only `epochNow()` is extracted; full MIT attribution and source hashes are recorded.
+- See [verification](evidence/foundation/verification.md) for checks and limits. Performance numbers remain targets. Hosted CI has not run during local preparation.
+
+## Ownership and starting points
+
+| Team / human lead | Branch | Stage | Current handoff |
+| --- | --- | --- | --- |
+| 1 / assign; default captain | feat/sync-control | [01](stages/01-sync-control.md) | [status](teams/sync-control/status.md), [handoff](teams/sync-control/handoff.md) |
+| 2 / assign | feat/audio-client | [02](stages/02-audio-client.md) | [status](teams/audio-client/status.md), [handoff](teams/audio-client/handoff.md) |
+| 3 / assign | feat/otc-localization | [03](stages/03-otc-localization.md) | [status](teams/otc-localization/status.md), [handoff](teams/otc-localization/handoff.md) |
+| 4 / assign | feat/admin-console | [04](stages/04-admin-console.md) | [status](teams/admin-console/status.md), [handoff](teams/admin-console/handoff.md) |
+
+Captain owns shared context/contracts/testkit/root/CI. Each lead owns its stage/status/handoff; agents create distinct journal files. ADRs are append-only and uniquely named. Root rules contain templates.
+
+## Shared reading
+
+- [Architecture](architecture.md), [glossary](glossary.md), [BeatSync provenance](beat-sync-extraction.md).
+- [Protocol](schema/protocol.md), [OTC](schema/otc.md), [playback](schema/playback.md).
+- [Foundation decision](decisions/20260919-000001-foundation-v1.md), [foundation stage](stages/00-foundation.md), [integration](stages/05-integration-rehearsal.md).
+- [Foundation journal](teams/foundation/journal/20260919-foundation.md).
+
+Keep raw audience recordings, secrets, large artifacts and machine configuration outside Git. Commit hashes and reproduction procedures with evidence instead.

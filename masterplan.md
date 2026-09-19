@@ -1,6 +1,26 @@
 # Audience Orchestra: master implementation plan
 
-Planning baseline: 2026-09-19. This document defines proposed implementation work, not completed features or verified performance.
+Handoff baseline: 2026-09-19, Git tag `foundation-v1`. The repository foundation is implemented and verified. Concert features and the performance targets below remain assigned implementation work; passing scaffold checks does not establish physical audio or camera performance.
+
+## Team handoff: start here
+
+Give each teammate this file, [rules.md](rules.md), and their stage brief from the table below. Work on the assigned branch in a separate clone/worktree; continue from the shared foundation.
+
+1. Read [README.md](README.md) for setup, then `AGENTS.md`, `rules.md`, `.devcontext/README.md`, and your stage/status/handoff files.
+2. Install **Bun 1.3.14**, run `bun install --frozen-lockfile`, and run your focused gate. Team 3 additionally installs **Python 3.13** and runs `bun run setup:python`. The other teams do not need Python for their own gate.
+3. Record `git rev-parse foundation-v1` and your current branch/commit in a new team journal. Assign human lead names; Team 1's lead is the default integration captain.
+4. Start the first slice in your brief, extend its tests, and keep status/handoff current. Send contract changes to the captain with producer/consumer examples before changing the boundary.
+
+| Team / branch | Ready-to-copy assignment and first slice | Independent gate |
+| --- | --- | --- |
+| 1 / `feat/sync-control` | [Clock, identity, and control](.devcontext/stages/01-sync-control.md): extract and characterize the clock before adding authoritative state | `bun run gate:sync` |
+| 2 / `feat/audio-client` | [Audio and audience](.devcontext/stages/02-audio-client.md): unlock/preload/scheduled click against an injected clock; render the frozen packet | `bun run gate:client` |
+| 3 / `feat/otc-localization` | [Optical localization](.devcontext/stages/03-otc-localization.md): independent decoder tests, then one actual recorded screen | `bun run gate:otc` |
+| 4 / `feat/admin-console` | [Admin and DJ](.devcontext/stages/04-admin-console.md): pure selection geometry, then mock-backed commands and workflow | `bun run gate:admin` |
+
+**Available now:** backend/client/admin shells; shared Zod and generated Python schemas; exhaustive OTC codebook/golden packets; original synthetic audio and JSON fixtures; loopback HTTP/WS mocks; Python validation/replay CLI; four gates; CI configuration; `.devcontext` handoffs. **Still to build:** the NTP estimator/lifecycle, real joins and control APIs, audio engine, flash renderer, video decoder/registration, interactive admin workflows, load/e2e harnesses, and physical rehearsal. Backend feature routes explicitly return 501 and real OTC processing exits nonzero until implemented. The mock's 1,500 device records are not a socket load test.
+
+The baseline and four branches are created locally. Remote publication is a separate captain action documented in the README. A teammate on another machine must fetch the published baseline first. Hardware/deadline inputs in section 12 should be resolved early; they do not block work against the committed contracts.
 
 ## 1. Outcome and scope
 
@@ -17,8 +37,8 @@ The four workstreams are:
 
 ### What was inspected
 
-- This workspace was empty and was not a Git repository when planning began. The user subsequently supplied `beatsync-source/`; its relevant clock, playback, server, schema, test, and license files have now been inspected.
-- BeatSync uses Bun, Hono, Next.js/React, Zustand, Zod, and Bun tests. Its MIT license identifies copyright (c) 2025 freeman-jiang. This was a source review, not a runtime or acoustic performance test. Bun was not found on this planning shell's PATH.
+- The user supplied `beatsync-source/`; its relevant clock, playback, server, schema, test, and license files have been inspected. The new workspace foundation has since been built independently of that reference.
+- BeatSync uses Bun, Hono, Next.js/React, Zustand, Zod, and Bun tests. Its MIT license identifies copyright (c) 2025 freeman-jiang. Provenance is recorded in `.devcontext/beat-sync-extraction.md`; `epochNow()` is the only function extracted so far. The reference two-phone demonstration and timing characterization remain Team 1/2 work.
 - **User requirement:** selectively extract reused implementation into this project's main folders. Keep `beatsync-source/` as an unchanged reference; the finished application must build and run without importing or serving anything from it.
 - The documentation convention follows `C:\Projects\Lattice\.devcontext`: an index, current architecture, glossary, stage briefs with acceptance criteria and evidence, schema notes, and append-only architecture decisions. Its application architecture is not being copied.
 
@@ -32,7 +52,7 @@ The four workstreams are:
 | Music | Prepared, compatible stems with explicit timeline offsets | Musical rehearsal; no automatic separation or beat matching |
 | Calibration | An error-checked temporal packet lasting about 11 seconds initially | Shorten only after camera, decoding, and flash-pattern validation |
 | Cameras | Three fixed 4K phones, one primarily covering each audience column, with overlap | Back-row visibility and actual codec/frame timing tests |
-| Stack | Bun/Hono backend, Next.js/React frontends, shared TypeScript/Zod, Python/OpenCV worker, FFmpeg/PyAV decoding | Preserve the inspected source stack; pin one compatible Bun version during foundation |
+| Stack | Bun 1.3.14/Hono backend, Next.js/React frontends, shared TypeScript/Zod, Python 3.13 worker; OpenCV and FFmpeg/PyAV decoding planned | JS and Python validation dependencies are locked; Team 3 pins the video toolchain after codec testing |
 | Deployment | One authoritative control process and one separately executed video worker; static media over HTTP(S) | Scale only if measurements demonstrate a bottleneck |
 | Schedule | An illustrative 36-hour implementation window | Team leads compress milestones to the actual deadline |
 
@@ -72,7 +92,7 @@ Designate the Team 1 human lead as integration captain, unless the four teammate
 
 Each team owns its corresponding `.devcontext/stages/` brief and `.devcontext/teams/<team>/` directory. Any team can add a uniquely named ADR. The captain curates shared architecture and schema summaries. Ownership applies to files, not just folders named in a PR description.
 
-Proposed scaffold:
+Implemented repository structure (comments describe intended responsibilities, not completed features):
 
 ```text
 backend/                      # HTTP, WebSocket, registry, routing, job adapter
@@ -85,7 +105,7 @@ packages/selection/           # pure geometry to select device IDs
 packages/testkit/             # small shared fixtures and clock/transport test doubles
 workers/otc/                  # Python CLI, decoder, tracking, camera registration
 tools/{load,client-demo,otc-fixtures,admin-demo}/
-fixtures/                     # small synthetic recordings, manifests, expected results
+fixtures/                     # synthetic JSON, original tones; recorded MP4 fixtures pending
 .devcontext/                  # committed development memory; see rules.md
 runtime/                      # ignored uploads, recordings, jobs, media, local state
 beatsync-source/               # unchanged reference; excluded from active workspaces
@@ -110,50 +130,49 @@ Paths in the first column are relative to `beatsync-source/`. Extract only the r
 
 Source-specific findings that affect the work:
 
-- Probe defaults are 16 measurements, 50 ms startup interval, 25 ms inter-probe gap with 5 ms tolerance, and 2,500 ms steady interval. Preserve a characterized baseline, then measure startup storms and introduce jitter/batching without corrupting pair-gap measurement.
+- Probe defaults are 16 measurements, 50 ms startup interval, 25 ms inter-probe gap with 5 ms tolerance, and 2,500 ms steady interval. Preserve a characterized baseline, then measure startup storms and stagger initialization. Batch telemetry, not timestamp capture or probe replies; preserve the measured inter-probe gap.
 - `epochNow()` already uses a monotonic clock with an epoch-shaped origin. It does not need replacement with `Date.now()`. Some heartbeat/liveness timers separately use wall-clock time; keep scheduling domains explicit.
 - `global.tsx` combines clock offset with manual audio nudge and subtracts filtered output latency. **Only pure clock offset belongs in optical timing.** Audio compensation and manual nudge must never move a calibration symbol.
 - `audioContextManager.ts` contains `perfTimeToAudioTime()`, but the inspected store playback path also schedules via `AudioContext.currentTime + delay`. Select one characterized output-timing method; do not combine both and compensate latency twice.
 - Playback has a single selected source and stops the previous source when creating a new one. The cache is limited to three buffers. Both behaviors need deliberate adjustment for prepared channel switches and four preloaded stems.
 - The existing source can have multiple queued tracks; its limitation here is one room-wide playing source, not an inability to list multiple files.
 - Its NTP fast path bypasses the general Zod parser. Preserve early timestamps while validating finite timestamps, pair indices, membership, and size before replying.
-- The root package pins `bun@1.3.8`, while `mise.toml` specifies Bun `1.3.14`. Resolve this to one tested version; do not carry contradictory runtime pins forward.
+- The reference root package pins `bun@1.3.8`, while its `mise.toml` specifies Bun `1.3.14`. The new workspace consistently pins and has been tested with Bun `1.3.14`.
 
-Create `THIRD_PARTY_NOTICES.md` and include the complete BeatSync MIT notice when extracting code. Record source path, available upstream revision or source-file hash, destination, retained behavior, deliberate changes, and migrated tests in `.devcontext/beat-sync-extraction.md`. Do not copy chat, music search/providers, analytics, advertising, IP geolocation, the old spatial-volume scene, cloud backups, or bundled commercial songs into the new app unless a concrete requirement emerges. IP/geographic location does not solve seat location.
+Preserve the complete BeatSync MIT notice in the existing `THIRD_PARTY_NOTICES.md`. Record each extraction's source path, upstream revision or source-file hash, destination, retained behavior, deliberate changes, and migrated tests in `.devcontext/beat-sync-extraction.md`. Do not copy chat, music search/providers, analytics, advertising, IP geolocation, the old spatial-volume scene, cloud backups, or bundled commercial songs unless a concrete requirement emerges. IP/geographic location does not solve seat location.
 
-## 3. Foundation gate: finish before four teams diverge
+## 3. Foundation baseline and remaining first experiments
 
-Budget approximately 60-90 minutes. Team 1 owns the scaffold; all four leads agree on the boundary examples. Teams can run hardware experiments while the scaffold is being prepared.
+The software foundation is delivered as `foundation-v1`: pinned dependencies, application shells, protocol v1 schemas and examples, 2,048 codewords, packet vectors, 30-device/1,500-device fixtures, original tones, a fake clock, HTTP/WS mocks, Python validation/replay, branch gates, CI, and team context. See [foundation evidence](.devcontext/evidence/foundation/verification.md) and [Stage 00](.devcontext/stages/00-foundation.md) for the exact checks and limitations.
 
-1. Use the supplied `beatsync-source/`. Record its upstream revision if available, otherwise source hashes, and the extraction map above. Reproduce its unmodified two-device demo and focused tests in a disposable reference copy; record failures without altering the supplied reference.
-2. Initialize the repository if needed. Commit these planning documents. Pin one compatible Bun runtime/package manager, the necessary frontend/backend dependencies, Python dependencies, and FFmpeg. Use the source's existing testing approach. New commands must work from PowerShell; do not blindly copy POSIX `rm`, `tee`, or shell environment-assignment scripts.
-3. Create the directory skeleton, minimal build/typecheck/test scripts, and `AGENTS.md` pointing every agent to `rules.md`, this plan, and `.devcontext/README.md`.
-4. Freeze `protocolVersion: 1` schemas and examples for joins, snapshots, clock probes, calibration, assignments, show transport, and OTC input/output. Use Zod as the authoring source, inferred TypeScript types, and generated JSON Schema for Python validation. Use JSON-compatible wire fields and reject schema-generation drift; avoid separately maintained competing type definitions.
-5. Commit an exhaustive 2,048-entry OTC codebook, its encoder specification, and representative golden packets. Team 2 renders these frozen codewords; Team 3 decodes them. Both must pass the same vectors before changing the packet.
-6. Supply fixtures for a 30-device crowd, three overlapping views, four channels, one prepared show, and an OTC result containing valid, missing, ambiguous, and duplicate observations. Provide a deterministic clock double and minimal HTTP/WS mocks. No team may require an unmerged sibling branch for its local tests.
-7. Define the root command interface in section 8, allocate ports, and add per-team CI checks. Mark commands as scaffolded only once they actually run.
-8. Commit and tag this baseline `foundation-v1`; create the four feature branches from that commit. Save their base SHA in the context index.
+`git rev-parse foundation-v1` identifies the common base; all four local feature branches are created at that commit. The tag is the canonical immutable baseline reference, avoiding a self-referential SHA in the commit that creates this document. Each team records the resolved SHA in its first journal.
 
-Do not spend the foundation window reproducing the full application. Its output is executable contracts and test seams. Keep the source tree outside the active workspaces, import aliases, build globs, and production assets. Verify the extracted project in a clean checkout that omits `beatsync-source/`.
+Do not repeat scaffold setup. Preserve the source-free build boundary and the executable schemas. Future extraction updates the existing `THIRD_PARTY_NOTICES.md` and provenance ledger. The following original foundation experiments remain explicit first team milestones, rather than blocking independent coding:
+
+- Teams 1/2: reproduce the unmodified BeatSync two-device baseline in a disposable copy, port focused tests, and characterize timing before adapting the estimator/audio path.
+- Team 3: obtain original camera clips and inspect near/back-row pixels; select/pin FFmpeg/PyAV/OpenCV based on actual codecs. No recorded MP4 is supplied by the foundation.
+- All leads: record deadline, human owners, venue access, supported phone sample, and music. Review shared fixtures before proposing any interface changes.
+
+The foundation does not claim synchronization, decoding, browser-interaction, load, or venue tests passed. Stage briefs define how each team replaces its shell/seam with real behavior and extends its gate.
 
 ### Branch/worktree setup
 
-These are future setup commands, not actions already performed by this planning task. Run after the committed foundation exists. On a shared Windows machine, use separate worktrees outside OneDrive's synchronized directory when practical; each teammate on a different machine can instead use an ordinary clone and the matching branch.
+The local branches already exist. On a shared Windows machine, use separate worktrees outside OneDrive's synchronized directory when practical; teammates on different machines can use ordinary clones after the captain publishes the refs. Worktree creation is left to each lead so machine paths are chosen locally.
 
 ```powershell
-# Run from the repository after creating foundation-v1.
+# Run from the repository containing the existing four local branches.
 # These destination directories must be new or empty.
-git worktree add -b feat/sync-control C:/Projects/HTN-worktrees/sync-control foundation-v1
-git worktree add -b feat/audio-client C:/Projects/HTN-worktrees/audio-client foundation-v1
-git worktree add -b feat/otc-localization C:/Projects/HTN-worktrees/otc-localization foundation-v1
-git worktree add -b feat/admin-console C:/Projects/HTN-worktrees/admin-console foundation-v1
+git worktree add C:/Projects/HTN-worktrees/sync-control feat/sync-control
+git worktree add C:/Projects/HTN-worktrees/audio-client feat/audio-client
+git worktree add C:/Projects/HTN-worktrees/otc-localization feat/otc-localization
+git worktree add C:/Projects/HTN-worktrees/admin-console feat/admin-console
 ```
 
 Never have multiple agents changing branches or installing dependencies in the same working directory. Each team lead assigns agents non-overlapping files or additional private worktrees. The four named branches remain the long-lived team integration branches.
 
 ## 4. Shared contracts and invariants
 
-The following is the baseline specification to implement in `packages/contracts/`. After foundation, the executable schemas and approved ADRs define the exact wire representation; update this plan when a material decision changes.
+The executable schemas in `packages/contracts/src/` and approved ADRs define the exact wire representation. The following explains their semantics; update this plan when a material decision changes. Structural validation does not replace the server's authorization, uniqueness, referential integrity, or revision checks.
 
 ### Identity, time, and state
 
@@ -214,6 +233,8 @@ Endpoint names below are the initial contract. Commands return either a validate
 
 Use an envelope with `protocolVersion`, `sessionId`, `serverEpoch`, `type`, `messageId`, and `payload`; state events also carry `revision`, and scheduled events carry `effectiveServerMs`. Client clock probes correlate replies with their probe ID. Client mutation requests carry `commandId` and relevant expected revision. Snapshot/resume is mandatory; correctness must not depend on receiving every broadcast.
 
+Keep state ordering separate from cancellation: a newer unrelated mix update must not cancel an already accepted transport start. Pending actions carry their domain revision (`transportRevision`, per-device `assignmentRevision`, or `mixRevision`) and any explicit superseded command ID. MVP permits one pending transport change and one pending assignment change per device; replacement in the same domain explicitly cancels the prior pending change. Snapshots include both effective state and pending actions.
+
 The public QR code only grants participant access. Admin commands/uploads require a separate operator credential. Bind a participant socket to its authenticated device, validate message shape/size, and limit join/upload rates. The OTC worker accepts server-resolved local file paths; never execute an uploaded filename as shell code. Do not build a general account system.
 
 ### Calibration and worker interchange
@@ -254,6 +275,8 @@ Encoder convention, frozen in the shared codebook:
 - Position 16 is overall even parity over all 16 positions.
 - Transmit positions 1 through 16 in that order. ID `0` encodes to all zeros; ID `2047` to all ones. Zero must never mean missing.
 
+Additional checked golden examples: ID `1` -> `1101000100000011`; ID `1024` -> `1110000000000001`. An independent planning calculation enumerated the specified 2,048 codewords and confirmed uniqueness and minimum pairwise distance 4. This verifies the packet mathematics only, not screen/camera decoding.
+
 Use two camera-tested screen colors, represented by exact RGB values in the manifest; the user's blue/red idea is one candidate, not a hard-coded decoder assumption. Use pilot measurements to classify colors rather than ideal RGB thresholds. Prefer a palette without saturated red after testing. No per-device imagery, text, or animation may cover the calibration area.
 
 Initial symbol duration is **200 ms**. The complete packet is:
@@ -276,7 +299,7 @@ A 200 ms symbol gives approximately six 30 fps frames before transition rejectio
 ### 5.3 Client and server sequence
 
 1. Freeze a run's participant IDs. Only joined, foreground, opted-in, sufficiently synchronized phones are eligible. New joiners wait for the next calibration or use manual assignment.
-2. Send `calibration.prepare` with the full immutable packet/manifest. Clients verify support and acknowledge readiness for that exact run and version.
+2. Send `calibration.prepare` with the immutable `CalibrationPlan` (packet, palette, versions, participant IDs). Clients acknowledge that exact run and version. Arm sends `CalibrationRun`, adding the scheduled start; only after uploads does the worker's `CalibrationManifest` add local camera files/hashes.
 3. Confirm all three camera operators are recording; arm for a common future time, initially at least three seconds ahead. Freeze the ready subset and report exclusions. Do not wait indefinitely for every registered phone.
 4. The client renders `slot = floor((nowServerMs() - startServerMs) / symbolMs)` from the pure sync clock on each animation frame. Do not increment bits with a chain of timers. A skipped frame must not shift every later bit.
 5. If a phone misses the run start, becomes hidden, or loses adequate timing, report failure; do not begin its own delayed packet. Log requested symbol transitions and observed animation-frame lateness as diagnostics, not proof of physical display timing.
@@ -354,20 +377,24 @@ Deliver in this order:
 
 Each show clip has `clipId`, `channelId`, `trackId`, `timelineStartMs`, `sourceOffsetMs`, `durationMs`, and `gain`. Validate source bounds and prohibit channel overlaps in the MVP. Align prepared stems to a common musical origin; mixing percussion from one song with melody from another requires compatible tempo/key and explicit preparation, not just a shared clock.
 
-A playing transport snapshot includes `showRevision`, `transportRevision`, `startServerMs`, and `positionMsAtStart`. At server time `S`, the show playhead is:
+A playing transport snapshot includes `showRevision`, `transportRevision`, `startServerMs`, and `positionMs` (the position at that start time). At server time `S`, the show playhead is:
 
 ```text
-showPositionMs = positionMsAtStart + (S - startServerMs)
+showPositionMs = positionMs + (S - startServerMs)
 clipSourceMs = sourceOffsetMs + (showPositionMs - timelineStartMs)
 ```
 
 Only play a clip when the show position is within its scheduled interval. Pausing holds a fixed show position. Seeking replaces the transport revision and schedules a new start; all channels use the same revised position. The admin playhead is derived from this state, not an independently accumulating UI timer.
+
+Before a future transport change becomes effective, retain the previous effective state and display its pending countdown. Do not evaluate a not-yet-started show as a negative playhead or stop current playback merely because its replacement command arrived.
 
 Convert a cue's server time to client performance time using `packages/sync/`, then to AudioContext time using one tested output-clock strategy. Schedule with Web Audio source/gain methods. JavaScript timers may maintain a queue but must not be the mechanism that starts sound at the deadline. The [Web Audio specification](https://www.w3.org/TR/webaudio/#dom-audiocontext-getoutputtimestamp) defines the relationship returned by `getOutputTimestamp()`; feature-detect valid support and test the fallback. Never subtract output latency again when the chosen mapping already accounts for it.
 
 During reassignment, prepare the target assets first, then atomically change subscription and schedule a short gain ramp at the common switch time. Retain the old channel until the target is ready or explicitly mute the device; do not silently play a missing asset. Preserve the common playhead instead of restarting the target track at zero. For a late cue, compute a new future rendezvous from current authoritative state or remain silent and request resync; calibration packets are never locally restarted late.
 
 Panic invalidates all queued audio actions and mutes immediately on receipt. Add a bounded playback lease, initially 10 seconds renewed by control heartbeats, so disconnected phones stop instead of playing indefinitely. A disconnected phone cannot receive an instantaneous panic; expose the lease bound and test it. A fresh authenticated snapshot and explicit ready state are required before it resumes.
+
+Schedule lease expiry through an audio-clock output gate, renewing that gate on heartbeat; a background-throttled JavaScript timeout is not a dependable stop mechanism. Keep this gate separate from musical gain automation, and require renewed readiness after an AudioContext interruption.
 
 ### Media, memory, and network budgets
 
@@ -390,6 +417,131 @@ Build against a deterministic mock immediately, then replace the adapter with th
 4. **Assign:** rectangle and lasso selection, column presets, explicit selected-ID count, channel color, clear assignment, and a preview before scheduling changes. Unknowns stay in a separate list. Keep a one-step restore of the previous assignment set for operator mistakes.
 5. **Perform:** a shared time ruler/playhead, one lane per channel, visible clip blocks/waveforms, play/pause/stop, seek, gain, mute/solo, cue markers, and readiness for the next cue. Clip dragging/trim may be done while stopped; live edits use scheduled transport/mix commands. Offline-generated waveform peaks or browser-computed peaks are sufficient; waveform rendering must not delay playback.
 
-Implement selected-ID geometry as pure functions in `packages/selection/`. Render 1,500 dots with canvas/SVG or an equivalently measured approach; avoid making every telemetry message rerender the entire interface. Display server-confirmed versus pending actions distinctly. On stale revisions or lost connection, show the conflict and refresh authoritative state rather than presenting a successful local change.
+Implement selected-ID geometry as pure functions in `packages/selection/`. Render 1,500 device records with canvas/SVG or an equivalently measured approach; avoid making every telemetry message rerender the entire interface. Display server-confirmed versus pending actions distinctly. On stale revisions or lost connection, show the conflict and refresh authoritative state rather than presenting a successful local change.
 
 First milestone: a mock-driven walkthrough from three uploads to a colored map, selection, assignment, and a moving four-lane playhead. Final milestone: the same walkthrough drives real phones and shows an explicit fallback when localization is incomplete.
+
+## 8. Independent development and verification
+
+### Commands available in foundation-v1
+
+These commands run after the [documented installation](README.md). Each focused gate needs no sibling service or unmerged branch. Mocks are labeled, loopback-only, and frontend mock mode is disabled in production builds. The gates currently verify scaffold behavior; each team must add the feature checks in the inventory below.
+
+| Branch | Local demonstration command | Focused gate | Dependency substitute |
+| --- | --- | --- | --- |
+| Sync/control | `bun run dev:sync-demo` | `bun run gate:sync` | Real health/501 shell; registry, sync and load behavior pending |
+| Audio/client | `bun run dev:client-demo` | `bun run gate:client` | Readiness preview; snapshot/assets/probes/explicit broadcast mock |
+| OTC | `bun run otc:validate` then `bun run otc:replay` | `bun run gate:otc` | Validates boundary and replays explicitly synthetic JSON; video processing pending |
+| Admin | `bun run dev:admin-demo` | `bun run gate:admin` | Read-only 1,500-device map/readiness fixture; workflow mutations pending |
+| Shared contracts | `bun run contracts:check` and `bun run fixtures:check` | `bun run test:contracts` | Golden messages, exhaustive codebook and independent mathematical checks |
+| Shells together | `bun run dev:all` | `bun run gate` then `bun run test:smoke` | Actual backend/frontend builds and HTTP startup, no concert workflow yet |
+| Reference isolation | `bun run check:isolation` | Full gate in a fresh source-free copy | Frozen JS/Python install without `beatsync-source/` |
+
+**Future commands, to be implemented and documented by their owners:** Team 3's real `python -m otc process --manifest <real-manifest> --output <result>` currently fails explicitly; `test:e2e` (captain/all teams) and `test:load -- --clients 1500 --duration 300` (Team 1) are not scripts yet. The committed OTC manifest has placeholder camera paths, not recordings. Extend branch-owned adapters for joins/mutations/job progress/failure scenarios; the shared mock is intentionally only the minimal starting seam described in `packages/testkit/README.md`.
+
+Initial ports: backend `8080`, participant UI `3000`, admin UI `3001`, client mock `18081`, admin mock `18084`; the OTC CLI has no port. Keep per-worktree environment files and runtime directories separate. Bind a phone-demo server to a reachable interface; `localhost` in a phone's URL means the phone, not the development laptop. Use a tested HTTPS origin for the actual event.
+
+Every gate runs schema/fixture drift checks, boundary checks, root lint/typecheck and contract tests. Each JS gate adds its focused tests and build; OTC adds Ruff and Python boundary/CLI tests (decoder/geometry tests must be added by Team 3). CI runs the four gates independently; its hosted execution remains pending until publication. Shared contract changes require all consumer gates. Ported BeatSync tests must run against extracted modules, not imports into the reference tree.
+
+Foundation checks must exercise actual boundary fixtures; a no-op script or empty test run is not a passing gate. As each implementation lands, extend its gate with the behaviors listed below and retain explicit pending status for physical checks.
+
+### Required test inventory
+
+| Owner | Automated evidence | Physical/manual evidence |
+| --- | --- | --- |
+| Team 1 | Clock offset sign, min-RTT selection, pair ordering/reset, wall-clock changes, sample age, server epoch replacement; duplicate joins, capacity, authorization, revisions/idempotency, stale ACKs, slow clients, subscription isolation, snapshot recovery, panic/lease; load during uploads and worker execution | Two-device source baseline; venue QR/HTTP/WSS reachability and connection readiness |
+| Team 2 | Output-clock units/fallback, no double compensation, one-context lifecycle, asset hashes, decoded-byte cache limits, simultaneous channel schedules, late joins, assignment at current playhead, seek/pause cancellation, interruption/resume, exact packet slot selection and missed frames | iOS Safari and Android Chrome phones, audio unlock, speaker/mute/volume, screen visibility, 2-minute sync, interruption and foreground return |
+| Team 3 | All 2,048 codewords; exhaustive single-bit correction/double-bit rejection under the decoder's documented assumptions; bounded erasures; complemented pass; invalid tag; frame timestamps/rotation; motion, dropped frames, occlusion, overlaps, reflections, color drift, compression, missing cameras, disconnected overlap, false matches | Actual original 4K phone recordings with known IDs/seats and near/back-row devices; annotated accepted/rejected tracks |
+| Team 4 | Selection boundaries/orientation, 1,500 points, coarse/unseen filtering, stale map, overlapping assignments, job retry/failure, pending versus committed actions, shared playhead, stopped editing, scheduled mix/transport, reconnect and panic | End-to-end operator walkthrough from QR to selected crowd playing different stems; camera upload/anchor usability |
+
+Synthetic video generation must have reproducible seeds and ground truth independent from the decoder's decisions. Include clean and progressively degraded scenes, 24/30/60 fps and variable timestamps, several-pixel screens, mild motion, moving occluders, merged screens, and unrelated blinking lights. Keep tiny fixtures in Git; generate full-density recordings locally or retrieve them by a documented manifest/hash. Label every result synthetic or physical.
+
+Use real-browser automation for UI/control flows where useful; mocked AudioContexts cannot establish acoustic timing. For a quantitative acoustic test, compare phones against a common reference using synchronized recording channels or a documented equal-path setup that can separate each device's onset. Report recording method, distances, devices/OS versions, sample count, median/p95/worst error, and drift. Do not infer acoustic accuracy from WebSocket arrival timestamps or estimated clock uncertainty.
+
+### Initial acceptance targets
+
+These are engineering targets to test and revise with evidence, not performance guarantees.
+
+| Gate | Target / pass condition |
+| --- | --- |
+| Source extraction | Focused baseline tests preserved; main app builds/tests without `beatsync-source/`; MIT notice and provenance recorded |
+| Contract compatibility | Every fixture validates in TS/Python; generation is deterministic; all 2,048 IDs round-trip and codebook minimum distance is 4 |
+| Clock logic | Deterministic symmetric-delay scenarios meet a 10 ms p95 error target; adversarial asymmetry explicitly demonstrates estimator limits; no stale epoch schedules |
+| Physical audio | Initial target <=30 ms p95 relative onset error on the supported, built-in-speaker device sample after accounting for recording path; measure over two minutes |
+| Optical correctness | Clean synthetic cases identify every resolvable phone with zero wrong accepted IDs; mildly degraded cases target >=95% recall with zero wrong accepted IDs in the fixture set |
+| Field optical result | Target >=90% of independently verified visible test phones localized, with zero observed misidentifications; report visible/participating counts separately and all rejection reasons |
+| Position usefulness | All audited accepted devices land in the correct column; coarse front/back ordering agrees with known seats within the chosen selection tolerance; uncertain boundaries flagged |
+| Processing | Initial target <=90 seconds for three approximately 15-second 4K clips on the named processing machine, excluding upload; measure peak memory and full end-to-end time |
+| Control capacity | 1,500 sockets for five minutes including a join wave, reassignment, reconnects, upload and worker activity; no lost committed state; p99 control event-loop delay <50 ms target |
+| Cue delivery | In the load scenario, >=99% of eligible connected clients acknowledge a scheduled cue before its deadline; dashboard accurately reports every excluded/late client |
+| Operator workflow | 1,500-device selection remains interactive, initially <100 ms target for selection computation; no UI claim of success before server confirmation |
+| Demonstration | Three consecutive complete rehearsals on the chosen physical setup, including one forced optical failure and one reconnect/panic recovery |
+
+Do not change targets after a failure without recording why, the new evidence, and the resulting demo limitation. A small zero-error test is useful evidence, not proof of a population-wide error rate. If sub-30 ms phone audio is unattainable, adjust the arrangement/device set and report the actual measurement; do not label clock synchronization alone as the acoustic gate.
+
+## 9. Integration order and team handoffs
+
+Merge small vertical slices during development; do not wait for four finished branches.
+
+1. **Foundation (complete):** `foundation-v1` supplies schemas, generated artifacts, fixtures, executable gates, and mock interfaces. All four branches start here.
+2. **Clock-to-client:** merge Team 1's extracted sync and Team 2's join/unlock/click path. Verify against two phones. This proves the reusable sync seam before any optical dependency.
+3. **First optical round trip:** merge Team 2's packet renderer and Team 3's codebook/clean-clip decoder. Team 4 already accepts fixture results. Film a small real group and decode actual IDs.
+4. **First spatial concert:** connect Team 1's assignments to Team 2's four-channel audio and Team 4's selections using a fixture map. This provides an independently demonstrable fallback while OTC improves.
+5. **Real map:** integrate uploads, worker progress/results, manual geometry, map review/commit, and then overlap registration. Verify one decoded ID reaches exactly the intended phone/channel.
+6. **Show and scale:** connect the complete transport/mix workflow, then run load plus worker/upload contention and real-device rehearsals. Freeze a tagged demonstration build.
+
+For every cross-team change, the producer supplies schema/version, a minimal example, a passing test command, error behavior, and known limitations in its handoff file. The consumer verifies that exact fixture. Contract changes merge before consumer changes; merge the latest `main` into long-lived feature branches instead of rewriting shared history. The captain owns merge conflicts in shared files. A passing mock-only branch is ready for integration, not automatically ready for stage.
+
+When blocked on another team, continue against its frozen fixture and record the missing behavior. Do not silently implement a competing server, time estimator, packet format, or state model. Teams that finish early can help Team 3 with labeled recordings/test fixtures or another team's explicitly assigned files after the receiving lead agrees on ownership.
+
+## 10. Milestones and go/no-go decisions
+
+Illustrative 36-hour schedule; preserve the sequence and reserve the final portion for rehearsal even if the actual window differs.
+
+| Window | All-team checkpoint | Required decision |
+| --- | --- | --- |
+| Hours 0-2 | Foundation, source characterization, first screen visibility and two-phone sound experiments | Is the intended venue/camera geometry plausible? Fix framing early |
+| Hours 2-6 | Each branch runs independently; Team 3 decodes a clean real-phone recording; four-lane console works with mocks | Keep or adjust packet/palette and media arrangement |
+| Hours 6-12 | Integrated join -> sync -> flash -> decode -> map -> assign -> play on 12-30 phones | If optics lag, preserve manual columns as the working demo while improving recall |
+| Hours 12-22 | Motion/occlusion handling, three cameras, registration fallback, mobile edge cases, first 1,500-socket run | Resolve measured failures; defer cosmetic or speculative features |
+| Hours 22-28 | Venue/representative-distance rehearsal, original camera files, upload timing, media preload, acoustic listening from several seats | Decide full crowd versus a reliable smaller participating area |
+| Hours 28-32 | Three complete rehearsals, fallback drills, shared documentation/handoffs | Freeze feature scope and tag the working build |
+| Hours 32-36 | Fix only demonstrated blockers, prepare devices/recordings, final set rehearsal | No dependency upgrades or protocol redesign |
+
+**The first gating risk is optical visibility and tracking, followed by venue networking and acoustic behavior.** Bring the slowest phones and furthest seats into the first experiments. If a true 1,000-phone rehearsal is unavailable, retain that as an unverified scale assumption in the presentation and the context notes.
+
+## 11. Ceremony runbook and fallbacks
+
+Assign one teammate to the console/show and the other three to the camera columns during capture. Once files are transferred, the camera operators can help resolve participant issues and inspect results. Arrange the joining/preloading window with the event team before the presentation if possible; audience onboarding plus video upload/processing may exceed the on-stage slot.
+
+1. Start the frozen build, create/load the prepared show, test HTTPS/WSS/media access from the audience network, and verify the server machine stays awake. Load four stems and confirm their aligned source origins.
+2. Position and secure cameras, mark primary columns/anchors, take back-row test crops, and verify recording codec/free storage. Keep the server clock process stable after devices synchronize.
+3. Put the join QR on screen early. Participants tap to enable sound, allow enough time for media download, and keep the page open. Display accurate readiness counts before proceeding.
+4. Record all cameras, prepare/arm one calibration, run the roughly 11-second packet, and stop recordings after the trailing margin. Transfer originals through the tested upload path or a tested wired transfer into the same manifest workflow.
+5. Process, inspect annotated matches, confirm map orientation with known volunteers, and commit the result. Use manual column mapping or declared manual participant choices for unresolved sections. Do not wait indefinitely for a perfect map.
+6. Select three/four regions, assign instruments, verify ready counts, then schedule a short musical cue. Confirm expected phones play and others remain silent. Begin the prepared performance.
+7. Keep mute/panic visible. End with a scheduled stop, confirm clients are silent, and retain only the recordings needed for agreed debugging. Keep raw audience recordings out of the repository.
+
+| Failure | Prepared fallback |
+| --- | --- |
+| Automatic camera stitching fails | Manual column anchors; continue using optically decoded IDs |
+| A camera is missing | Localize the two available columns; explicitly assign the remaining column manually |
+| Optical decoding has inadequate recall | Retry the affected subset, then manual left/center/right choice; identify the fallback honestly |
+| Audience network cannot handle downloads/joins | Use a rehearsed smaller participating area/device set and preloaded assets; do not assume one hotspot serves 1,000 phones |
+| Some phones miss a cue | Keep them silent, display their status, and rendezvous at a later scheduled cue |
+| Audio sounds smeared across the room | Use spatial call-and-response, sustained parts, or smaller nearby sections from the prepared fallback arrangement |
+| Full live calibration exceeds the presentation time | Calibrate the current audience beforehand if allowed; otherwise demonstrate a smaller live group and label any prerecorded material |
+| Backend restarts | New epoch, stopped state, reconnect/resync/readiness before restarting; never replay stale pending actions |
+
+## 12. Definition of done and remaining inputs
+
+The implementation is done when the extracted project is independent of the reference source; four focused gates and integrated checks pass; a real three-camera calibration produces reviewed device-ID/location pairs; operator selections determine which real phones play each synchronized channel; the prepared timeline and interruption/stop paths work; and `.devcontext` contains reproducible evidence, measured limits, and handoffs for all four teams.
+
+Resolve these early without blocking unrelated work:
+
+- Exact hackathon deadline, presentation duration, and permission/timing for audience joining before the set: all human leads.
+- Venue column/row layout, camera positions/models, furthest phone distance, network access/capacity, and processing laptop: Teams 1 and 3.
+- Prepared stems, musical arrangement, target browser/device sample, and acceptable listening result: Team 2 with the show operator.
+- Any upstream BeatSync revision metadata absent from the supplied copy: Team 1; source hashes are an acceptable provenance baseline.
+
+Further technical references are linked at their relevant decisions above. The OTC packet, numerical targets, and architecture are proposed project choices and must be validated in this venue; those sources do not establish success with this audience.

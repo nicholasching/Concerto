@@ -1,0 +1,15 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: #101724; color: #dfe8f5; font: 16px/1.6 system-ui, sans-serif; }
+main { max-width: 1040px; margin: 0 auto; padding: 48px 24px; }
+h1 { margin: 4px 0 20px; font-size: 42px; line-height: 1.2; }
+h2 { font-size: 20px; }
+p { max-width: 800px; }
+.eyebrow { color: #88a9cf; letter-spacing: .12em; font-size: 12px; }
+.notice { color: #f2c76d; font-weight: 700; letter-spacing: .08em; }
+section { margin: 26px 0; padding: 22px; background: #192336; border: 1px solid #2c3b52; border-radius: 10px; }
+.status { color: #71d0b0; font-weight: 600; }
+.stats { display: flex; flex-wrap: wrap; gap: 28px; }
+.stats strong { font-size: 30px; }
+svg { width: 100%; background: #101724; border-radius: 8px; }
+.lane { padding: 12px; margin: 8px 0; border-left: 5px solid; background: #222e43; }
+.lane span { float: right; color: #a1b3cc; }

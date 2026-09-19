@@ -1,0 +1,1010 @@
+{
+  "protocolVersion": 1,
+  "sessionId": "demo",
+  "serverEpoch": "fixture-epoch",
+  "revision": 1,
+  "serverMs": 90000,
+  "show": {
+    "showId": "foundation-show",
+    "showRevision": 1,
+    "label": "Synthetic four-channel fixture",
+    "tracks": [
+      {
+        "trackId": "tone-0",
+        "label": "Percussion test tone",
+        "url": "/api/assets/tone-0",
+        "sha256": "2ef802bfb6be4b718d12275994fefc72cf3bcb96abe87849747a4b529f7133ee",
+        "byteSize": 256044,
+        "durationMs": 8000,
+        "sampleRateHz": 16000,
+        "channels": 1
+      },
+      {
+        "trackId": "tone-1",
+        "label": "Bass test tone",
+        "url": "/api/assets/tone-1",
+        "sha256": "02faf8b9d6bc1dfe563f6a401db901359763b4426ef447454631c8f6a54373a5",
+        "byteSize": 256044,
+        "durationMs": 8000,
+        "sampleRateHz": 16000,
+        "channels": 1
+      },
+      {
+        "trackId": "tone-2",
+        "label": "Harmony test tone",
+        "url": "/api/assets/tone-2",
+        "sha256": "3f88642fca03098a80eaff3fbc1975c46b15c7962e247f3978c969ae6a930161",
+        "byteSize": 256044,
+        "durationMs": 8000,
+        "sampleRateHz": 16000,
+        "channels": 1
+      },
+      {
+        "trackId": "tone-3",
+        "label": "Melody test tone",
+        "url": "/api/assets/tone-3",
+        "sha256": "946d5720435a611ccc098f01af83cb242b16718493e4707eabde4b6e6bbfa852",
+        "byteSize": 256044,
+        "durationMs": 8000,
+        "sampleRateHz": 16000,
+        "channels": 1
+      }
+    ],
+    "channels": [
+      {
+        "channelId": "channel-0",
+        "label": "Percussion",
+        "color": "#f59e0b",
+        "gain": 0.3,
+        "mute": false,
+        "solo": false
+      },
+      {
+        "channelId": "channel-1",
+        "label": "Bass",
+        "color": "#34d399",
+        "gain": 0.3,
+        "mute": false,
+        "solo": false
+      },
+      {
+        "channelId": "channel-2",
+        "label": "Harmony",
+        "color": "#a78bfa",
+        "gain": 0.3,
+        "mute": false,
+        "solo": false
+      },
+      {
+        "channelId": "channel-3",
+        "label": "Melody",
+        "color": "#38bdf8",
+        "gain": 0.3,
+        "mute": false,
+        "solo": false
+      }
+    ],
+    "clips": [
+      {
+        "clipId": "clip-0",
+        "channelId": "channel-0",
+        "trackId": "tone-0",
+        "timelineStartMs": 0,
+        "sourceOffsetMs": 0,
+        "durationMs": 8000,
+        "gain": 1
+      },
+      {
+        "clipId": "clip-1",
+        "channelId": "channel-1",
+        "trackId": "tone-1",
+        "timelineStartMs": 0,
+        "sourceOffsetMs": 0,
+        "durationMs": 8000,
+        "gain": 1
+      },
+      {
+        "clipId": "clip-2",
+        "channelId": "channel-2",
+        "trackId": "tone-2",
+        "timelineStartMs": 0,
+        "sourceOffsetMs": 0,
+        "durationMs": 8000,
+        "gain": 1
+      },
+      {
+        "clipId": "clip-3",
+        "channelId": "channel-3",
+        "trackId": "tone-3",
+        "timelineStartMs": 0,
+        "sourceOffsetMs": 0,
+        "durationMs": 8000,
+        "gain": 1
+      }
+    ]
+  },
+  "transport": {
+    "status": "stopped",
+    "transportRevision": 0,
+    "showRevision": 1,
+    "positionMs": 0,
+    "startServerMs": null
+  },
+  "pendingActions": [],
+  "role": "admin",
+  "audienceMap": {
+    "mapRevision": 1,
+    "runId": "fixture-run",
+    "evidence": "synthetic",
+    "locations": [
+      {
+        "deviceId": 0,
+        "column": "left",
+        "sourceCameraIds": [
+          "camera-left"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.16666666666666666,
+        "y": 0.09090909090909091,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 1,
+        "column": "center",
+        "sourceCameraIds": [
+          "camera-center"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.5,
+        "y": 0.09090909090909091,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 2,
+        "column": "right",
+        "sourceCameraIds": [
+          "camera-right"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.8333333333333334,
+        "y": 0.09090909090909091,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 3,
+        "column": "left",
+        "sourceCameraIds": [
+          "camera-left"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.16666666666666666,
+        "y": 0.18181818181818182,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 4,
+        "column": "center",
+        "sourceCameraIds": [
+          "camera-center"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.5,
+        "y": 0.18181818181818182,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 5,
+        "column": "right",
+        "sourceCameraIds": [
+          "camera-right"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.8333333333333334,
+        "y": 0.18181818181818182,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 6,
+        "column": "left",
+        "sourceCameraIds": [
+          "camera-left"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.16666666666666666,
+        "y": 0.2727272727272727,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 7,
+        "column": "center",
+        "sourceCameraIds": [
+          "camera-center"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.5,
+        "y": 0.2727272727272727,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 8,
+        "column": "right",
+        "sourceCameraIds": [
+          "camera-right"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.8333333333333334,
+        "y": 0.2727272727272727,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 9,
+        "column": "left",
+        "sourceCameraIds": [
+          "camera-left"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.16666666666666666,
+        "y": 0.36363636363636365,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 10,
+        "column": "center",
+        "sourceCameraIds": [
+          "camera-center"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.5,
+        "y": 0.36363636363636365,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 11,
+        "column": "right",
+        "sourceCameraIds": [
+          "camera-right"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.8333333333333334,
+        "y": 0.36363636363636365,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 12,
+        "column": "left",
+        "sourceCameraIds": [
+          "camera-left"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.16666666666666666,
+        "y": 0.45454545454545453,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 13,
+        "column": "center",
+        "sourceCameraIds": [
+          "camera-center"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.5,
+        "y": 0.45454545454545453,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 14,
+        "column": "right",
+        "sourceCameraIds": [
+          "camera-right"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.8333333333333334,
+        "y": 0.45454545454545453,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 15,
+        "column": "left",
+        "sourceCameraIds": [
+          "camera-left"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.16666666666666666,
+        "y": 0.5454545454545454,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 16,
+        "column": "center",
+        "sourceCameraIds": [
+          "camera-center"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.5,
+        "y": 0.5454545454545454,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 17,
+        "column": "right",
+        "sourceCameraIds": [
+          "camera-right"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.8333333333333334,
+        "y": 0.5454545454545454,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 18,
+        "column": "left",
+        "sourceCameraIds": [
+          "camera-left"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.16666666666666666,
+        "y": 0.6363636363636364,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 19,
+        "column": "center",
+        "sourceCameraIds": [
+          "camera-center"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.5,
+        "y": 0.6363636363636364,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 20,
+        "column": "right",
+        "sourceCameraIds": [
+          "camera-right"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.8333333333333334,
+        "y": 0.6363636363636364,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 21,
+        "column": "left",
+        "sourceCameraIds": [
+          "camera-left"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.16666666666666666,
+        "y": 0.7272727272727273,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 22,
+        "column": "center",
+        "sourceCameraIds": [
+          "camera-center"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.5,
+        "y": 0.7272727272727273,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 23,
+        "column": "right",
+        "sourceCameraIds": [
+          "camera-right"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.8333333333333334,
+        "y": 0.7272727272727273,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 24,
+        "column": "left",
+        "sourceCameraIds": [
+          "camera-left"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.16666666666666666,
+        "y": 0.8181818181818182,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 25,
+        "column": "center",
+        "sourceCameraIds": [
+          "camera-center"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.5,
+        "y": 0.8181818181818182,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 26,
+        "column": "right",
+        "sourceCameraIds": [
+          "camera-right"
+        ],
+        "decodeScore": 0.98,
+        "mappingResidualPx": 1,
+        "status": "localized",
+        "x": 0.8333333333333334,
+        "y": 0.8181818181818182,
+        "mappingMode": "manual-anchors"
+      },
+      {
+        "deviceId": 27,
+        "column": "left",
+        "sourceCameraIds": [],
+        "decodeScore": null,
+        "mappingResidualPx": null,
+        "status": "coarse",
+        "x": null,
+        "y": null,
+        "mappingMode": "manual-column"
+      },
+      {
+        "deviceId": 28,
+        "column": "center",
+        "sourceCameraIds": [],
+        "decodeScore": null,
+        "mappingResidualPx": null,
+        "status": "ambiguous",
+        "x": null,
+        "y": null,
+        "mappingMode": "none"
+      },
+      {
+        "deviceId": 29,
+        "column": "right",
+        "sourceCameraIds": [],
+        "decodeScore": null,
+        "mappingResidualPx": null,
+        "status": "unseen",
+        "x": null,
+        "y": null,
+        "mappingMode": "none"
+      }
+    ]
+  },
+  "devices": [
+    {
+      "deviceId": 0,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 1,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 2,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 3,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 4,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 5,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 6,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 7,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 8,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 9,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 10,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 11,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 12,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 13,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 14,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 15,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 16,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 17,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 18,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 19,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 20,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 21,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 22,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 23,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 24,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 25,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 26,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 27,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 28,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    },
+    {
+      "deviceId": 29,
+      "connected": true,
+      "foreground": true,
+      "clockReady": true,
+      "clockUncertaintyMs": 5,
+      "clockSampleAgeMs": 100,
+      "audioUnlocked": false,
+      "decodedTrackHashes": {}
+    }
+  ],
+  "assignments": [
+    {
+      "deviceId": 0,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 1,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 2,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 3,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 4,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 5,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 6,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 7,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 8,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 9,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 10,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 11,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 12,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 13,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 14,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 15,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 16,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 17,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 18,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 19,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 20,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 21,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 22,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 23,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 24,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 25,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 26,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 27,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 28,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    },
+    {
+      "deviceId": 29,
+      "channelId": null,
+      "assignmentRevision": 0,
+      "mapRevision": 1
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "@orchestra/contracts",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts", "./otc": "./src/otc.ts" },
+  "dependencies": { "zod": "4.4.3" }
+}
