@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { z } from "zod";
 import {
   ApiError, AssignmentRequest, CommandAccepted, JoinRequest, JoinResponse, MixRequest, PROTOCOL_VERSION,
-  SaveShowRequest, TransportRequest,
+  SaveShowRequest, Track, TransportRequest,
 } from "@orchestra/contracts";
+import type { AssetStore } from "./assets";
 import { matchesOperatorSecret } from "./auth";
 import { Barrier } from "./barriers";
 import type { ServerClock } from "./clock";
@@ -18,6 +20,16 @@ import { nextTransport, positionAt } from "./transport";
 
 export const DEFAULT_LEAD_TIME_MS = 3000;
 
+const numeric = z.coerce.number();
+const AssetUpload = z.object({
+  commandId: z.string().min(1).max(160),
+  label: z.string().min(1).max(200),
+  byteSize: numeric.int().positive(),
+  durationMs: numeric.positive(),
+  sampleRateHz: numeric.int().positive(),
+  channels: numeric.int().min(1).max(2),
+});
+
 export interface AppDeps {
   clock: ServerClock;
   registry: DeviceRegistry;
@@ -27,6 +39,7 @@ export interface AppDeps {
   commands: CommandLog;
   connections: ConnectionRegistry;
   preparations: Preparations;
+  assets: AssetStore;
   operatorSecret?: string;
   leadTimeMs?: number;
 }
@@ -250,6 +263,57 @@ export function createApp(deps: AppDeps) {
     const ack = accepted(deps.clock, request.commandId, transport.transportRevision);
     deps.commands.remember(request.commandId, ack);
     return c.json(ack);
+  });
+
+  // Metadata travels in the query so the body stays a raw stream. Duration, sample rate and
+  // channel count are declared by the operator and not verified here: decoding audio in the
+  // control process is exactly the CPU work that belongs elsewhere. Size and hash are measured.
+  app.post("/api/assets", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Registering an asset requires the operator secret."), 401);
+    }
+    const query = AssetUpload.safeParse(c.req.query());
+    if (!query.success) return c.json(apiError("INVALID_REQUEST", "Asset metadata was missing or malformed."), 400);
+
+    const replayed = deps.commands.get<unknown>(query.data.commandId);
+    if (replayed) return c.json(replayed);
+
+    const body = c.req.raw.body;
+    if (!body) return c.json(apiError("INVALID_REQUEST", "Asset upload had no body."), 400);
+
+    const trackId = crypto.randomUUID();
+    const written = await deps.assets.write(trackId, body);
+    // A short read means the connection dropped mid-upload. Registering it would put a hash in a
+    // show that no phone can ever match.
+    if (written.byteSize !== query.data.byteSize) {
+      await deps.assets.discard(trackId);
+      return c.json(apiError(
+        "TRUNCATED_UPLOAD",
+        `Expected ${query.data.byteSize} bytes and received ${written.byteSize}.`,
+        true,
+      ), 400);
+    }
+
+    const track = Track.parse({
+      trackId, label: query.data.label, url: `/api/assets/${trackId}`,
+      sha256: written.sha256, byteSize: written.byteSize,
+      durationMs: query.data.durationMs, sampleRateHz: query.data.sampleRateHz, channels: query.data.channels,
+    });
+    deps.commands.remember(query.data.commandId, track);
+    return c.json(track);
+  });
+
+  // Unauthenticated on purpose: every participant needs the audio, the id is unguessable, and
+  // this is the route that should move to a static host or CDN before the event.
+  app.get("/api/assets/:trackId", async c => {
+    const trackId = c.req.param("trackId");
+    const path = deps.assets.path(trackId);
+    if (!path || !(await deps.assets.exists(trackId))) {
+      return c.json(apiError("UNKNOWN_ASSET", "No such asset in this session."), 404);
+    }
+    return new Response(Bun.file(path), {
+      headers: { "content-type": "application/octet-stream", "cache-control": "public, max-age=31536000, immutable" },
+    });
   });
 
   app.post("/api/assignments", async c => {

@@ -1,4 +1,5 @@
 import { createApp } from "./app";
+import { AssetStore, assetsPath } from "./assets";
 import { matchesOperatorSecret } from "./auth";
 import { CheckpointStore, checkpointPath } from "./checkpoint";
 import { createServerClock } from "./clock";
@@ -22,6 +23,7 @@ const joins = new RateLimiter(JOIN_LIMIT.capacity, JOIN_LIMIT.refillPerSecond, c
 const connections = new ConnectionRegistry();
 const telemetry = new OperatorTelemetry();
 const preparations = new Preparations();
+const assets = new AssetStore(assetsPath());
 
 const restored = await store.read();
 if (restored) {
@@ -37,7 +39,7 @@ if (!process.env.OPERATOR_SECRET) {
 }
 
 const app = createApp({
-  clock, registry, store, joins, state, commands, connections, preparations,
+  clock, registry, store, joins, state, commands, connections, preparations, assets,
   operatorSecret: process.env.OPERATOR_SECRET,
 });
 

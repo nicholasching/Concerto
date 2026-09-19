@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join as joinPath } from "node:path";
 import { ApiError, CommandAccepted, ParticipantSnapshot, PROTOCOL_VERSION, ServerMessage, type ShowData } from "@orchestra/contracts";
 import { createApp, DEFAULT_LEAD_TIME_MS } from "../src/app";
+import { AssetStore } from "../src/assets";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
 import { CommandLog } from "../src/commands";
@@ -63,6 +64,7 @@ const prepared = async () => {
     joins: new RateLimiter(100, 100, () => serverMs),
     commands: new CommandLog(),
     preparations: new Preparations(),
+    assets: new AssetStore(joinPath(directory, "assets")),
   });
   await app.request("/api/show", {
     method: "PUT",

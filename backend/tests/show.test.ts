@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join as joinPath } from "node:path";
 import { AdminSnapshot, ApiError, CommandAccepted, PROTOCOL_VERSION, type ShowData } from "@orchestra/contracts";
 import { createApp } from "../src/app";
+import { AssetStore } from "../src/assets";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
 import { CommandLog } from "../src/commands";
@@ -36,6 +37,7 @@ const harness = () => {
     commands: new CommandLog(),
     connections: new ConnectionRegistry(),
     preparations: new Preparations(),
+    assets: new AssetStore(joinPath(directory, "assets")),
     joins: new RateLimiter(100, 100, () => serverMs),
   });
   return { app, state, store, registry };

@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { ApiError } from "@orchestra/contracts";
 import { createApp } from "../src/app";
+import { AssetStore } from "../src/assets";
 import { CheckpointStore } from "../src/checkpoint";
 import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
@@ -19,6 +20,7 @@ const app = () =>
     commands: new CommandLog(),
     connections: new ConnectionRegistry(),
     preparations: new Preparations(),
+    assets: new AssetStore("/tmp/orchestra-unused-assets"),
   });
 
 test("health identifies a foundation, not a running concert", async () => {

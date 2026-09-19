@@ -6,6 +6,7 @@ import {
   AdminSnapshot, ApiError, ClientMessage, CommandAccepted, PROTOCOL_VERSION, ServerMessage, type ShowData,
 } from "@orchestra/contracts";
 import { createApp, DEFAULT_LEAD_TIME_MS } from "../src/app";
+import { AssetStore } from "../src/assets";
 import { Barrier } from "../src/barriers";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
@@ -65,6 +66,7 @@ const harness = () => {
     store: new CheckpointStore(joinPath(directory, "checkpoint.json")),
     joins: new RateLimiter(100, 100, () => serverMs),
     commands: new CommandLog(),
+    assets: new AssetStore(joinPath(directory, "assets")),
   });
   return { app, state, preparations, connections, clock };
 };

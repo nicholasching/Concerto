@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join as joinPath } from "node:path";
 import { ApiError, JoinResponse } from "@orchestra/contracts";
 import { createApp } from "../src/app";
+import { AssetStore } from "../src/assets";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
 import { DeviceRegistry, MAX_DEVICES } from "../src/registry";
@@ -41,6 +42,7 @@ const harness = (options: { capacity?: number; refillPerSecond?: number } = {}) 
     commands: new CommandLog(),
     connections: new ConnectionRegistry(),
     preparations: new Preparations(),
+    assets: new AssetStore(joinPath(directory, "assets")),
   });
   return { app, registry, store, clock: serverClock };
 };
