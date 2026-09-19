@@ -1,0 +1,36 @@
+{
+  "evidence": "synthetic",
+  "decoderVersion": "otc-v1.2",
+  "participants": 1500,
+  "uniqueAcceptedIds": 1500,
+  "missingIds": [],
+  "acceptedObservations": 2606,
+  "identityOrCenterMismatches": [],
+  "partialScreenObservations": 10,
+  "maximumFullyInFrameCenterErrorPx": 1.1764447472946862,
+  "fullyInFrameCenterTolerancePx": 2,
+  "maximumClippedCentroidErrorPx": 2.099487365862794,
+  "locationStatuses": {
+    "coarse": 448,
+    "ambiguous": 1052
+  },
+  "coarseWrongColumnIds": [],
+  "processingMs": 38356.08079994563,
+  "inputHashes": [
+    {
+      "cameraId": "camera-left",
+      "sha256": "36d6c4732fa30cc77081a804eaf69c304b03ca41ed0afecdd7d94f52a9ac8fb3"
+    },
+    {
+      "cameraId": "camera-center",
+      "sha256": "7dcf6898c49998571a0479a109eba00cc376ebcf4f6e41ca3323928aeb3013f3"
+    },
+    {
+      "cameraId": "camera-right",
+      "sha256": "7dff909efb5a074c5702200ff18fd1d98b7f8f9d53a4b4b87807f413d0f2508c"
+    }
+  ],
+  "limitation": "Identity/column evidence only. Null anchors cannot produce a canonical seat map. Partial-screen centroid errors are reported separately; nearest-screen identity and polygon membership are still required.",
+  "checkerWrongIdentityInjectionMismatchCount": 2,
+  "debugArtifactsEnabled": true
+}

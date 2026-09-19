@@ -1,0 +1,74 @@
+[
+  {
+    "view": "overview",
+    "frames": 405,
+    "firstPtsMs": 0.0,
+    "lastPtsMs": 13467.0,
+    "sampledSymbolsMatched": 25,
+    "bytes": 15195298,
+    "fullyInFrame": 1500,
+    "screenWidthPxRange": [
+      4,
+      35
+    ],
+    "screenHeightPxRange": [
+      7,
+      41
+    ],
+    "sha256": "ac9b4e50710b6e6108198d4167574ef1adfb5aeecef6cb3ad0ffd7468fb64cce"
+  },
+  {
+    "view": "camera-left",
+    "frames": 405,
+    "firstPtsMs": 0.0,
+    "lastPtsMs": 13467.0,
+    "sampledSymbolsMatched": 9,
+    "bytes": 12269185,
+    "fullyInFrame": 775,
+    "screenWidthPxRange": [
+      8,
+      46
+    ],
+    "screenHeightPxRange": [
+      15,
+      71
+    ],
+    "sha256": "36d6c4732fa30cc77081a804eaf69c304b03ca41ed0afecdd7d94f52a9ac8fb3"
+  },
+  {
+    "view": "camera-center",
+    "frames": 405,
+    "firstPtsMs": 0.0,
+    "lastPtsMs": 13467.0,
+    "sampledSymbolsMatched": 20,
+    "bytes": 17441205,
+    "fullyInFrame": 1046,
+    "screenWidthPxRange": [
+      9,
+      45
+    ],
+    "screenHeightPxRange": [
+      15,
+      70
+    ],
+    "sha256": "7dcf6898c49998571a0479a109eba00cc376ebcf4f6e41ca3323928aeb3013f3"
+  },
+  {
+    "view": "camera-right",
+    "frames": 405,
+    "firstPtsMs": 0.0,
+    "lastPtsMs": 13467.0,
+    "sampledSymbolsMatched": 16,
+    "bytes": 12260674,
+    "fullyInFrame": 775,
+    "screenWidthPxRange": [
+      8,
+      46
+    ],
+    "screenHeightPxRange": [
+      15,
+      71
+    ],
+    "sha256": "7dff909efb5a074c5702200ff18fd1d98b7f8f9d53a4b4b87807f413d0f2508c"
+  }
+]

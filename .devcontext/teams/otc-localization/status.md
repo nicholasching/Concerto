@@ -1,16 +1,12 @@
 # otc-localization checkpoint
 
-Status: not started (foundation available).
-Owner: Team 3 human lead, to be named.
-Branch: feat/otc-localization. Base: foundation-v1; record resolved SHA in first journal.
+Status: ready for software integration (audited; stage remains in progress pending physical acceptance). Owner: Team 3 human lead (user). Branch: feat/otc-localization. Baseline: foundation-v1, ab59c27105627977ee52dc2bcd4276b4532b9e2a.
 
-- Owned files: workers/otc/, tools/otc-fixtures/
-- Implemented foundation: Python schema/identity validation, explicit synthetic replay and complete codebook.
-- Assigned feature work: MP4 fixtures, video dependencies, real process decoder, tracking and registration.
-- Independent command: `bun run otc:validate; bun run otc:replay`.
-- Gate: `bun run gate:otc` after `bun run setup:python`.
-- Foundation evidence: [verification](../../evidence/foundation/verification.md). No feature/hardware gate has passed yet.
-- Next action: Implement an independent bounded-error codeword decoder and tests, while obtaining an actual near/back-row camera sample.
-- Dependencies: Team 1 consumes CLI/results; Team 4 consumes review evidence; Team 2 supplies physical packet clips. Frozen fixtures permit work now.
-
-Update this checkpoint at each handoff. Append experiment history in agent-owned journals.
+- Implemented: actual MP4 decoding, conservative identity/tracking, manual/validated-overlap mapping, diagnostics and review artifacts. Default is one spawned process per camera; --workers 1 keeps a serial reference.
+- Perspective fixtures: larger foreground and smaller back-row screens, converging rows; 90/90 review phones localized. Explicit 1x2-pixel rear phones stay unseen. No acceptance threshold was loosened.
+- Viewing fixture: 1,500 phones in 30 curved/rising rows with two aisle gaps; 4K overview and three close views in runtime/otc-fixtures/auditorium-1500. All phones fit in the overview. See [scene evidence](../../evidence/otc-localization/20260919-auditorium-sweep.md) for assumptions.
+- Latest [masterplan/integration audit](../../evidence/otc-localization/20260919-integration-audit.md): fixed overlap hiding contradictory manual anchors; primary ROI now takes precedence, disagreement stays ambiguous. Final gate passes **79 Python tests** plus shared checks; fixture-tool Ruff, pip and whitespace checks pass. New cross-language CLI check validates actual results/progress and hash failure in consumer TypeScript schemas.
+- Fresh v1.2 scale verification: grid 1,500/1,500 localized correctly in 30.83 seconds / 805.49 MiB sampled aggregate resident peak. Curved auditorium 1,500/1,500 unique IDs recovered with no independent identity mismatches; null anchors yield 448 coarse and 1,052 ambiguous locations, zero full positions. Prior reports remain historical evidence.
+- No physical footage yet: Team 2 renderer is the next physical-test dependency. Software work is not blocked; physical optics/codec/geometry/venue performance remain unverified.
+- Existing wire schemas unchanged (decoderVersion otc-v1.2, packet otc-v1). CLI supports --evidence, --job-id/--debug-dir and --workers 1|3 (default 3). Forced cancellation must stop the process tree. Captain reviews previously added Python pins before merge; this audit adds no dependencies.
+- Next consumer action: run `bun tools/otc-fixtures/verify-handoff.ts`. Team 1 integrates lifecycle and candidate/result/commit APIs; Team 4 supplies camera geometry and pre-commit review; Team 2 builds the exact packet renderer. Available remote refs were inspected, not merged or end-to-end tested. See [handoff](handoff.md) for exact responsibilities.

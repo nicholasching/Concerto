@@ -1,0 +1,131 @@
+{
+  "evidence": "synthetic",
+  "case": "perspective",
+  "seed": 7,
+  "participants": 90,
+  "statuses": {
+    "localized": 90
+  },
+  "wrongLocalizedIds": [],
+  "positionErrorTolerance": 0.015,
+  "maximumPositionError": 0.0037197470678100274,
+  "wallMs": 4859.56789998454,
+  "processingMs": 4784.837500017602,
+  "workersRequested": 3,
+  "cameraWorkerProcesses": 3,
+  "parentPeakResidentBytes": 62136320,
+  "parentMemoryMethod": "GetProcessMemoryInfo(self).PeakWorkingSetSize",
+  "peakSampledProcessTreeResidentBytes": 302555136,
+  "processTreeMemoryMethod": "Toolhelp32 descendants + sum of live WorkingSetSize",
+  "memorySamplingIntervalMs": 100,
+  "memorySamples": 40,
+  "incompleteMemorySamples": 0,
+  "maximumSampledProcessCount": 4,
+  "memorySamplingError": null,
+  "memorySamplingCaveat": "Sampled process-resident sum; shared pages may be counted more than once; peaks between samples can be missed. Incomplete samples are excluded from the peak.",
+  "python": "3.13.15",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "av": "18.1.0",
+  "opencv": "4.13.0",
+  "numpy": "2.4.6",
+  "inputHashes": [
+    {
+      "cameraId": "camera-left",
+      "sha256": "b87a949c990ea81b91d00f4b8dac1d0046d92ee2510f449b2c74775022d59532"
+    },
+    {
+      "cameraId": "camera-center",
+      "sha256": "bc3e5edda77b7e9463708d668b365560570a4e8ac0f7231ee01d725dd915f752"
+    },
+    {
+      "cameraId": "camera-right",
+      "sha256": "4e64c1e544674e0a8979ddfbf8ce27e32c78305445ea76a3ea21a7f5304863c5"
+    }
+  ],
+  "debugArtifactsEnabled": false,
+  "accuracyGroups": {
+    "depth": {
+      "front": {
+        "participants": 36,
+        "expectedResolvable": 36,
+        "localizedExpectedResolvable": 36,
+        "unexpectedAccepted": 0,
+        "widthPxRange": [
+          23,
+          37
+        ],
+        "heightPxRange": [
+          36,
+          59
+        ],
+        "resolvableRecall": 1.0
+      },
+      "middle": {
+        "participants": 24,
+        "expectedResolvable": 24,
+        "localizedExpectedResolvable": 24,
+        "unexpectedAccepted": 0,
+        "widthPxRange": [
+          16,
+          19
+        ],
+        "heightPxRange": [
+          26,
+          30
+        ],
+        "resolvableRecall": 1.0
+      },
+      "back": {
+        "participants": 30,
+        "expectedResolvable": 30,
+        "localizedExpectedResolvable": 30,
+        "unexpectedAccepted": 0,
+        "widthPxRange": [
+          12,
+          14
+        ],
+        "heightPxRange": [
+          18,
+          23
+        ],
+        "resolvableRecall": 1.0
+      }
+    },
+    "largestVisibleMinimumSidePx": {
+      "16plus": {
+        "participants": 60,
+        "expectedResolvable": 60,
+        "localizedExpectedResolvable": 60,
+        "unexpectedAccepted": 0,
+        "widthPxRange": [
+          16,
+          37
+        ],
+        "heightPxRange": [
+          26,
+          59
+        ],
+        "resolvableRecall": 1.0
+      },
+      "8to15": {
+        "participants": 30,
+        "expectedResolvable": 30,
+        "localizedExpectedResolvable": 30,
+        "unexpectedAccepted": 0,
+        "widthPxRange": [
+          12,
+          14
+        ],
+        "heightPxRange": [
+          18,
+          23
+        ],
+        "resolvableRecall": 1.0
+      }
+    }
+  },
+  "unexpectedAcceptedUnresolvableIds": [],
+  "missingExpectedResolvableIds": [],
+  "wrongAcceptedObservations": [],
+  "observationPositionErrorTolerancePx": 2
+}
