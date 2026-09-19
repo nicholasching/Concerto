@@ -20,7 +20,7 @@ Setup installs the editable worker and pinned dependencies from `requirements-de
 ## Backend boundary
 
 ```text
-python -m otc process --manifest PATH --output NEW_PATH --evidence synthetic|physical [--job-id ID] [--debug-dir NEW_OR_EMPTY_DIR]
+python -m otc process --manifest PATH --output NEW_PATH --evidence synthetic|physical [--job-id ID] [--debug-dir NEW_OR_EMPTY_DIR] [--workers 1|3]
 ```
 
 - Read the frozen `CalibrationManifest` schema. Video paths may be absolute or relative to the manifest's directory. All declared files must exist and pass SHA-256 verification before any decoding begins. To process fewer cameras, submit a manifest containing only available cameras.
@@ -28,6 +28,8 @@ python -m otc process --manifest PATH --output NEW_PATH --evidence synthetic|phy
 - Stdout contains `JobProgress` NDJSON with validate/decode/track/register/complete events. `jobId` defaults to `runId`; the backend should pass its own job ID. Progress is stage based; frame-count updates need not increase its numeric fraction.
 - Exit 0 and the final complete event follow schema/semantic validation and atomic result writing. Existing result paths are refused. Exit 2 reports JSON diagnostics on stderr for expected input/processing failures. A crash/nonzero exit is also failure, even if some progress/debug artifacts exist. No failed progress event or success result is fabricated.
 - The backend owns timeouts, cancellation, unique job directories, upload paths, and authoritative map publication. It must recheck current session/epoch/run/input hashes and reject synthetic results for a physical audience map. The worker produces a candidate map only.
+- Default `--workers 3` launches one spawned process for each supplied camera (at most three), with one OpenCV thread and two video decoder threads per camera. Frame tracking stays sequential within each view. The parent validates hashes first, emits progress, merges results in manifest order and writes the final map. Only compact observations/metadata cross processes; each child writes its own debug files.
+- `--workers 1` retains a serial reference for benchmarks and diagnosis. Direct Python callers using the default spawn mode must call from a script protected by `if __name__ == "__main__":`; use the CLI in the backend. Camera failures or parent callback exceptions terminate/reap the other children. Forced backend cancellation must terminate the entire process tree, not just its parent.
 - `validate-manifest` checks JSON semantics, not video files. Existing `replay-fixture` remains explicitly synthetic JSON replay; it does not invoke the decoder.
 
 Example progress shape (identifiers vary):
@@ -45,7 +47,9 @@ Example progress shape (identifiers vary):
 5. Map ordered anchors (front-left/front-right/back-right/back-left) in rotated image pixels into the primary column's canonical strip. Audience x runs left to right and y front to back, independently of the image's visual orientation. A column homography is approximate geometry, not metric seat localization.
 6. Overlap registration requires at least eight shared accepted IDs, distributed matches, RANSAC inliers and a deterministic held-out residual check. Use only the validated support hull; never extrapolate across an unseen crowd. Manual anchors remain the fallback. Conflicting positions/columns and duplicate optical IDs (possible reflections) stay ambiguous. Without geometry, consistent primary-camera evidence can yield `coarse` column-only results. Coarse/ambiguous/unseen results have null x/y.
 
-Current optical assumptions: stationary cameras, the full approximately 11-second packet visible with leading/trailing margins, dark neutral guards, and two sufficiently saturated/bright distinguishable colors. Static saturated lights are rejected by temporal evidence; use exclusion ROIs when they overlap phones. The initial palette/thresholds need phone-camera experiments. Missing first pilots, severe motion, prolonged occlusion, very tiny/dim screens, auto exposure, rolling shutter, HEVC/HDR and venue lighting remain limitations; synthetic success does not establish physical recall.
+Current optical assumptions: stationary cameras, the full approximately 11-second packet visible with leading/trailing margins, dark neutral guards, and two sufficiently saturated/bright distinguishable colors. Screens are detected and sampled in individual native-resolution ROIs, so their sizes need not match. Perspective fixtures exercise larger front screens, smaller rear screens and converging rows; the 640x360 test includes ordinary rear screens six pixels wide. A separate 1x2-pixel rear-screen case stays unseen. This is fixture evidence, not a universal minimum resolvable phone size.
+
+Static saturated lights are rejected by temporal evidence; use exclusion ROIs when they overlap phones. The initial palette/thresholds need phone-camera experiments. Missing first pilots, severe motion, prolonged occlusion, very tiny/dim screens, auto exposure, rolling shutter, HEVC/HDR and venue lighting remain limitations; synthetic success does not establish physical recall. The auditorium reference photo is not calibrated geometry, and the fixture does not model the balcony or recover a 3D seating map.
 
 ## Admin review artifacts
 
@@ -55,7 +59,9 @@ These artifacts are worker-owned diagnostics, not a new frozen public API. Team 
 
 ## Verification and next work
 
-See [Team 3 handoff](../../.devcontext/teams/otc-localization/handoff.md), [evidence](../../.devcontext/evidence/otc-localization/20260919-pipeline.md), and [fixture tools](../../tools/otc-fixtures/README.md). Run `bun run gate:otc`; generator/benchmark lint additionally uses `.venv\Scripts\python.exe -m ruff check workers/otc tools/otc-fixtures`. Focused tests live under `workers/otc/tests/` and generate their own MP4s.
+See [Team 3 handoff](../../.devcontext/teams/otc-localization/handoff.md), [parallel/perspective evidence](../../.devcontext/evidence/otc-localization/20260919-parallel-perspective.md), [initial evidence](../../.devcontext/evidence/otc-localization/20260919-pipeline.md), and [fixture tools](../../tools/otc-fixtures/README.md). Run `bun run gate:otc`; generator/benchmark lint additionally uses `.venv\Scripts\python.exe -m ruff check workers/otc tools/otc-fixtures`. Focused tests live under `workers/otc/tests/` and generate their own MP4s.
+
+On the recorded Ryzen 7 7840HS run, unchanged 1,500-ID 4K inputs took 97.80 seconds serial and 32.19 seconds with three camera workers; outputs are identical except processingMs. Sampled aggregate resident memory rose from 292.90 to 801.14 MiB. This is one synthetic comparison, not a hardware-independent or physical-venue guarantee.
 
 Next physical proof: integrate Team 2's exact renderer, record known IDs near and far with original camera files, audit visible-phone recall and false acceptance, then check three-camera geometry, runtime and memory. No physical test has been performed yet.
 

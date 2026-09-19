@@ -13,7 +13,8 @@ import numpy as np
 
 from otc.validation import ROOT, validate_manifest
 
-CASES = ("clean", "degraded", "wrong-tag", "duplicates", "crossing", "rotated", "vfr", "empty")
+CASES = ("clean", "degraded", "wrong-tag", "duplicates", "crossing", "rotated", "vfr", "empty",
+         "perspective", "perspective-undersized")
 
 
 def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, height=360, seed=7):
@@ -31,6 +32,7 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
     rng = np.random.default_rng(seed)
     columns = max(2, math.ceil(math.sqrt(math.ceil(count / 3) / 2)))
     rows = math.ceil(math.ceil(count / 3) / columns)
+    perspective = case.startswith("perspective")
     phones = []
     for index, device_id in enumerate(ids):
         column, local = index % 3, index // 3
@@ -40,6 +42,10 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
             "column": ("left", "center", "right")[column],
             "motionPhase": float(rng.uniform(0, 2 * math.pi)),
         })
+        if perspective:
+            phones[-1].update(depth=phones[-1]["y"], cameraScreens=[],
+                              expectedUnresolvable=(case == "perspective-undersized" and
+                                                    local // columns == rows - 1))
     tag = manifest["runTag"] + (case == "wrong-tag")
     packets = {}
     for device_id in ids:
@@ -64,6 +70,10 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
 
         def project(x, y):
             # Camera looks toward audience: left/right and front/back are reversed.
+            if perspective:
+                scale = 1 / (1 + 3*y)
+                return (width * (0.5 + ((low+high)/2-x) / (high-low) * scale),
+                        height * (0.94 - 0.82 * 4*y * scale))
             return width * (high-x) / (high-low), height * (0.94 - 0.88*y)
 
         camera["anchors"] = [dict(zip(("x", "y"), project(x, y))) for x, y in (
@@ -71,6 +81,27 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
             ((camera_index+1)/3, 1), (camera_index/3, 1),
         )]
         camera["rotationDegrees"] = 90 if case == "rotated" and camera_index == 1 else 0
+        screen_sizes = {}
+        for phone in phones:
+            screen_width, screen_height = 10, 16
+            if perspective:
+                scale = (height / 360) / (1 + 3*phone["depth"])
+                screen_width, screen_height = round(22*scale), round(35*scale)
+                if phone["expectedUnresolvable"]:
+                    # Isolated resolution-limit injection: these are not ordinary
+                    # equal-sized phones under the virtual perspective camera.
+                    screen_width, screen_height = 1, 2
+                x, y = project(phone["x"], phone["y"])
+                x0, y0 = round(x-(screen_width-1)/2), round(y-(screen_height-1)/2)
+                phone["cameraScreens"].append({
+                    "cameraId": camera["cameraId"], "centerPx": {"x": x, "y": y},
+                    "widthPx": screen_width, "heightPx": screen_height,
+                    # Raster rounding may make a near-edge rectangle fully
+                    # visible even when its ideal continuous edge is outside.
+                    "visible": (0 <= x0 < width-screen_width and
+                                0 <= y0 < height-screen_height),
+                })
+            screen_sizes[phone["deviceId"]] = (screen_width, screen_height)
         path = output_dir / f"camera-{camera_index}.mp4"
         with av.open(str(path), "w") as container:
             stream = container.add_stream("libx264", rate=fps)
@@ -104,9 +135,14 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
                         color = color * np.array([0.79, 0.91, 0.84])
                         if index == 2 and slot == 25:
                             continue  # One full data-slot erasure.
-                    x0, y0 = round(x-5), round(y-8)
-                    if 0 <= x0 < width-10 and 0 <= y0 < height-16:
-                        rgb[y0:y0+16, x0:x0+10] = color.clip(0, 255).astype(np.uint8)
+                    screen_width, screen_height = screen_sizes[device_id]
+                    if perspective:
+                        x0 = round(x-(screen_width-1)/2)
+                        y0 = round(y-(screen_height-1)/2)
+                    else:
+                        x0, y0 = round(x-5), round(y-8)
+                    if 0 <= x0 < width-screen_width and 0 <= y0 < height-screen_height:
+                        rgb[y0:y0+screen_height, x0:x0+screen_width] = color.clip(0, 255).astype(np.uint8)
                         if case == "degraded" and index == 5 and 23 <= slot <= 28:
                             rgb[y0:y0+16, x0:x0+5] = 9  # Half-covered phone, then uncovered.
                 if case == "duplicates" and camera_index == 0:

@@ -8,20 +8,22 @@ import time
 import cv2
 import numpy as np
 
+from .camera_worker import run_cameras
 from .geometry import build_mappings, fuse_locations, reject_duplicates
-from .sampling import decode_tracks
-from .tracking import scan_camera
 from .validation import validate_manifest, validate_result, validate_schema
 from .video import verify_video
 
-DECODER_VERSION = "otc-v1.0"
+DECODER_VERSION = "otc-v1.1"
 
 
-def process_manifest(manifest, base_dir, evidence, *, job_id=None, debug_dir=None, progress=None):
+def process_manifest(manifest, base_dir, evidence, *, job_id=None, debug_dir=None, progress=None,
+                     workers=3):
     start = time.perf_counter()
     validate_manifest(manifest)
     if evidence not in ("synthetic", "physical"):
         raise ValueError("Input provenance must be declared synthetic or physical")
+    if type(workers) is not int or workers not in (1, 3):
+        raise ValueError("workers must be 1 (serial reference) or 3 (one process per camera)")
     job_id = job_id or manifest["runId"]
 
     def report(stage, fraction, message):
@@ -48,45 +50,13 @@ def process_manifest(manifest, base_dir, evidence, *, job_id=None, debug_dir=Non
     cv2.setNumThreads(1)
     observations, diagnostics, artifacts = [], [], []
     dimensions = {}
-    count = len(paths)
-    for index, (camera, path) in enumerate(zip(manifest["cameras"], paths)):
-        camera_id = camera["cameraId"]
-        report("decode", 0.05 + index / count * 0.75, f"Decoding camera {camera_id}")
-
-        def on_frames(frames, pts_ms):
-            report("track", 0.05 + index / count * 0.75,
-                   f"{camera_id}: {frames} frames, clip PTS {pts_ms:.1f} ms")
-
-        scan = scan_camera(path, camera, on_frames)
-        seen, details, phase, messages = decode_tracks(scan, manifest, camera_id)
-        observations.extend(seen)
-        dimensions[camera_id] = (scan.width, scan.height)
-        diagnostics.append({
-            "cameraId": camera_id, "frameWidth": scan.width, "frameHeight": scan.height,
-            "phasePtsMs": phase, "acceptedTracks": 0, "rejectedTracks": 0,
-            "messages": [f"{scan.frame_count} frames; PTS relative to first decoded frame",
-                         "Rotation applied clockwise from manifest, once"] + messages,
-        })
-        if debug_dir is not None:
-            # Artifact filenames never interpolate camera IDs or uploaded filenames.
-            filename = f"camera-{index}"
-            by_id = {track.track_id: track for track in scan.tracks}
-            preview_pts = scan.preview_pts_ms
-            centers = {}
-            for observation in seen:
-                track = by_id[observation["trackId"]]
-                sample = min(track.samples, key=lambda item: abs(item.pts_ms-preview_pts))
-                centers[observation["trackId"]] = [round(sample.x), round(sample.y)]
-            if not cv2.imwrite(str(debug_dir / f"{filename}.png"),
-                               cv2.cvtColor(scan.preview, cv2.COLOR_RGB2BGR)):
-                raise ValueError("Could not write debug preview")
-            (debug_dir / f"{filename}.json").write_text(json.dumps({
-                "cameraId": camera_id, "previewPtsMs": scan.preview_pts_ms, "tracks": details,
-            }, indent=2, allow_nan=False) + "\n", encoding="utf-8")
-            artifacts.append({"cameraId": camera_id, "preview": f"{filename}.png",
-                              "tracks": f"{filename}.json", "previewCenters": centers})
-        # Full decoded frames are not retained across cameras.
-        del scan
+    camera_results = run_cameras(manifest, paths, debug_dir, workers, report)
+    for camera, result in zip(manifest["cameras"], camera_results):
+        observations.extend(result["observations"])
+        dimensions[camera["cameraId"]] = result["dimensions"]
+        diagnostics.append(result["diagnostic"])
+        if result["artifact"] is not None:
+            artifacts.append(result["artifact"])
     report("register", 0.85, "Applying anchors, validating overlap and checking duplicate identities")
     blocked = reject_duplicates(observations)
     mappings = build_mappings(manifest, dimensions, observations)

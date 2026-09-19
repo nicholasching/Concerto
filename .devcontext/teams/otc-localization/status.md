@@ -2,9 +2,10 @@
 
 Status: ready for integration (first software slice; stage remains in progress). Owner: Team 3 human lead (user). Branch: feat/otc-localization. Baseline: foundation-v1, ab59c27105627977ee52dc2bcd4276b4532b9e2a.
 
-- Implemented: actual MP4 decoding, conservative identity/tracking, manual/validated-overlap mapping, diagnostics and review artifacts. Generated clips permit independent work without phone flashing.
-- Dense synthetic: 1,500/1,500 correctly positioned IDs under benchmark checks; 96.19 seconds, 328.66 MiB. Initial 90-second target remains unmet.
-- Final gate passes: 64 Python tests plus shared checks. Separately verified 14 unique shared contract tests and fixture-tool lint. See [evidence](../../evidence/otc-localization/20260919-pipeline.md).
+- Implemented: actual MP4 decoding, conservative identity/tracking, manual/validated-overlap mapping, diagnostics and review artifacts. Default is one spawned process per camera; --workers 1 keeps a serial reference.
+- New same-input dense synthetic comparison: 1,500/1,500 correct in both modes; 97.80 seconds serial vs 32.19 seconds parallel (~3x). Sampled aggregate memory: 292.90 vs 801.14 MiB. The 90-second target is met on the clean synthetic set; original venue footage is still untested.
+- Perspective fixtures: larger foreground and smaller back-row screens, converging rows; 90/90 review phones localized. Explicit 1x2-pixel rear phones stay unseen. No acceptance threshold was loosened.
+- Final gate passes: 74 Python tests plus shared checks; fixture-tool Ruff and documentation links checked. See [latest evidence](../../evidence/otc-localization/20260919-parallel-perspective.md) and [initial evidence](../../evidence/otc-localization/20260919-pipeline.md).
 - No physical footage yet: Team 2 renderer is the next physical-test dependency. Software work is not blocked; physical optics/codec/geometry/venue performance remain unverified.
-- Existing wire schemas unchanged. CLI adds required --evidence and optional --job-id/--debug-dir. Captain reviews Python dependency pins before merge.
+- Existing wire schemas unchanged (decoderVersion otc-v1.1). CLI supports --evidence, --job-id/--debug-dir and --workers 1|3 (default 3). Forced cancellation must stop the process tree. Captain reviews previously added Python pins before merge; this slice adds no dependencies.
 - Next consumer action: Team 1 runs generated clips through worker lifecycle; Team 4 inspects results/review artifacts. See [handoff](handoff.md).

@@ -47,6 +47,8 @@ def main() -> int:
                                  help="Explicit input provenance; the decoder cannot infer it")
             command.add_argument("--job-id", help="Backend job ID; defaults to run ID for direct CLI")
             command.add_argument("--debug-dir", type=Path)
+            command.add_argument("--workers", type=int, choices=(1, 3), default=3,
+                                 help="3: one process per camera; 1: serial reference")
     args = parser.parse_args()
     try:
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
@@ -62,6 +64,7 @@ def main() -> int:
             result = process_manifest(
                 manifest, args.manifest.resolve().parent, args.evidence,
                 job_id=args.job_id, debug_dir=args.debug_dir, progress=report,
+                workers=args.workers,
             )
             write_result(args.output, result)
             report({"protocolVersion": 1, "jobId": args.job_id or manifest["runId"],
