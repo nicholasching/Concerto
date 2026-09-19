@@ -347,7 +347,12 @@ export class SessionState {
     const assignment = this.assignments.get(deviceId);
     const location = this.locations.get(deviceId);
     if (!readiness || !assignment || !location) return null;
-    return ParticipantSnapshot.parse({ ...this.base(clock), role: "participant", deviceId, readiness, assignment, location });
+    const pendingActions = this.pendingActions.flatMap<PendingActionData>(action => {
+      if (action.domain !== "assignment") return [action];
+      const assignments = action.assignments.filter(item => item.deviceId === deviceId);
+      return assignments.length ? [{ ...action, assignments }] : [];
+    });
+    return ParticipantSnapshot.parse({ ...this.base(clock), pendingActions, role: "participant", deviceId, readiness, assignment, location });
   }
 
   adminSnapshot(clock: ServerClock): AdminSnapshotData {

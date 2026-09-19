@@ -58,6 +58,10 @@ export const handleClientMessage = (input: {
     };
   }
 
+  if (message.data.serverEpoch !== clock.serverEpoch) {
+    return error(clock, "STALE_EPOCH", "Resynchronize before reporting state for this server epoch.");
+  }
+
   if (message.data.type === "device.status") {
     if (message.data.payload.deviceId !== deviceId) {
       return error(clock, "DEVICE_MISMATCH", "A socket may only report status for the device it authenticated as.");

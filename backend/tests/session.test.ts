@@ -79,6 +79,28 @@ class FakeSocket implements ClientSocket {
 }
 
 describe("role-filtered snapshots", () => {
+  test("pending assignments never reveal other participants", () => {
+    const { state } = harness();
+    state.register(0);
+    state.register(1);
+    state.scheduleAssignments({ commandId: "assign-all", effectiveServerMs: serverMs + 5000,
+      assignments: [0, 1].map(deviceId => ({ deviceId, channelId: null, assignmentRevision: 1, mapRevision: 0 })) });
+    const actions = state.participantSnapshot(0, clock)!.pendingActions;
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatchObject({ assignments: [{ deviceId: 0 }] });
+    if (actions[0].domain === "assignment") expect(actions[0].assignments).toHaveLength(1);
+  });
+
+  test("a status from the old server epoch cannot restore readiness", () => {
+    const { state } = harness();
+    state.register(0);
+    const readiness = state.participantSnapshot(0, clock)!.readiness;
+    const reply = handleClientMessage({ clock, state, deviceId: 0, receivedServerMs: serverMs,
+      raw: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: "old", messageId: "stale",
+        type: "device.status", payload: { ...readiness, connected: true, clockReady: true, audioUnlocked: true } }) });
+    expect(reply).toMatchObject({ type: "error", payload: { error: { code: "STALE_EPOCH" } } });
+    expect(state.participantSnapshot(0, clock)!.readiness.audioUnlocked).toBe(false);
+  });
   test("a participant sees its own state and no other phone's telemetry", async () => {
     const { app } = harness();
     const first = await join(app);

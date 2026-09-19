@@ -78,10 +78,19 @@ const server = Bun.serve<SocketData, string>({
       : new Response("Expected a WebSocket upgrade.", { status: 426 });
   },
   websocket: {
+    maxPayloadLength: 65536,
     open(ws) {
-      if (ws.data.role === "operator") return connections.addOperator(ws);
+      if (ws.data.role === "operator") {
+        connections.addOperator(ws);
+        ws.send(JSON.stringify({ protocolVersion: 1, sessionId: clock.sessionId, serverEpoch: clock.serverEpoch,
+          messageId: crypto.randomUUID(), type: "state.snapshot", revision: state.revision, payload: state.adminSnapshot(clock) }));
+        return;
+      }
       connections.bindParticipant(ws.data.deviceId, ws);
       state.setConnected(ws.data.deviceId, true);
+      ws.send(JSON.stringify({ protocolVersion: 1, sessionId: clock.sessionId, serverEpoch: clock.serverEpoch,
+        messageId: crypto.randomUUID(), type: "state.snapshot", revision: state.revision,
+        payload: state.participantSnapshot(ws.data.deviceId, clock) }));
       telemetry.mark();
     },
     close(ws) {
@@ -94,6 +103,7 @@ const server = Bun.serve<SocketData, string>({
     message(ws, raw) {
       const receivedServerMs = clock.nowServerMs();
       if (ws.data.role === "operator") return;
+      if (connections.participantSocket(ws.data.deviceId) !== ws) return;
       const reply = handleClientMessage({
         raw: String(raw), receivedServerMs, clock, deviceId: ws.data.deviceId, state, preparations, calibrations,
       });
