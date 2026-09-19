@@ -14,3 +14,11 @@ test("connection and clock do not imply audible readiness", () => {
   snapshot.readiness.decodedTrackHashes[track.trackId] = track.sha256;
   expect(participantStatus(snapshot)).toBe("Prepared; playback implementation pending");
 });
+
+test("a hidden page is reported before later readiness steps", () => {
+  const snapshot = ParticipantSnapshot.parse(structuredClone(fixture));
+  snapshot.readiness.foreground = false;
+  expect(participantStatus(snapshot)).toBe("Page in background");
+  snapshot.readiness.connected = false;
+  expect(participantStatus(snapshot)).toBe("Disconnected");
+});
