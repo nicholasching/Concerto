@@ -44,6 +44,14 @@ export class Barrier {
     return true;
   }
 
+  // Calibration acknowledgements name a run rather than show and transport revisions, so the
+  // preparation id alone identifies what is being confirmed. The caller checks the run.
+  acknowledgePreparation(input: { deviceId: number; preparationId: string; ready: boolean; reason: string | null }): boolean {
+    return this.acknowledge({
+      ...input, showRevision: this.showRevision, transportRevision: this.transportRevision,
+    });
+  }
+
   // A device that disconnects cannot satisfy the barrier, and waiting for it would hold the show.
   exclude(deviceId: number, reason: string): void {
     if (!this.expectedIds.has(deviceId)) return;

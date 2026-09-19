@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { ApiError } from "@orchestra/contracts";
 import { createApp } from "../src/app";
 import { AssetStore } from "../src/assets";
+import { CalibrationRuns } from "../src/calibration";
 import { CheckpointStore } from "../src/checkpoint";
 import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
@@ -21,6 +22,8 @@ const app = () =>
     connections: new ConnectionRegistry(),
     preparations: new Preparations(),
     assets: new AssetStore("/tmp/orchestra-unused-assets"),
+    uploads: new AssetStore("/tmp/orchestra-unused-uploads"),
+    calibrations: new CalibrationRuns(),
   });
 
 test("health identifies a foundation, not a running concert", async () => {

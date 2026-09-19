@@ -5,6 +5,7 @@ import { join as joinPath } from "node:path";
 import { ApiError, JoinResponse } from "@orchestra/contracts";
 import { createApp } from "../src/app";
 import { AssetStore } from "../src/assets";
+import { CalibrationRuns } from "../src/calibration";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
 import { DeviceRegistry, MAX_DEVICES } from "../src/registry";
@@ -43,6 +44,8 @@ const harness = (options: { capacity?: number; refillPerSecond?: number } = {}) 
     connections: new ConnectionRegistry(),
     preparations: new Preparations(),
     assets: new AssetStore(joinPath(directory, "assets")),
+    uploads: new AssetStore(joinPath(directory, "uploads")),
+    calibrations: new CalibrationRuns(),
   });
   return { app, registry, store, clock: serverClock };
 };

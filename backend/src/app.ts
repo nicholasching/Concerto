@@ -2,12 +2,13 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import {
-  ApiError, AssignmentRequest, CommandAccepted, JoinRequest, JoinResponse, MixRequest, PROTOCOL_VERSION,
-  SaveShowRequest, Track, TransportRequest,
+  ApiError, AssignmentRequest, CalibrationArmRequest, CalibrationCreateRequest, CalibrationRun, CommandAccepted,
+  JoinRequest, JoinResponse, MixRequest, PROTOCOL_VERSION, SaveShowRequest, Track, TransportRequest,
 } from "@orchestra/contracts";
 import type { AssetStore } from "./assets";
 import { matchesOperatorSecret } from "./auth";
 import { Barrier } from "./barriers";
+import { MAX_CAMERAS, type CalibrationRuns } from "./calibration";
 import type { ServerClock } from "./clock";
 import type { CheckpointStore } from "./checkpoint";
 import type { CommandLog } from "./commands";
@@ -21,6 +22,14 @@ import { nextTransport, positionAt } from "./transport";
 export const DEFAULT_LEAD_TIME_MS = 3000;
 
 const numeric = z.coerce.number();
+const CameraUploadQuery = z.object({
+  commandId: z.string().min(1).max(160),
+  cameraId: z.string().min(1).max(160),
+  primaryColumn: z.enum(["left", "center", "right"]),
+  rotationDegrees: z.coerce.number().int().refine(value => [0, 90, 180, 270].includes(value), "unsupported rotation"),
+  byteSize: numeric.int().positive(),
+  label: z.string().min(1).max(200),
+});
 const AssetUpload = z.object({
   commandId: z.string().min(1).max(160),
   label: z.string().min(1).max(200),
@@ -40,6 +49,8 @@ export interface AppDeps {
   connections: ConnectionRegistry;
   preparations: Preparations;
   assets: AssetStore;
+  uploads: AssetStore;
+  calibrations: CalibrationRuns;
   operatorSecret?: string;
   leadTimeMs?: number;
 }
@@ -314,6 +325,145 @@ export function createApp(deps: AppDeps) {
     return new Response(Bun.file(path), {
       headers: { "content-type": "application/octet-stream", "cache-control": "public, max-age=31536000, immutable" },
     });
+  });
+
+  app.post("/api/calibrations", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Creating a calibration run requires the operator secret."), 401);
+    }
+    const body = CalibrationCreateRequest.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(apiError("INVALID_REQUEST", "Calibration request did not match the protocol v1 schema."), 400);
+    const request = body.data;
+    const guard = guardCommand(deps, request);
+    if (guard) return c.json(guard.body, guard.status);
+
+    const replayed = deps.commands.get<unknown>(request.commandId);
+    if (replayed) return c.json(replayed);
+
+    // Only phones that are actually here can be frozen into the run. A participant that is not
+    // connected cannot render the packet, and counting it would only produce a phantom exclusion.
+    const connected = new Set(deps.state.connectedDeviceIds());
+    const participantIds = request.participantIds.filter(deviceId => connected.has(deviceId));
+    if (participantIds.length === 0) {
+      return c.json(apiError("NO_ELIGIBLE_PARTICIPANTS", "None of the named devices are connected."), 409);
+    }
+
+    const outcome = deps.calibrations.create({
+      sessionId: deps.clock.sessionId, serverEpoch: deps.clock.serverEpoch,
+      participantIds, palette: request.palette, paletteVersion: request.paletteVersion,
+    });
+    if (!outcome.ok) {
+      return outcome.code === "RUN_IN_PROGRESS"
+        ? c.json(apiError("RUN_IN_PROGRESS", "Finish or discard the active calibration run first."), 409)
+        : c.json(apiError("RUN_TAGS_EXHAUSTED", "This session has used all 256 run tags; start a new session."), 409);
+    }
+
+    const barrier = new Barrier(crypto.randomUUID(), deps.state.showRevision, deps.state.transport.transportRevision, participantIds);
+    deps.preparations.start("calibration", barrier);
+    deps.connections.sendToParticipants(participantIds, JSON.stringify({
+      ...envelope(deps.clock), type: "calibration.prepare", revision: deps.state.revision,
+      payload: { preparationId: barrier.preparationId, plan: outcome.run.plan },
+    }));
+
+    // The plan is returned whole and unmodified so it stays a valid contract object; the
+    // preparation id travels beside it rather than inside it.
+    const result = { plan: outcome.run.plan, preparationId: barrier.preparationId };
+    deps.commands.remember(request.commandId, result);
+    return c.json(result);
+  });
+
+  app.post("/api/calibrations/:runId/arm", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Arming a calibration run requires the operator secret."), 401);
+    }
+    const body = CalibrationArmRequest.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(apiError("INVALID_REQUEST", "Arm request did not match the protocol v1 schema."), 400);
+    const request = body.data;
+    const guard = guardCommand(deps, request);
+    if (guard) return c.json(guard.body, guard.status);
+
+    const replayed = deps.commands.get<unknown>(request.commandId);
+    if (replayed) return c.json(replayed);
+
+    const run = deps.calibrations.get(c.req.param("runId"));
+    if (!run || run.plan.runId !== request.runId) {
+      return c.json(apiError("UNKNOWN_RUN", "No such calibration run in this session."), 404);
+    }
+    if (run.status !== "created") {
+      return c.json(apiError("RUN_NOT_ARMABLE", `This run is ${run.status}.`), 409);
+    }
+
+    // The acknowledgements have to name the preparation the operator is looking at, or the
+    // ready count on screen describes a different run than the one about to start.
+    const barrier = deps.preparations.current("calibration");
+    if (!barrier || barrier.preparationId !== request.preparationId) {
+      return c.json(apiError("STALE_PREPARATION", "That preparation is no longer the current one."), 409);
+    }
+    if (barrier.readyDevices().length === 0) {
+      return c.json(apiError("NOBODY_READY", "No device has acknowledged this calibration."), 409);
+    }
+    const leadTime = leadTimeError(deps, request.effectiveServerMs, deps.clock.nowServerMs());
+    if (leadTime) return c.json(leadTime.body, leadTime.status);
+
+    deps.calibrations.arm(run.plan.runId, request.effectiveServerMs);
+    const armed = CalibrationRun.parse({ ...run.plan, startServerMs: request.effectiveServerMs });
+    deps.connections.sendToParticipants(barrier.readyDevices(), JSON.stringify({
+      ...envelope(deps.clock), type: "calibration.arm", revision: deps.state.revision,
+      effectiveServerMs: request.effectiveServerMs,
+      payload: { preparationId: barrier.preparationId, run: armed },
+    }));
+
+    const ack = accepted(deps.clock, request.commandId, deps.state.revision);
+    deps.commands.remember(request.commandId, ack);
+    return c.json({ ...ack, excluded: barrier.excludedDevices(), ready: barrier.readyDevices().length });
+  });
+
+  // The submitted label is recorded for the operator and never used as a path: the file lands
+  // under a server-generated id.
+  app.post("/api/calibrations/:runId/uploads", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Uploading a recording requires the operator secret."), 401);
+    }
+    const query = CameraUploadQuery.safeParse(c.req.query());
+    if (!query.success) return c.json(apiError("INVALID_REQUEST", "Upload metadata was missing or malformed."), 400);
+
+    const replayed = deps.commands.get<unknown>(query.data.commandId);
+    if (replayed) return c.json(replayed);
+
+    const run = deps.calibrations.get(c.req.param("runId"));
+    if (!run) return c.json(apiError("UNKNOWN_RUN", "No such calibration run in this session."), 404);
+    if (run.status === "committed" || run.status === "discarded") {
+      return c.json(apiError("RUN_CLOSED", `This run is ${run.status}.`), 409);
+    }
+    const existing = [...run.uploads.values()];
+    if (existing.some(upload => upload.cameraId === query.data.cameraId)) {
+      return c.json(apiError("CAMERA_ALREADY_UPLOADED", `Camera ${query.data.cameraId} already has a recording for this run.`), 409);
+    }
+    if (existing.length >= MAX_CAMERAS) {
+      return c.json(apiError("TOO_MANY_CAMERAS", `A run accepts at most ${MAX_CAMERAS} recordings.`), 409);
+    }
+
+    const body = c.req.raw.body;
+    if (!body) return c.json(apiError("INVALID_REQUEST", "Upload had no body."), 400);
+
+    const uploadId = crypto.randomUUID();
+    const written = await deps.uploads.write(uploadId, body);
+    if (written.byteSize !== query.data.byteSize) {
+      await deps.uploads.discard(uploadId);
+      return c.json(apiError(
+        "TRUNCATED_UPLOAD", `Expected ${query.data.byteSize} bytes and received ${written.byteSize}.`, true,
+      ), 400);
+    }
+
+    const upload = {
+      uploadId, runId: run.plan.runId, cameraId: query.data.cameraId,
+      primaryColumn: query.data.primaryColumn,
+      rotationDegrees: query.data.rotationDegrees as 0 | 90 | 180 | 270,
+      sha256: written.sha256, byteSize: written.byteSize, label: query.data.label,
+    };
+    deps.calibrations.addUpload(upload);
+    deps.commands.remember(query.data.commandId, upload);
+    return c.json(upload);
   });
 
   app.post("/api/assignments", async c => {

@@ -1,5 +1,6 @@
 import { createApp } from "./app";
 import { AssetStore, assetsPath } from "./assets";
+import { CalibrationRuns } from "./calibration";
 import { matchesOperatorSecret } from "./auth";
 import { CheckpointStore, checkpointPath } from "./checkpoint";
 import { createServerClock } from "./clock";
@@ -24,6 +25,8 @@ const connections = new ConnectionRegistry();
 const telemetry = new OperatorTelemetry();
 const preparations = new Preparations();
 const assets = new AssetStore(assetsPath());
+const uploads = new AssetStore(process.env.UPLOADS_PATH ?? "runtime/uploads");
+const calibrations = new CalibrationRuns();
 
 const restored = await store.read();
 if (restored) {
@@ -39,7 +42,7 @@ if (!process.env.OPERATOR_SECRET) {
 }
 
 const app = createApp({
-  clock, registry, store, joins, state, commands, connections, preparations, assets,
+  clock, registry, store, joins, state, commands, connections, preparations, assets, uploads, calibrations,
   operatorSecret: process.env.OPERATOR_SECRET,
 });
 
@@ -83,7 +86,7 @@ const server = Bun.serve<SocketData, string>({
       const receivedServerMs = clock.nowServerMs();
       if (ws.data.role === "operator") return;
       const reply = handleClientMessage({
-        raw: String(raw), receivedServerMs, clock, deviceId: ws.data.deviceId, state, preparations,
+        raw: String(raw), receivedServerMs, clock, deviceId: ws.data.deviceId, state, preparations, calibrations,
       });
       if (reply.type !== "clock.reply") telemetry.mark();
       ws.send(JSON.stringify(reply));

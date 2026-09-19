@@ -7,6 +7,7 @@ import {
 } from "@orchestra/contracts";
 import { createApp, DEFAULT_LEAD_TIME_MS } from "../src/app";
 import { AssetStore } from "../src/assets";
+import { CalibrationRuns } from "../src/calibration";
 import { Barrier } from "../src/barriers";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
@@ -67,6 +68,8 @@ const harness = () => {
     joins: new RateLimiter(100, 100, () => serverMs),
     commands: new CommandLog(),
     assets: new AssetStore(joinPath(directory, "assets")),
+    uploads: new AssetStore(joinPath(directory, "uploads")),
+    calibrations: new CalibrationRuns(),
   });
   return { app, state, preparations, connections, clock };
 };
