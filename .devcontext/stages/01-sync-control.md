@@ -1,6 +1,6 @@
 # Stage 01 - Sync and authoritative control
 
-Status: not started (foundation provided). Owner: Team 1 lead, default captain. Branch: feat/sync-control. Base: foundation-v1.
+Status: in progress. Slice 1 implemented; slices 2-5 outstanding. Owner: Team 1 lead, default captain. Branch: feat/sync-control. Base: foundation-v1.
 
 ## Agent assignment
 
