@@ -51,7 +51,10 @@ async function attemptJoin({ api, sessionId, storage, fetch: post = fetch }: Joi
       tokenRejected = true;
       response = await send(null);
     }
-    if (response.status === 409) return { status: "full" };
+    if (response.status === 409 || response.status === 503) {
+      const error = ApiError.safeParse(await response.clone().json().catch(() => null));
+      if (error.success && ["SESSION_FULL", "CAPACITY_REACHED"].includes(error.data.error.code)) return { status: "full" };
+    }
     if (!response.ok) return { status: "error", message: await errorMessage(response) };
     const join = JoinResponse.parse(await response.json());
     if (join.sessionId !== sessionId) return { status: "error", message: `Joined session ${join.sessionId}, expected ${sessionId}` };

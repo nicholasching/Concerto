@@ -63,7 +63,7 @@ test("joins, opens a token-bound socket and connects on its own snapshot", async
   const connection = create();
   connection.start();
   await settle();
-  expect(sockets[0].url).toBe(`ws://mock/ws?token=${TOKEN}`);
+  expect(sockets[0].url).toBe(`ws://mock/ws?resumeToken=${TOKEN}`);
   expect(last().status.kind).toBe("joining");
   sockets[0].receive(snapshotMessage(snapshotFor()));
   expect(last().status).toEqual({ kind: "connected" });
@@ -210,5 +210,5 @@ test("send only works on a connected, open socket; stop closes and ignores late 
 });
 
 test("socketUrl adds the token to the configured socket URL", () => {
-  expect(socketUrl("ws://host:1/ws", "abc")).toBe("ws://host:1/ws?token=abc");
+  expect(socketUrl("ws://host:1/ws", "abc")).toBe("ws://host:1/ws?resumeToken=abc");
 });

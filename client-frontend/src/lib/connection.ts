@@ -11,10 +11,10 @@ export function backoffDelayMs(attempt: number, random: () => number = Math.rand
   return base + random() * BACKOFF.jitter * base;
 }
 
-// Proposal for Team 1: the socket proves its identity with the resume token.
+// Canonical Team 1 endpoint: the socket proves its identity with the resume token.
 export function socketUrl(wsUrl: string, resumeToken: string): string {
   const url = new URL(wsUrl);
-  url.searchParams.set("token", resumeToken);
+  url.searchParams.set("resumeToken", resumeToken);
   return url.toString();
 }
 
@@ -175,12 +175,15 @@ export class ParticipantConnection {
     if (!parsed.success) { this.log("dropped message that failed ServerMessage validation"); return; }
     const message = parsed.data;
     if (message.type !== "state.snapshot") {
-      if (this.state.status.kind === "connected") this.options.onMessage?.(message);
+      const current = this.state.snapshot;
+      if (this.state.status.kind === "connected" && current && message.sessionId === current.sessionId
+        && message.serverEpoch === current.serverEpoch) this.options.onMessage?.(message);
       return;
     }
     const snapshot = message.payload;
     const identity = this.state.identity;
-    if (snapshot.role !== "participant" || !identity || snapshot.deviceId !== identity.deviceId || snapshot.sessionId !== identity.sessionId) {
+    if (snapshot.role !== "participant" || !identity || snapshot.deviceId !== identity.deviceId || snapshot.sessionId !== identity.sessionId
+      || message.sessionId !== snapshot.sessionId || message.serverEpoch !== snapshot.serverEpoch) {
       this.log("dropped snapshot for another device or session");
       return;
     }

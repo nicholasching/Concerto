@@ -117,7 +117,7 @@ export default function Page() {
       openSocket: browserSocket,
       onChange: state => {
         // A run can't survive losing the socket or a server restart.
-        if (state.status.kind !== "connected") session.abort("disconnected");
+        if (state.status.kind !== "connected") { session.abort("disconnected"); control.disconnected(); }
         setConn(state);
       },
       onMessage: message => {

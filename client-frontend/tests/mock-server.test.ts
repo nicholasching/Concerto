@@ -92,7 +92,7 @@ test("a second tab with the same identity replaces the first", async () => {
 
 test("the mock refuses a socket with an unknown token and a status for another device", async () => {
   server = startClientDemoServer({ port: 0, log: () => {} });
-  const refused = new WebSocket(`ws://127.0.0.1:${server.port}/ws?token=nope`);
+  const refused = new WebSocket(`ws://127.0.0.1:${server.port}/ws?resumeToken=nope`);
   const closed = await new Promise<number>(resolve => { refused.onclose = event => resolve(event.code); });
   expect(closed).not.toBe(1000);
 
@@ -179,7 +179,8 @@ test("assign, play, then reconnect mid-song rebuilds the same playhead from the 
     openSocket: browserSocket, log: () => {},
     onChange: state => {
       states.push(state);
-      if (state.snapshot && state.snapshot !== lastSnapshot) { lastSnapshot = state.snapshot; control.applySnapshot(state.snapshot); }
+      if (state.status.kind !== "connected") control.disconnected();
+      else if (state.snapshot && state.snapshot !== lastSnapshot) { lastSnapshot = state.snapshot; control.applySnapshot(state.snapshot); }
     },
     onMessage: message => control.handle(message),
   });

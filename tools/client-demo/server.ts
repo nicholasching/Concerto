@@ -182,7 +182,7 @@ export function startClientDemoServer({ port = 18081, capacity = 30, log = conso
       const url = new URL(request.url);
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
       if (url.pathname === "/ws") {
-        const deviceId = tokens.get(url.searchParams.get("token") ?? "");
+        const deviceId = tokens.get(url.searchParams.get("resumeToken") ?? "");
         if (deviceId === undefined) return new Response("Unknown token", { status: 401 });
         return server.upgrade(request, { data: { deviceId } }) ? undefined : new Response("Upgrade required", { status: 426 });
       }

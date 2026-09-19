@@ -59,17 +59,37 @@ export class ShowControl {
   private engine: Engine | null = null;
   /** Last master gain seen this page load; the snapshot doesn't carry it (see proposed ADR). */
   private lastMasterGain = 1;
+  private epoch: string | null = null;
+  private needsReload = false;
 
   constructor(private readonly options: ShowControlOptions) {}
 
   attach(engine: Engine | null): void {
     this.engine = engine;
+    this.settle();
     this.reloadEngine();
+  }
+
+  disconnected(): void {
+    this.engine?.panic();
+    this.leaseExpiresMs = null;
+    this.needsReload = true;
   }
 
   contextResumed(): void { this.engine?.contextResumed(); }
 
   applySnapshot(snapshot: ParticipantSnapshotData): void {
+    const epochChanged = this.epoch !== snapshot.serverEpoch;
+    if (epochChanged) {
+      if (this.epoch !== null) this.engine?.panic();
+      this.epoch = snapshot.serverEpoch;
+      this.transportRevision = this.assignmentRevision = this.mixRevision = this.panicRevision = -1;
+      this.panicked = false;
+      this.leaseExpiresMs = null;
+      this.lastMasterGain = 1;
+    }
+    this.settle();
+    const before = this.playbackKey();
     this.show = snapshot.show;
     if (snapshot.transport.transportRevision > this.panicRevision) this.panicked = false;
     this.transport = this.guardPanic(snapshot.transport);
@@ -88,7 +108,12 @@ export class ShowControl {
         this.pendingMix = { value: { masterGain: action.masterGain, channels: action.channels }, atServerMs: action.effectiveServerMs };
       }
     }
-    this.reloadEngine();
+    if (epochChanged || this.needsReload || before !== this.playbackKey()) this.reloadEngine();
+    this.needsReload = false;
+  }
+
+  private playbackKey(): string {
+    return JSON.stringify([this.show, this.transport, this.channelId, this.mix, this.pendingTransport, this.pendingChannel, this.pendingMix]);
   }
 
   handle(message: ServerMessageData): void {
@@ -189,6 +214,8 @@ export class ShowControl {
     this.panicRevision = Math.max(this.transportRevision, this.pendingTransport?.value.transportRevision ?? -1);
     this.panicked = true;
     this.pendingTransport = null;
+    this.pendingChannel = this.pendingMix = null;
+    this.leaseExpiresMs = null;
     if (this.transport) this.transport = this.guardPanic(this.transport);
     this.engine?.panic();
   }

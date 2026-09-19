@@ -51,6 +51,11 @@ test("a full session is reported once, not retried", async () => {
   expect(bodies).toHaveLength(1);
 });
 
+test("the production server capacity error also stops retries", async () => {
+  const { fetch } = recorder([apiError(503, "CAPACITY_REACHED")]);
+  expect(await joinSession({ api: "http://mock", sessionId: "demo", storage: memory(), fetch })).toEqual({ status: "full" });
+});
+
 test("invalid responses, wrong sessions and network errors are errors, not identities", async () => {
   const storage = memory();
   const bad = await joinSession({ api: "http://mock", sessionId: "demo", storage, fetch: async () => Response.json({ deviceId: 5 }) });

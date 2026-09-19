@@ -138,3 +138,22 @@ test("messages go out only with an identity and pass the shared schema", () => {
   silent.handle({ ...envelope, type: "transport.prepare", payload: { preparationId: "p", showRevision: 1, transportRevision: 1 } });
   expect(sent).toHaveLength(0);
 });
+
+test("telemetry snapshots do not interrupt or recreate playing source nodes", () => {
+  const snapshot = { ...structuredClone(base), transport: playing(7, T0 - 1000) };
+  control.applySnapshot(snapshot);
+  calls = [];
+  control.applySnapshot({ ...structuredClone(snapshot), revision: snapshot.revision + 1, serverMs: T0 + 100,
+    readiness: { ...snapshot.readiness, clockSampleAgeMs: 10 } });
+  expect(calls).toEqual([]);
+});
+
+test("a server restart clears panic revisions and previous audio lease", () => {
+  control.handle(transportCommit(playing(20, T0), T0));
+  control.handle({ ...envelope, type: "panic", payload: { commandId: "p" } });
+  control.applySnapshot({ ...structuredClone(base), serverEpoch: "replacement" });
+  calls = [];
+  control.handle(transportCommit(playing(1, T0 + 3000), T0 + 3000));
+  expect(calls).toEqual([["transport", 1, T0 + 3000]]);
+  expect(control.view().panicked).toBe(false);
+});
