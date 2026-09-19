@@ -19,7 +19,9 @@ For Team 3: the rendered packet matches `otc-golden-packets.json` for IDs 0, 1, 
 
 Checks run:
 - `bun run gate:client`: PASS (71 tests), including an end-to-end prepare → ready → arm → result run against the mock.
-- Desktop Chrome automation: Chrome reports the automation window as hidden and delivers zero animation frames there. The phone correctly answered `ready: false, reason: "hidden"` and did not flash. **The visible flash itself has not been watched yet.**
+- Desktop Chrome automation: Chrome reports the automation window as hidden and delivers zero animation frames there. The phone correctly answered `ready: false, reason: "hidden"` and did not flash.
+- The user watched the flash in a visible desktop tab and confirmed it works (2026-09-19). The mock recorded `completed: true`, max frame lateness 8.6 ms.
+- Unlock feedback: if `AudioContext.resume()` doesn't finish within 4 s (a tap the browser didn't accept as a gesture), the page shows "Sound didn't start. Tap the sound button again." Checked in the automation window, where resume hangs.
 
 Manual check to do: `bun run dev:client-demo`, open http://localhost:3000 in a visible window, then `curl -X POST localhost:18081/__mock__/calibrate`. Expect: a countdown for about 2 s, then ~11 s of full-screen amber/blue flashing, then the page returns showing "Calibration: done". `curl localhost:18081/__mock__/calibration` shows `completed: true`. Switching tabs mid-flash should give `reason: "hidden"`. Warning: this is a flashing full-screen pattern.
 

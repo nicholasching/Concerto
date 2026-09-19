@@ -12,9 +12,10 @@ Branch: feat/audio-client. Base: foundation-v1 = ab59c27105627977ee52dc2bcd4276b
   - `tools/client-demo`: synthetic join/resume mock with drop/restart/devices test controls, plus `/__mock__/calibrate` and `/__mock__/calibration`.
 - Not yet: manual column picker (waits on [proposed ADR](../../decisions/20260919-113215-audio-client-manual-column.md)), channel playback (slice 4), phones (slice 5), real clock (Team 1).
 - Independent command: `bun run dev:client-demo`.
-- Gate: `bun run gate:client` passed 2026-09-19 on the slice 3 working tree (71 tests, build ok).
-- Unverified: the flash in a visible browser (the automation window is hidden and gets no animation frames), real backend, real clock, phones over a reachable HTTPS origin, the foreground switch, physical display timing, and filmed clips for Team 3.
-- Next action: a person watches the flash once in a visible desktop browser (steps in the handoff). Then subplan 04 (channel playback). Phone checks and clips for Team 3 once a reachable origin exists.
+- Gate: `bun run gate:client` passed 2026-09-19 on the slice 3 working tree plus the unlock-feedback fix (74 tests, build ok).
+- Verified by the user 2026-09-19: the flash works in a visible desktop browser (`mock-run-2` completed, 8.6 ms max frame lateness).
+- Unverified: real backend, real clock, phones over a reachable HTTPS origin, the foreground switch, physical display timing, and filmed clips for Team 3.
+- Next action: subplan 04 (channel playback). Phone checks and clips for Team 3 once a reachable origin exists.
 - Dependencies: Team 1 supplies the real `SynchronizedClock` and join/socket API. The proposals in [handoff.md](handoff.md) need Team 1's agreement. The captain needs to review the `bun.lock` and `THIRD_PARTY_NOTICES.md` edits from slice 1.
 
 Update this checkpoint at each handoff. Append experiment history in agent-owned journals.

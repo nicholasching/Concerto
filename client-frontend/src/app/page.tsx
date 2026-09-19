@@ -5,6 +5,7 @@ import { CalibrationSession, type CalibrationPhase } from "../lib/calibration";
 import { browserSocket, ParticipantConnection, type ConnectionState } from "../lib/connection";
 import { fixtureClock } from "../lib/fixture-clock";
 import { FlashRenderer } from "../lib/flash-renderer";
+import { unlockWithin } from "../lib/audio-unlock";
 import { browserStorage, joinSession } from "../lib/join";
 import { buildReadiness, statusMessage, StatusReporter } from "../lib/readiness";
 import { participantStatus } from "../lib/status";
@@ -52,6 +53,7 @@ export default function Page() {
   const [audioState, setAudioState] = useState<string | null>(null);
   const [verifiedHashes, setVerifiedHashes] = useState<Record<string, string>>({});
   const [assetNote, setAssetNote] = useState<string | null>(null);
+  const [audioNote, setAudioNote] = useState<string | null>(null);
   const [phase, setPhase] = useState<CalibrationPhase>({ kind: "idle" });
   const [optedOut, setOptedOut] = useState(false);
   const optedOutRef = useRef(false);
@@ -172,11 +174,9 @@ export default function Page() {
       host.current = new AudioContextHost();
       host.current.onStateChange(setAudioState);
     }
-    try {
-      await host.current.unlock();
-    } catch (error) {
-      setAssetNote(`Audio failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    setAudioNote("Unlocking audio...");
+    const outcome = await unlockWithin(() => host.current!.unlock(), timers);
+    setAudioNote(outcome.kind === "running" ? null : outcome.kind === "timeout" ? "Sound didn't start. Tap the sound button again." : `Audio failed: ${outcome.message}`);
     setAudioState(host.current.state);
   }
 
@@ -207,6 +207,7 @@ export default function Page() {
       <ul className="checks">{checks.map(([label, ok]) => <li key={label} className={ok ? "ok" : "no"}>{ok ? "✓" : "✗"} {label}</li>)}</ul>
       <p>The clock sync comes from Team 1 and isn&apos;t connected yet, so &quot;Clock synced&quot; stays off.</p>
       {identity && audioState !== "running" && <button type="button" onClick={enableSound}>{isAudioContextPaused(audioState) ? "Tap to resume sound" : "Enable sound"}</button>}
+      {audioNote && <p role="alert">{audioNote}</p>}
       {assetNote && <p>{assetNote}</p>}
       <p>{calibrationLabel(phase, optedOut)}</p>
       {identity && phase.kind !== "armed" && <button type="button" onClick={toggleSkip}>{optedOut ? "Take part in calibration" : "Skip calibration"}</button>}
