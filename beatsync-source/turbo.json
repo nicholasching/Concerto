@@ -1,0 +1,50 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "persistent": true,
+      "cache": false
+    },
+    "test": {
+      "dependsOn": ["^test"],
+      "inputs": ["$TURBO_DEFAULT$", "bunfig.toml", "happydom.ts", "test-setup.ts"]
+    },
+    "dev:demo": {
+      "persistent": true,
+      "cache": false
+    },
+    "build:demo": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "demo": {
+      "dependsOn": ["build:demo"],
+      "persistent": true,
+      "cache": false
+    },
+    "dev:log": {
+      "persistent": true,
+      "cache": false
+    },
+    "start": {
+      "dependsOn": ["build"],
+      "outputs": [".next/**"]
+    },
+    "start:log": {
+      "dependsOn": ["build"],
+      "persistent": true,
+      "cache": false
+    },
+    "demo:log": {
+      "dependsOn": ["build:demo"],
+      "persistent": true,
+      "cache": false
+    }
+  }
+}

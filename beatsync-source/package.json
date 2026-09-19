@@ -1,0 +1,44 @@
+{
+  "name": "beatsync",
+  "packageManager": "bun@1.3.8",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "start": "turbo run start",
+    "server": "turbo start --filter=server",
+    "client": "turbo start --filter=client",
+    "docker:build": "docker build -t beatsync .",
+    "docker:run": "docker rm -f beatsync-server 2>/dev/null || true && docker run --name beatsync-server -p 8080:8080 --env-file apps/server/.env beatsync",
+    "docker:prod": "bun run docker:build && bun run docker:run",
+    "docker:stop": "docker stop beatsync-server",
+    "docker:clean": "docker rm -f beatsync-server 2>/dev/null || true && docker system prune -f",
+    "pm2:start": "pm2 start pm2.config.js",
+    "pm2:stop": "pm2 stop beatsync-server",
+    "pm2:restart": "pm2 restart beatsync-server",
+    "pm2:logs": "pm2 logs beatsync-server",
+    "demo:dev": "turbo run dev:demo",
+    "demo:build": "turbo run build:demo",
+    "demo": "turbo run demo",
+    "demo:log": "turbo run demo:log",
+    "dev:log": "turbo run dev:log",
+    "start:log": "turbo run start:log",
+    "prepare": "lefthook install"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@types/bun": "latest",
+    "lefthook": "2.1.9",
+    "prettier": "3.8.3",
+    "turbo": "2.9.16"
+  },
+  "peerDependencies": {
+    "typescript": "^6.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/s3-request-presigner": "3.1062.0"
+  }
+}

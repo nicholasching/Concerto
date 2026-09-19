@@ -1,0 +1,136 @@
+import { ClientActionEnum } from "@beatsync/shared";
+import { handleAudioSourceLoaded } from "@/websocket/handlers/handleAudioSourceLoaded";
+import { handleDeleteAudioSources } from "@/websocket/handlers/handleDeleteAudioSources";
+import { handleLoadDefaultTracks } from "@/websocket/handlers/handleLoadDefaultTracks";
+import { handleSearchMusic } from "@/websocket/handlers/handleSearchMusic";
+import { handleSendChatMessage } from "@/websocket/handlers/handleSendChatMessage";
+import { handleSendIp } from "@/websocket/handlers/handleSendIp";
+import { handleSetAdmin } from "@/websocket/handlers/handleSetAdmin";
+import { handleSetPlaybackControls } from "@/websocket/handlers/handleSetPlaybackControls";
+import { handleStreamMusic } from "@/websocket/handlers/handleStreamMusic";
+import { handleMoveClient } from "@/websocket/handlers/moveClient";
+import { handleNTPRequest } from "@/websocket/handlers/ntpRequest";
+import { handlePause } from "@/websocket/handlers/pause";
+import { handlePlay } from "@/websocket/handlers/play";
+import { handleLivenessPong } from "@/websocket/handlers/livenessPong";
+import { handleReorderClient } from "@/websocket/handlers/reorderClient";
+import { handleSetGlobalVolume } from "@/websocket/handlers/setGlobalVolume";
+import { handleSetListeningSource } from "@/websocket/handlers/setListeningSource";
+import { handleStartSpatialAudio } from "@/websocket/handlers/startSpatialAudio";
+import { handleStopSpatialAudio } from "@/websocket/handlers/stopSpatialAudio";
+import { handleReorderAudioSources } from "@/websocket/handlers/handleReorderAudioSources";
+import { handleSetMetronome } from "@/websocket/handlers/setMetronome";
+import { handleSetLowPassFreq } from "@/websocket/handlers/setLowPassFreq";
+import { handleSync } from "@/websocket/handlers/sync";
+import type { WebsocketRegistry } from "@/websocket/types";
+
+export const WS_REGISTRY: WebsocketRegistry = {
+  [ClientActionEnum.enum.AUDIO_SOURCE_LOADED]: {
+    handle: handleAudioSourceLoaded,
+    description: "Audio source loaded event",
+  },
+  [ClientActionEnum.enum.NTP_REQUEST]: {
+    handle: handleNTPRequest,
+    description: "Time synchronization request for NTP-based sync",
+  },
+  [ClientActionEnum.enum.PLAY]: {
+    handle: handlePlay,
+    description: "Schedule play action for synchronized playback",
+  },
+
+  [ClientActionEnum.enum.PAUSE]: {
+    handle: handlePause,
+    description: "Schedule pause action for synchronized playback",
+  },
+
+  [ClientActionEnum.enum.START_SPATIAL_AUDIO]: {
+    handle: handleStartSpatialAudio,
+    description: "Start spatial audio processing loop",
+  },
+
+  [ClientActionEnum.enum.STOP_SPATIAL_AUDIO]: {
+    handle: handleStopSpatialAudio,
+    description: "Stop spatial audio processing and reset gains",
+  },
+
+  [ClientActionEnum.enum.REORDER_CLIENT]: {
+    handle: handleReorderClient,
+    description: "Reorder clients in room for spatial positioning",
+  },
+
+  [ClientActionEnum.enum.SET_LISTENING_SOURCE]: {
+    handle: handleSetListeningSource,
+    description: "Update listening position for spatial audio",
+  },
+
+  [ClientActionEnum.enum.MOVE_CLIENT]: {
+    handle: handleMoveClient,
+    description: "Move client position in spatial audio space",
+  },
+
+  [ClientActionEnum.enum.SYNC]: {
+    handle: handleSync,
+    description: "Sync late-joining client with room state",
+  },
+
+  [ClientActionEnum.enum.LOAD_DEFAULT_TRACKS]: {
+    handle: handleLoadDefaultTracks,
+    description: "Load default tracks into the room if queue is empty",
+  },
+
+  [ClientActionEnum.enum.DELETE_AUDIO_SOURCES]: {
+    handle: handleDeleteAudioSources,
+    description: "Delete audio sources with room prefix (non-default only)",
+  },
+
+  [ClientActionEnum.enum.SET_ADMIN]: {
+    handle: handleSetAdmin,
+    description: "Set admin status for a client",
+  },
+
+  [ClientActionEnum.enum.SET_PLAYBACK_CONTROLS]: {
+    handle: handleSetPlaybackControls,
+    description: "Set playback controls for a room",
+  },
+
+  [ClientActionEnum.enum.SEND_IP]: {
+    handle: handleSendIp,
+    description: "Send IP to server",
+  },
+
+  [ClientActionEnum.enum.SEARCH_MUSIC]: {
+    handle: handleSearchMusic,
+    description: "Search for music",
+  },
+
+  [ClientActionEnum.enum.STREAM_MUSIC]: {
+    handle: handleStreamMusic,
+    description: "Stream music",
+  },
+
+  [ClientActionEnum.enum.SET_GLOBAL_VOLUME]: {
+    handle: handleSetGlobalVolume,
+    description: "Set global volume for all clients in the room",
+  },
+
+  [ClientActionEnum.enum.SEND_CHAT_MESSAGE]: {
+    handle: handleSendChatMessage,
+    description: "Send a chat message to all clients in the room",
+  },
+  [ClientActionEnum.enum.REORDER_AUDIO_SOURCES]: {
+    handle: handleReorderAudioSources,
+    description: "Reorder audio sources in the room queue",
+  },
+  [ClientActionEnum.enum.SET_METRONOME]: {
+    handle: handleSetMetronome,
+    description: "Toggle metronome on/off for all clients in the room",
+  },
+  [ClientActionEnum.enum.SET_LOW_PASS_FREQ]: {
+    handle: handleSetLowPassFreq,
+    description: "Set low-pass filter cutoff frequency for all clients",
+  },
+  [ClientActionEnum.enum.LIVENESS_PONG]: {
+    handle: handleLivenessPong,
+    description: "Liveness reply to a server LIVENESS_PING",
+  },
+};
