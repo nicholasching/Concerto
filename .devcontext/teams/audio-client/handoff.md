@@ -2,6 +2,39 @@
 
 Read [stage brief](../../stages/02-audio-client.md), root rules/masterplan and shared schema notes before changing code. Workflow: take the next slice from the stage brief, write a subplan under `plans/`, get it reviewed, then implement.
 
+## Slice 4 (2026-09-19): channel playback, transport, mix, panic and lease
+
+Subplan: [plans/04](plans/04-channel-playback.md). Status: ready for integration. A listening check is still pending.
+
+Client behaviour:
+- **Prepares.**
+  - `assets.prepare` preloads the show and replies `assets.ready`, listing only verified hashes.
+  - `assignment.prepare` (own device only) and `transport.prepare` reply ready, or not ready with `audio-locked`, `clock`, `show-mismatch` or `assets-missing`.
+- **Commits.** `assignment.commit`, `transport.commit` and `mix.commit` apply at `effectiveServerMs`, strictly in revision order. A replacement in the same domain cancels the pending one; other domains are unaffected.
+- **Late commands and joins.** A commit whose time has already passed, or a snapshot of a show that is already playing, rejoins at `now + 1000 ms` at the shared playhead.
+- **Panic.** `panic` stops all sources and closes the output gate at once. After that, only a higher `transportRevision` can play.
+- **Lease.** `lease.renew` holds an audio-clock gate open until `expiresServerMs`. Without a lease the phone is silent.
+- **Snapshots.** `state.snapshot` rebuilds from `transport`, `assignment` and `pendingActions`. Master gain is the last one known this page load, or 1.0.
+- **Clock.** Production has no clock yet, so it answers `reason: "clock"`. Mock mode uses the labelled fixture clock.
+
+**Proposals for Team 1 (in addition to the slice 2 list):**
+6. Send `lease.renew` right after the socket opens, then every few seconds. The mock uses every 3 s with a 10 s expiry.
+7. After `panic`, move the snapshot's transport to a new stopped revision, as the mock does.
+8. Carry the effective mix in the snapshot: [proposed ADR](../../decisions/20260919-120306-audio-client-mix-in-snapshot.md).
+
+Checks run:
+- `bun run gate:client`: PASS (103 tests).
+  - Timeline maths and the engine run against a fake AudioContext that records start/stop and gain automation: crossfade at the switch time, pause/seek, superseded changes, panic, lease gate, missing tracks, mix.
+  - `ShowControl` tests cover every prepare/commit rule.
+  - A mock end-to-end test covers assign, play and a reconnect mid-song, which rebuilds the same playhead.
+- Desktop Chrome (automation, audio locked):
+  - Ready replies were all `audio-locked`, which is correct for a window that can't unlock audio.
+  - The display showed "Switching to Melody in 2.3 s", then "Channel: Melody", then "Play in 2.3 s", then "Playing 0:01.6", "Paused at 0:03.4", "Paused at 0:06.0" (seek), "Playing 0:06.2" and "Muted by operator".
+- Found and fixed while testing:
+  - The display only refreshed while audio was running, so a phone without sound showed stale state. It now refreshes on its own.
+  - A "play in 0.5 s" command waited for the 1 s late-join margin even when nothing was playing. That margin now only applies when joining something already sounding.
+- Not verified: actual sound, which needs a person to listen. See the steps in the chat or in the mock README.
+
 ## Slice 3 (2026-09-19): calibration flash
 
 Subplan: [plans/03](plans/03-calibration-flash.md). Status: ready for integration. One manual check is pending.

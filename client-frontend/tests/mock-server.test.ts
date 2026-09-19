@@ -3,6 +3,7 @@ import type { ServerMessageData } from "@orchestra/contracts";
 import { calibrationPacket } from "@orchestra/contracts/otc";
 import { REPLACED_CLOSE_CODE as SERVER_REPLACED, startClientDemoServer } from "../../tools/client-demo/server";
 import { CalibrationSession } from "../src/lib/calibration";
+import { ShowControl } from "../src/lib/show-control";
 import { browserSocket, ParticipantConnection, REPLACED_CLOSE_CODE, type ConnectionState } from "../src/lib/connection";
 import { joinSession, type KeyValueStore } from "../src/lib/join";
 import { buildReadiness, statusMessage } from "../src/lib/readiness";
@@ -139,11 +140,72 @@ test("a calibration run goes prepare → ready → arm → result through the re
   for (let i = 0; i < 50 && run.results.length === 0; i += 1) { await Bun.sleep(10); run = await record(); }
   expect(run.ready).toEqual([0]);
   expect(run.results).toEqual([{ deviceId: 0, completed: true, reason: null, maxFrameLatenessMs: 3 }] as never);
-  expect(messages.map(message => message.type)).toEqual(["calibration.prepare", "calibration.arm"]);
+  expect(messages.map(message => message.type).filter(type => type.startsWith("calibration"))).toEqual(["calibration.prepare", "calibration.arm"]);
   connection.stop();
 });
 
 test("the mock refuses to calibrate with nobody connected", async () => {
   server = startClientDemoServer({ port: 0, log: () => {} });
   expect((await fetch(new URL("/__mock__/calibrate", server.url), { method: "POST" })).status).toBe(409);
+});
+
+test("assign, play, then reconnect mid-song rebuilds the same playhead from the mock's snapshot", async () => {
+  server = startClientDemoServer({ port: 0, log: () => {} });
+  const calls: string[] = [];
+  const states: ConnectionState[] = [];
+  const nowMs = () => performance.timeOrigin + performance.now();
+  const identity = () => {
+    const state = states.at(-1);
+    return state?.identity && state.snapshot ? { sessionId: state.snapshot.sessionId, serverEpoch: state.snapshot.serverEpoch, deviceId: state.identity.deviceId } : null;
+  };
+  let connection: ParticipantConnection | null = null;
+  const control = new ShowControl({
+    send: message => { connection!.send(message); }, identity,
+    facts: () => ({ audioRunning: true, clockUsable: true, verified: () => true }),
+    preload: async () => {}, now: nowMs,
+  });
+  control.attach({
+    load: (_s, transport, channelId) => calls.push(`load ${transport.status} ${channelId}`),
+    setTransport: transport => calls.push(`transport ${transport.status}`),
+    setChannel: channelId => calls.push(`channel ${channelId}`),
+    setMix: () => calls.push("mix"), panic: () => calls.push("panic"),
+    renewLease: () => calls.push("lease"), contextResumed: () => calls.push("resumed"),
+  });
+  let lastSnapshot: unknown = null;
+  const storage = memory(); // one browser: the reconnect must resume the same device
+  connection = new ParticipantConnection({
+    wsUrl: `ws://127.0.0.1:${server.port}/ws`,
+    join: () => joinSession({ api: server!.url.toString(), sessionId: "demo", storage }),
+    openSocket: browserSocket, log: () => {},
+    onChange: state => {
+      states.push(state);
+      if (state.snapshot && state.snapshot !== lastSnapshot) { lastSnapshot = state.snapshot; control.applySnapshot(state.snapshot); }
+    },
+    onMessage: message => control.handle(message),
+  });
+  connection.start();
+  await until(() => states.at(-1)?.status.kind === "connected" && calls.includes("lease"));
+
+  await fetch(new URL("/__mock__/assign?deviceId=0&channelId=channel-1&leadMs=200&readyWaitMs=100", server.url), { method: "POST" });
+  await until(() => calls.includes("channel channel-1"));
+  await fetch(new URL("/__mock__/transport?action=play&positionMs=0&leadMs=200&readyWaitMs=100", server.url), { method: "POST" });
+  await until(() => calls.includes("transport playing"));
+  const playback = await (await fetch(new URL("/__mock__/playback", server.url))).json() as { readies: { type: string; ready: boolean }[] };
+  expect(playback.readies.map(item => `${item.type}:${item.ready}`)).toEqual(["assignment.ready:true", "transport.ready:true"]);
+  await Bun.sleep(400); // both changes are now effective
+
+  const before = control.view();
+  const beforeAt = nowMs();
+  await fetch(new URL("/__mock__/drop", server.url), { method: "POST" });
+  await until(() => states.at(-1)?.status.kind === "reconnecting");
+  await until(() => states.at(-1)?.status.kind === "connected", 3000);
+  const after = control.view();
+  const afterAt = nowMs();
+  expect(states.at(-1)?.identity?.deviceId).toBe(0);
+  expect(calls.filter(call => call.startsWith("load")).at(-1)).toBe("load playing channel-1");
+  expect(after.channelId).toBe("channel-1");
+  expect(after.transport?.transportRevision).toBe(before.transport?.transportRevision);
+  // Same shared playhead: the position moved by exactly the time that passed during the reconnect.
+  expect(after.positionMs - before.positionMs).toBeCloseTo(afterAt - beforeAt, -1);
+  connection.stop();
 });

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { AudioContextHost, DecodedBudget, isAudioContextPaused, preloadTracks, type LoadedTrack } from "@orchestra/audio";
+import { AudioContextHost, DecodedBudget, isAudioContextPaused, PlaybackEngine, preloadTracks, type LoadedTrack } from "@orchestra/audio";
+import type { ShowData } from "@orchestra/contracts";
 import { CalibrationSession, type CalibrationPhase } from "../lib/calibration";
 import { browserSocket, ParticipantConnection, type ConnectionState } from "../lib/connection";
 import { fixtureClock } from "../lib/fixture-clock";
@@ -8,27 +9,44 @@ import { FlashRenderer } from "../lib/flash-renderer";
 import { unlockWithin } from "../lib/audio-unlock";
 import { browserStorage, joinSession } from "../lib/join";
 import { buildReadiness, statusMessage, StatusReporter } from "../lib/readiness";
+import { ShowControl, type PlaybackView } from "../lib/show-control";
 import { participantStatus } from "../lib/status";
-import { AudioDemo } from "./audio-demo";
 import { CalibrationOverlay } from "./calibration-overlay";
 
 const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 const wsUrl = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8080/ws";
 const sessionId = process.env.NEXT_PUBLIC_SESSION_ID ?? "demo";
 const mock = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCKS === "1";
-// Optical timing uses only the server clock. Team 1's clock isn't wired in yet, so production has none
-// and answers calibration with "clock". Mock mode uses the labelled local fixture clock.
-const calibrationClock = mock ? fixtureClock : null;
+// Calibration and playback use only the server clock. Team 1's clock isn't wired in yet, so production has
+// none and answers "clock". Mock mode uses the labelled local fixture clock.
+const serverClock = mock ? fixtureClock : null;
 const timers = { setTimeout: (callback: () => void, ms: number) => window.setTimeout(callback, ms), clearTimeout: (handle: unknown) => window.clearTimeout(handle as number) };
 
 function calibrationLabel(phase: CalibrationPhase, optedOut: boolean): string {
   if (optedOut) return "Calibration: skipped";
   switch (phase.kind) {
-    case "idle": return calibrationClock ? "Calibration: waiting for the operator" : "Calibration: not available until the server clock is connected";
+    case "idle": return serverClock ? "Calibration: waiting for the operator" : "Calibration: not available until the server clock is connected";
     case "prepared": return "Calibration: ready, waiting for the start";
     case "armed": return "Calibration: running";
     case "finished": return phase.completed ? "Calibration: done" : `Calibration: didn't finish (${phase.reason})`;
   }
+}
+
+const clockTime = (ms: number) => `${Math.floor(ms / 60000)}:${(Math.floor(ms / 1000) % 60).toString().padStart(2, "0")}.${Math.floor((ms % 1000) / 100)}`;
+
+function playbackLabels(view: PlaybackView, show: ShowData | undefined, nowServerMs: number | null): { channel: string; color: string | null; transport: string; pending: string[] } {
+  const channelName = (id: string | null) => id === null ? "no channel" : show?.channels.find(channel => channel.channelId === id)?.label ?? id;
+  const inSeconds = (at: number) => nowServerMs === null ? "" : ` in ${Math.max(0, (at - nowServerMs) / 1000).toFixed(1)} s`;
+  const t = view.transport;
+  const transport = view.panicked ? "Muted by operator"
+    : !t || t.status === "stopped" ? "Stopped"
+    : t.status === "paused" ? `Paused at ${clockTime(view.positionMs)}`
+    : nowServerMs !== null && nowServerMs < t.startServerMs ? `Starting at ${clockTime(t.positionMs)}${inSeconds(t.startServerMs)}`
+    : `Playing ${clockTime(view.positionMs)}`;
+  const pending: string[] = [];
+  if (view.pendingChannel) pending.push(`Switching to ${channelName(view.pendingChannel.value)}${inSeconds(view.pendingChannel.atServerMs)}`);
+  if (view.pendingTransport) pending.push(`${view.pendingTransport.value.status === "playing" ? "Play" : view.pendingTransport.value.status === "paused" ? "Pause" : "Stop"}${inSeconds(view.pendingTransport.atServerMs)}`);
+  return { channel: channelName(view.channelId), color: show?.channels.find(channel => channel.channelId === view.channelId)?.color ?? null, transport, pending };
 }
 
 function connectionLabel(state: ConnectionState): string {
@@ -60,6 +78,8 @@ export default function Page() {
   const calibration = useRef<CalibrationSession | null>(null);
   const surface = useRef<HTMLDivElement | null>(null);
   const surfaceText = useRef<HTMLParagraphElement | null>(null);
+  const showControl = useRef<ShowControl | null>(null);
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     const session = new CalibrationSession(
@@ -71,6 +91,26 @@ export default function Page() {
       setPhase,
     );
     calibration.current = session;
+    const control = new ShowControl({
+      send: message => { connection.current?.send(message); },
+      identity: () => {
+        const state = connection.current?.current;
+        return state?.identity && state.snapshot ? { sessionId: state.snapshot.sessionId, serverEpoch: state.snapshot.serverEpoch, deviceId: state.identity.deviceId } : null;
+      },
+      facts: () => ({
+        audioRunning: host.current?.state === "running",
+        clockUsable: serverClock !== null,
+        verified: (trackId, sha256) => cache.current.get(trackId)?.sha256 === sha256,
+      }),
+      preload: async showToLoad => {
+        const audio = host.current;
+        if (!audio || audio.state !== "running") return;
+        await preloadTracks(showToLoad.tracks, { ctx: audio.context(), budget: budget.current, baseUrl: api }, cache.current);
+        setVerifiedHashes(Object.fromEntries([...cache.current.values()].map(track => [track.trackId, track.sha256])));
+      },
+      now: () => serverClock?.nowServerMs() ?? null,
+    });
+    showControl.current = control;
     const client = new ParticipantConnection({
       wsUrl,
       join: () => joinSession({ api, sessionId, storage: browserStorage() }),
@@ -82,9 +122,11 @@ export default function Page() {
       },
       onMessage: message => {
         if (message.type === "calibration.prepare") {
-          session.onPrepare(message, { foreground: document.visibilityState === "visible", clockUsable: calibrationClock !== null, optedOut: optedOutRef.current });
-        } else if (message.type === "calibration.arm" && calibrationClock) {
-          session.onArm(message, calibrationClock.nowServerMs());
+          session.onPrepare(message, { foreground: document.visibilityState === "visible", clockUsable: serverClock !== null, optedOut: optedOutRef.current });
+        } else if (message.type === "calibration.arm" && serverClock) {
+          session.onArm(message, serverClock.nowServerMs());
+        } else {
+          control.handle(message);
         }
       },
       timers,
@@ -139,15 +181,38 @@ export default function Page() {
     return () => { cancelled = true; };
   }, [show, audioState]);
 
+  // Every new authoritative snapshot rebuilds playback state (reconnect, late join).
+  useEffect(() => {
+    if (conn.snapshot) showControl.current?.applySnapshot(conn.snapshot);
+  }, [conn.snapshot]);
+
+  // The engine exists only while audio runs and a server clock exists. It is rebuilt when verified
+  // tracks change, so a finished preload is picked up; a resumed context gets a fresh engine too.
+  useEffect(() => {
+    const audio = host.current;
+    const control = showControl.current;
+    if (!audio || !control || audioState !== "running" || !serverClock) return;
+    const engine = new PlaybackEngine({ ctx: audio.context(), output: audio.masterGain, clock: serverClock, buffer: trackId => cache.current.get(trackId)?.buffer });
+    control.attach(engine);
+    const housekeeping = window.setInterval(() => engine.tick(), 1000);
+    return () => { window.clearInterval(housekeeping); control.attach(null); engine.dispose(); };
+  }, [audioState, verifiedHashes]);
+
+  // Refresh the playback display (playhead, countdowns, received commands) whether or not audio runs.
+  useEffect(() => {
+    const refresh = window.setInterval(() => setTick(value => value + 1), 250);
+    return () => window.clearInterval(refresh);
+  }, []);
+
   // Run the flash only while armed. The renderer paints the overlay directly, one colour per frame.
   useEffect(() => {
-    if (phase.kind !== "armed" || !calibrationClock) return;
+    if (phase.kind !== "armed" || !serverClock) return;
     const session = calibration.current!;
     let wakeLock: WakeLockSentinel | null = null;
     navigator.wakeLock?.request("screen").then(lock => { wakeLock = lock; }, () => {});
     const renderer = new FlashRenderer({
-      clock: calibrationClock,
-      clockUsable: () => calibrationClock !== null,
+      clock: serverClock,
+      clockUsable: () => serverClock !== null,
       run: phase.run,
       packet: phase.packet,
       frames: { request: callback => requestAnimationFrame(callback), cancel: handle => cancelAnimationFrame(handle as number) },
@@ -192,7 +257,7 @@ export default function Page() {
     [`Assets verified (${Object.keys(verifiedHashes).length}/${tracks.length})`, assetsVerified],
   ] : [];
   const kind = conn.status.kind;
-  const firstTrack = tracks[0];
+  const playback = showControl.current && show ? playbackLabels(showControl.current.view(), show, serverClock?.nowServerMs() ?? null) : null;
 
   return <main>
     <p className="eyebrow">AUDIENCE ORCHESTRA / TEAM 2</p>
@@ -212,7 +277,13 @@ export default function Page() {
       <p>{calibrationLabel(phase, optedOut)}</p>
       {identity && phase.kind !== "armed" && <button type="button" onClick={toggleSkip}>{optedOut ? "Take part in calibration" : "Skip calibration"}</button>}
     </section>
+    {playback && <section>
+      <h2><span className="swatch" style={{ background: playback.color ?? "transparent" }} /> Channel: {playback.channel}</h2>
+      <p className="status">{playback.transport}</p>
+      {playback.pending.map(line => <p key={line}>{line}</p>)}
+      {!serverClock && <p>Playback needs the server clock from Team 1, so this phone stays silent for now.</p>}
+      {serverClock && audioState !== "running" && <p>Enable sound to play your part.</p>}
+    </section>}
     {phase.kind === "armed" && <CalibrationOverlay surface={surface} text={surfaceText} onSkip={toggleSkip} />}
-    {mock && host.current && firstTrack && <AudioDemo host={host.current} trackId={firstTrack.trackId} buffer={cache.current.get(firstTrack.trackId)?.buffer ?? null} />}
   </main>;
 }
