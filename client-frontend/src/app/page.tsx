@@ -1,17 +1,34 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { AudioContextHost, DecodedBudget, isAudioContextPaused, preloadTracks, type LoadedTrack } from "@orchestra/audio";
+import { CalibrationSession, type CalibrationPhase } from "../lib/calibration";
 import { browserSocket, ParticipantConnection, type ConnectionState } from "../lib/connection";
+import { fixtureClock } from "../lib/fixture-clock";
+import { FlashRenderer } from "../lib/flash-renderer";
 import { browserStorage, joinSession } from "../lib/join";
 import { buildReadiness, statusMessage, StatusReporter } from "../lib/readiness";
 import { participantStatus } from "../lib/status";
 import { AudioDemo } from "./audio-demo";
+import { CalibrationOverlay } from "./calibration-overlay";
 
 const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 const wsUrl = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8080/ws";
 const sessionId = process.env.NEXT_PUBLIC_SESSION_ID ?? "demo";
 const mock = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCKS === "1";
+// Optical timing uses only the server clock. Team 1's clock isn't wired in yet, so production has none
+// and answers calibration with "clock". Mock mode uses the labelled local fixture clock.
+const calibrationClock = mock ? fixtureClock : null;
 const timers = { setTimeout: (callback: () => void, ms: number) => window.setTimeout(callback, ms), clearTimeout: (handle: unknown) => window.clearTimeout(handle as number) };
+
+function calibrationLabel(phase: CalibrationPhase, optedOut: boolean): string {
+  if (optedOut) return "Calibration: skipped";
+  switch (phase.kind) {
+    case "idle": return calibrationClock ? "Calibration: waiting for the operator" : "Calibration: not available until the server clock is connected";
+    case "prepared": return "Calibration: ready, waiting for the start";
+    case "armed": return "Calibration: running";
+    case "finished": return phase.completed ? "Calibration: done" : `Calibration: didn't finish (${phase.reason})`;
+  }
+}
 
 function connectionLabel(state: ConnectionState): string {
   const { status } = state;
@@ -35,19 +52,46 @@ export default function Page() {
   const [audioState, setAudioState] = useState<string | null>(null);
   const [verifiedHashes, setVerifiedHashes] = useState<Record<string, string>>({});
   const [assetNote, setAssetNote] = useState<string | null>(null);
+  const [phase, setPhase] = useState<CalibrationPhase>({ kind: "idle" });
+  const [optedOut, setOptedOut] = useState(false);
+  const optedOutRef = useRef(false);
+  const calibration = useRef<CalibrationSession | null>(null);
+  const surface = useRef<HTMLDivElement | null>(null);
+  const surfaceText = useRef<HTMLParagraphElement | null>(null);
 
   useEffect(() => {
+    const session = new CalibrationSession(
+      message => { connection.current?.send(message); },
+      () => {
+        const state = connection.current?.current;
+        return state?.identity && state.snapshot ? { sessionId: state.snapshot.sessionId, serverEpoch: state.snapshot.serverEpoch, deviceId: state.identity.deviceId } : null;
+      },
+      setPhase,
+    );
+    calibration.current = session;
     const client = new ParticipantConnection({
       wsUrl,
       join: () => joinSession({ api, sessionId, storage: browserStorage() }),
       openSocket: browserSocket,
-      onChange: setConn,
+      onChange: state => {
+        // A run can't survive losing the socket or a server restart.
+        if (state.status.kind !== "connected") session.abort("disconnected");
+        setConn(state);
+      },
+      onMessage: message => {
+        if (message.type === "calibration.prepare") {
+          session.onPrepare(message, { foreground: document.visibilityState === "visible", clockUsable: calibrationClock !== null, optedOut: optedOutRef.current });
+        } else if (message.type === "calibration.arm" && calibrationClock) {
+          session.onArm(message, calibrationClock.nowServerMs());
+        }
+      },
       timers,
     });
     connection.current = client;
     const onVisibility = () => {
       const visible = document.visibilityState === "visible";
       setForeground(visible);
+      if (!visible) session.abort("hidden");
       if (visible) client.wake();
     };
     const onOnline = () => client.wake();
@@ -93,6 +137,36 @@ export default function Page() {
     return () => { cancelled = true; };
   }, [show, audioState]);
 
+  // Run the flash only while armed. The renderer paints the overlay directly, one colour per frame.
+  useEffect(() => {
+    if (phase.kind !== "armed" || !calibrationClock) return;
+    const session = calibration.current!;
+    let wakeLock: WakeLockSentinel | null = null;
+    navigator.wakeLock?.request("screen").then(lock => { wakeLock = lock; }, () => {});
+    const renderer = new FlashRenderer({
+      clock: calibrationClock,
+      clockUsable: () => calibrationClock !== null,
+      run: phase.run,
+      packet: phase.packet,
+      frames: { request: callback => requestAnimationFrame(callback), cancel: handle => cancelAnimationFrame(handle as number) },
+      paint: (color, text) => {
+        if (surface.current) surface.current.style.background = color;
+        if (surfaceText.current) surfaceText.current.textContent = text ?? "";
+      },
+      onDone: maxFrameLatenessMs => session.complete(maxFrameLatenessMs),
+      onClockLost: () => session.abort("clock"),
+    });
+    renderer.start();
+    return () => { renderer.stop(); void wakeLock?.release().catch(() => {}); };
+  }, [phase]);
+
+  function toggleSkip() {
+    const next = !optedOutRef.current;
+    optedOutRef.current = next;
+    setOptedOut(next);
+    if (next) calibration.current?.abort("opted-out");
+  }
+
   async function enableSound() {
     if (!host.current) {
       host.current = new AudioContextHost();
@@ -134,7 +208,10 @@ export default function Page() {
       <p>The clock sync comes from Team 1 and isn&apos;t connected yet, so &quot;Clock synced&quot; stays off.</p>
       {identity && audioState !== "running" && <button type="button" onClick={enableSound}>{isAudioContextPaused(audioState) ? "Tap to resume sound" : "Enable sound"}</button>}
       {assetNote && <p>{assetNote}</p>}
+      <p>{calibrationLabel(phase, optedOut)}</p>
+      {identity && phase.kind !== "armed" && <button type="button" onClick={toggleSkip}>{optedOut ? "Take part in calibration" : "Skip calibration"}</button>}
     </section>
+    {phase.kind === "armed" && <CalibrationOverlay surface={surface} text={surfaceText} onSkip={toggleSkip} />}
     {mock && host.current && firstTrack && <AudioDemo host={host.current} trackId={firstTrack.trackId} buffer={cache.current.get(firstTrack.trackId)?.buffer ?? null} />}
   </main>;
 }

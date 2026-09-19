@@ -12,5 +12,7 @@
 | `POST /__mock__/drop` | Close every socket, keep identities |
 | `POST /__mock__/restart` | New `serverEpoch`, keep identities, close every socket |
 | `GET /__mock__/devices` | Last reported readiness per joined device |
+| `POST /__mock__/calibrate?leadMs=3000&readyWaitMs=1000` | Sends `calibration.prepare` (new run ID, next run tag, `amber-blue-v1`) to connected devices, then after `readyWaitMs` arms the ready ones to start `leadMs` later. 409 with nobody connected |
+| `GET /__mock__/calibration` | Each run's participants, ready/not-ready replies and `calibration.result`s |
 
 The join/socket behavior is a proposal for Team 1, listed in `.devcontext/teams/audio-client/handoff.md`. The real-HTTP/WebSocket test is `client-frontend/tests/mock-server.test.ts`.

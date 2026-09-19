@@ -1,5 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
+import type { ServerMessageData } from "@orchestra/contracts";
+import { calibrationPacket } from "@orchestra/contracts/otc";
 import { REPLACED_CLOSE_CODE as SERVER_REPLACED, startClientDemoServer } from "../../tools/client-demo/server";
+import { CalibrationSession } from "../src/lib/calibration";
 import { browserSocket, ParticipantConnection, REPLACED_CLOSE_CODE, type ConnectionState } from "../src/lib/connection";
 import { joinSession, type KeyValueStore } from "../src/lib/join";
 import { buildReadiness, statusMessage } from "../src/lib/readiness";
@@ -99,4 +102,48 @@ test("the mock refuses a socket with an unknown token and a status for another d
   connection.send(statusMessage(last().snapshot!, spoof));
   await until(() => last().status.kind === "reconnecting");
   connection.stop();
+});
+
+test("a calibration run goes prepare → ready → arm → result through the real mock", async () => {
+  server = startClientDemoServer({ port: 0, log: () => {} });
+  const messages: ServerMessageData[] = [];
+  const states: ConnectionState[] = [];
+  let session: CalibrationSession | null = null;
+  const connection = new ParticipantConnection({
+    wsUrl: `ws://127.0.0.1:${server.port}/ws`,
+    join: () => joinSession({ api: server!.url.toString(), sessionId: "demo", storage: memory() }),
+    openSocket: browserSocket, log: () => {},
+    onChange: state => states.push(state),
+    onMessage: message => {
+      messages.push(message);
+      if (message.type === "calibration.prepare") session!.onPrepare(message, { foreground: true, clockUsable: true, optedOut: false });
+      if (message.type === "calibration.arm") session!.onArm(message, performance.timeOrigin + performance.now());
+    },
+  });
+  session = new CalibrationSession(message => { connection.send(message); }, () => {
+    const state = states.at(-1);
+    return state?.identity && state.snapshot ? { sessionId: state.snapshot.sessionId, serverEpoch: state.snapshot.serverEpoch, deviceId: state.identity.deviceId } : null;
+  });
+  connection.start();
+  await until(() => states.at(-1)?.status.kind === "connected");
+
+  const started = await (await fetch(new URL("/__mock__/calibrate?leadMs=2000&readyWaitMs=100", server.url), { method: "POST" })).json() as { runId: string; runTag: number; participantIds: number[] };
+  expect(started.participantIds).toEqual([0]);
+  await until(() => session!.phase.kind === "armed");
+  const armed = session.phase;
+  expect(armed.kind === "armed" && armed.packet).toEqual(calibrationPacket(0, started.runTag));
+  // The renderer is covered separately; finish the run as it would.
+  session.complete(3);
+  const record = async () => ((await (await fetch(new URL("/__mock__/calibration", server!.url))).json()) as { ready: number[]; results: { completed: boolean }[] }[])[0];
+  let run = await record();
+  for (let i = 0; i < 50 && run.results.length === 0; i += 1) { await Bun.sleep(10); run = await record(); }
+  expect(run.ready).toEqual([0]);
+  expect(run.results).toEqual([{ deviceId: 0, completed: true, reason: null, maxFrameLatenessMs: 3 }] as never);
+  expect(messages.map(message => message.type)).toEqual(["calibration.prepare", "calibration.arm"]);
+  connection.stop();
+});
+
+test("the mock refuses to calibrate with nobody connected", async () => {
+  server = startClientDemoServer({ port: 0, log: () => {} });
+  expect((await fetch(new URL("/__mock__/calibrate", server.url), { method: "POST" })).status).toBe(409);
 });

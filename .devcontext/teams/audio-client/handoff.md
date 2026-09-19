@@ -2,6 +2,27 @@
 
 Read [stage brief](../../stages/02-audio-client.md), root rules/masterplan and shared schema notes before changing code. Workflow: take the next slice from the stage brief, write a subplan under `plans/`, get it reviewed, then implement.
 
+## Slice 3 (2026-09-19): calibration flash
+
+Subplan: [plans/03](plans/03-calibration-flash.md). Status: ready for integration. One manual check is pending.
+
+Client behaviour:
+- `calibration.prepare`: ignored unless the session/epoch match and this device is in `participantIds`. Otherwise the client replies `calibration.ready` with `ready: false` and a reason (`opted-out`, `hidden` or `clock`), or `ready: true`. A later skip withdraws a yes with `ready: false, reason: "opted-out"`.
+- `calibration.arm`: accepted only for the same `preparationId`, identical plan fields and `effectiveServerMs === run.startServerMs`. If it arrives at or after the start, the phone sends `calibration.result { completed: false, reason: "late" }` and never flashes.
+- The flash colour is `palette.zero`/`one`/`neutral` of `calibrationPacket(deviceId, runTag)[floor((now - start) / 200)]`, using the pure server clock only. A skipped frame jumps straight to the right slot.
+- Exactly one `calibration.result` per armed run: `completed: true` with `maxFrameLatenessMs` (a diagnostic, not display timing), or `completed: false` with `hidden`/`clock`/`disconnected`/`superseded`/`opted-out`. A result can be lost if the socket is already gone; the server should treat a missing result as not completed.
+- Production has no clock yet, so it answers `reason: "clock"`. Mock mode uses the labelled local fixture clock.
+
+For the captain / Team 1 / Team 4: [proposed ADR](../../decisions/20260919-113215-audio-client-manual-column.md) for a `participant.column` message so phones that skip can pick left/center/right.
+
+For Team 3: the rendered packet matches `otc-golden-packets.json` for IDs 0, 1, 1023, 1024 and 2047 (test). No filmed clips yet; that needs phones on a reachable origin.
+
+Checks run:
+- `bun run gate:client`: PASS (71 tests), including an end-to-end prepare → ready → arm → result run against the mock.
+- Desktop Chrome automation: Chrome reports the automation window as hidden and delivers zero animation frames there. The phone correctly answered `ready: false, reason: "hidden"` and did not flash. **The visible flash itself has not been watched yet.**
+
+Manual check to do: `bun run dev:client-demo`, open http://localhost:3000 in a visible window, then `curl -X POST localhost:18081/__mock__/calibrate`. Expect: a countdown for about 2 s, then ~11 s of full-screen amber/blue flashing, then the page returns showing "Calibration: done". `curl localhost:18081/__mock__/calibration` shows `completed: true`. Switching tabs mid-flash should give `reason: "hidden"`. Warning: this is a flashing full-screen pattern.
+
 ## Slice 2 (2026-09-19): join, resume and connection
 
 Subplan: [plans/02](plans/02-join-resume-connection.md). Status: ready for integration against Team 1's API.

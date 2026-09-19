@@ -10,6 +10,8 @@ export const REPLACED_CLOSE_CODE = 4001;
 const epochNow = () => performance.timeOrigin + performance.now();
 
 interface SocketData { deviceId: number }
+interface CalibrationRecord { runId: string; runTag: number; preparationId: string; participantIds: number[]; ready: number[]; notReady: { deviceId: number; reason: string | null }[]; startServerMs: number | null; results: { deviceId: number; completed: boolean; reason: string | null; maxFrameLatenessMs: number }[] }
+const PALETTE = { paletteVersion: "amber-blue-v1", palette: { zero: "#FFB000", one: "#0066FF", neutral: "#111111" } };
 
 export function startClientDemoServer({ port = 18081, capacity = 30, log = console.log } = {}) {
   const snapshot = createDemoSnapshot(capacity);
@@ -18,6 +20,8 @@ export function startClientDemoServer({ port = 18081, capacity = 30, log = conso
   const tokens = new Map<string, number>();
   const sockets = new Map<number, ServerWebSocket<SocketData>>();
   let nextDeviceId = 0;
+  let lastRunTag = -1;
+  const calibrations: CalibrationRecord[] = [];
 
   const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET,POST,OPTIONS", "X-Orchestra-Mock": "1" };
   const json = (body: unknown, status = 200) => Response.json(body, { status, headers: cors });
@@ -33,6 +37,28 @@ export function startClientDemoServer({ port = 18081, capacity = 30, log = conso
     ws.send(JSON.stringify(ServerMessage.parse({ ...envelope(), type: "state.snapshot", revision: snapshot.revision, payload: participantSnapshot(snapshot, ws.data.deviceId) })));
   };
   const closeAll = (code: number, reason: string) => { for (const ws of sockets.values()) ws.close(code, reason); };
+
+  // Prepare every connected device, wait for readiness, then arm the ready subset at a common future time.
+  function calibrate(leadMs: number, readyWaitMs: number) {
+    const participantIds = [...sockets.keys()].sort((a, b) => a - b);
+    if (participantIds.length === 0) return apiError(409, "NO_PARTICIPANTS", "No connected devices to calibrate");
+    if (lastRunTag >= 255) return apiError(409, "RUN_TAGS_EXHAUSTED", "Start a new session after 256 calibrations");
+    const runTag = ++lastRunTag;
+    const record: CalibrationRecord = { runId: `mock-run-${runTag}`, runTag, preparationId: `mock-prepare-${runTag}`, participantIds, ready: [], notReady: [], startServerMs: null, results: [] };
+    calibrations.push(record);
+    const plan = { protocolVersion: 1 as const, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch, runId: record.runId, runTag, participantIds, packetVersion: "otc-v1" as const, codebookVersion: "hamming16-11-v1" as const, ...PALETTE, symbolMs: 200 as const };
+    snapshot.revision += 1;
+    const prepare = JSON.stringify(ServerMessage.parse({ ...envelope(), type: "calibration.prepare", revision: snapshot.revision, payload: { preparationId: record.preparationId, plan } }));
+    for (const id of participantIds) sockets.get(id)?.send(prepare);
+    setTimeout(() => {
+      const startServerMs = epochNow() + leadMs;
+      record.startServerMs = startServerMs;
+      snapshot.revision += 1;
+      const arm = JSON.stringify(ServerMessage.parse({ ...envelope(), type: "calibration.arm", revision: snapshot.revision, effectiveServerMs: startServerMs, payload: { preparationId: record.preparationId, run: { ...plan, startServerMs } } }));
+      for (const id of record.ready) sockets.get(id)?.send(arm);
+    }, readyWaitMs);
+    return json({ runId: record.runId, runTag, participantIds });
+  }
 
   async function join(request: Request) {
     const parsed = JoinRequest.safeParse(await request.json().catch(() => null));
@@ -73,6 +99,10 @@ export function startClientDemoServer({ port = 18081, capacity = 30, log = conso
       if (request.method === "GET" && url.pathname === "/__mock__/devices") {
         return json(snapshot.devices.filter(device => device.deviceId < nextDeviceId));
       }
+      if (request.method === "POST" && url.pathname === "/__mock__/calibrate") {
+        return calibrate(Number(url.searchParams.get("leadMs") ?? 3000), Number(url.searchParams.get("readyWaitMs") ?? 1000));
+      }
+      if (request.method === "GET" && url.pathname === "/__mock__/calibration") return json(calibrations);
       if (request.method === "POST" && url.pathname === "/__mock__/drop") { closeAll(1012, "mock drop"); return json({ dropped: true }); }
       if (request.method === "POST" && url.pathname === "/__mock__/restart") {
         snapshot.serverEpoch = crypto.randomUUID();
@@ -103,6 +133,20 @@ export function startClientDemoServer({ port = 18081, capacity = 30, log = conso
         const message = parsed.data;
         if (message.sessionId !== snapshot.sessionId || message.serverEpoch !== snapshot.serverEpoch) { ws.close(1008, "Wrong session/epoch"); return; }
         if (message.type === "clock.probe") ws.send(JSON.stringify(ServerMessage.parse({ ...envelope(), type: "clock.reply", payload: { ...message.payload, t1, t2: epochNow() } })));
+        if (message.type === "calibration.ready" || message.type === "calibration.result") {
+          const record = calibrations.find(item => item.runId === message.payload.runId);
+          if (!record) return;
+          if (message.type === "calibration.ready") {
+            record.ready = record.ready.filter(id => id !== ws.data.deviceId);
+            record.notReady = record.notReady.filter(item => item.deviceId !== ws.data.deviceId);
+            if (message.payload.ready) record.ready.push(ws.data.deviceId);
+            else record.notReady.push({ deviceId: ws.data.deviceId, reason: message.payload.reason });
+          } else {
+            const { completed, reason, maxFrameLatenessMs } = message.payload;
+            record.results.push({ deviceId: ws.data.deviceId, completed, reason, maxFrameLatenessMs });
+            log(`device ${ws.data.deviceId}: calibration ${record.runId} ${completed ? "completed" : `not completed (${reason})`}, max frame lateness ${maxFrameLatenessMs.toFixed(1)} ms`);
+          }
+        }
         if (message.type === "device.status") {
           if (message.payload.deviceId !== ws.data.deviceId) { ws.close(1008, "Device mismatch"); return; }
           const index = snapshot.devices.findIndex(device => device.deviceId === ws.data.deviceId);

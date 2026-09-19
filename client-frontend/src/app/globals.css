@@ -17,3 +17,6 @@ svg { width: 100%; background: #101724; border-radius: 8px; }
 .checks .ok { color: #71d0b0; }
 .checks .no { color: #a1b3cc; }
 button { font: inherit; padding: 8px 14px; margin: 4px 8px 4px 0; }
+.calibration { position: fixed; inset: 0; z-index: 10; background: #111111; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 24px; }
+.calibration-text { color: #dfe8f5; font-size: 22px; text-align: center; max-width: 520px; }
+.calibration-skip { position: fixed; bottom: 16px; right: 16px; opacity: 0.6; }

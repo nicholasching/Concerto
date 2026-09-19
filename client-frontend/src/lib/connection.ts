@@ -1,4 +1,4 @@
-import { ServerMessage, type ClientMessageData, type ParticipantSnapshotData } from "@orchestra/contracts";
+import { ServerMessage, type ClientMessageData, type ParticipantSnapshotData, type ServerMessageData } from "@orchestra/contracts";
 import type { JoinData, JoinResult } from "./join";
 
 // Backoff adapted from BeatSync apps/client/src/hooks/useWebSocketReconnection.ts (MIT).
@@ -72,6 +72,8 @@ export interface ConnectionOptions {
   join: () => Promise<JoinResult>;
   openSocket: (url: string) => SocketLike;
   onChange: (state: ConnectionState) => void;
+  /** Every other validated message for the current socket, after the connection has its snapshot. */
+  onMessage?: (message: ServerMessageData) => void;
   timers?: Timers;
   random?: () => number;
   log?: (message: string) => void;
@@ -172,7 +174,10 @@ export class ParticipantConnection {
     const parsed = ServerMessage.safeParse(body);
     if (!parsed.success) { this.log("dropped message that failed ServerMessage validation"); return; }
     const message = parsed.data;
-    if (message.type !== "state.snapshot") return;
+    if (message.type !== "state.snapshot") {
+      if (this.state.status.kind === "connected") this.options.onMessage?.(message);
+      return;
+    }
     const snapshot = message.payload;
     const identity = this.state.identity;
     if (snapshot.role !== "participant" || !identity || snapshot.deviceId !== identity.deviceId || snapshot.sessionId !== identity.sessionId) {
