@@ -1,6 +1,6 @@
 # Stage 03 - Optical localization
 
-Status: in progress; first software slice ready for integration. Owner: Team 3 lead. Branch: feat/otc-localization. Base: foundation-v1 (ab59c27105627977ee52dc2bcd4276b4532b9e2a).
+Status: in progress; software implementation audited and ready for integration. Owner: Team 3 lead. Branch: feat/otc-localization. Base: foundation-v1 (ab59c27105627977ee52dc2bcd4276b4532b9e2a).
 
 ## Implemented
 
@@ -15,11 +15,14 @@ No physical footage exists because Team 2's renderer is not built. Generated vid
 - Geometry: ordered anchors/orientation, invalid anchors, distributed overlap, held-out false match rejection, support hull and conflicting positions.
 - Dense synthetic: same 1,500/1,500 correct positions in serial/parallel modes, maximum error 0.00058544. Fresh three-clip 4K comparison: 97.80 seconds serial vs 32.19 parallel; sampled aggregate resident memory 292.90 vs 801.14 MiB. Initial 90-second target met on synthetic inputs.
 - Perspective review: 90/90 localized across front/middle/back; largest front screen 37x59 and smallest rear 12x18 pixels. Automated smaller-image scenarios include six-pixel rear screens and safe rejection of deliberate 1x2-pixel phones.
-- Final gate: 76 Python tests pass plus shared schema/fixture/boundary/typecheck/lint/contracts. A new 1,500-phone curved/tiered viewing fixture adds geometry/media checks, without claiming full localization: [scene evidence](../evidence/otc-localization/20260919-auditorium-sweep.md). See [parallel/perspective evidence](../evidence/otc-localization/20260919-parallel-perspective.md) and [initial evidence](../evidence/otc-localization/20260919-pipeline.md) for prior checks.
+- Latest [integration audit](../evidence/otc-localization/20260919-integration-audit.md): corrected overlap precedence so contradictory primary anchors remain ambiguous; agreeing views prefer the primary ROI. Final gate: **79 Python tests** plus shared schema/fixture/boundary/typecheck/lint/contracts. Real CLI output/progress also passes the consumer TypeScript schemas and an injected hash-failure check.
+- Fresh decoder v1.2 dense run: all 1,500 localized correctly in 30.83 seconds; sampled aggregate resident peak 805.49 MiB. Curved/tiered fixture: all 1,500 IDs recovered, but null anchors intentionally produce 448 coarse / 1,052 ambiguous locations. No full seat map or physical recall is claimed. See [scene evidence](../evidence/otc-localization/20260919-auditorium-sweep.md), [parallel/perspective evidence](../evidence/otc-localization/20260919-parallel-perspective.md) and [initial evidence](../evidence/otc-localization/20260919-pipeline.md) for prior checks.
 
 ## Run and integrate
 
 See [worker README](../../workers/otc/README.md) and [handoff](../teams/otc-localization/handoff.md). Run setup:python, generate clips, run process with required --evidence synthetic, then gate:otc; lint tools/otc-fixtures separately. Protocol-v1 schemas/codebook are unchanged. Captain reviews Python pins before merge.
+
+Consumer proof: `bun tools/otc-fixtures/verify-handoff.ts` generates fresh clips and validates the actual worker boundary from TypeScript. Team 1 still owns lifecycle/current-state publication; Teams 1/4 must connect camera geometry metadata and candidate review before map commit. No other branch was merged or live application integration claimed in this audit.
 
 ## Remaining acceptance
 

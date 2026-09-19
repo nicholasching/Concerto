@@ -1,0 +1,24 @@
+{
+  "protocolVersion": 1,
+  "decoderVersion": "otc-v1.2",
+  "evidence": "synthetic",
+  "participantCount": 30,
+  "localizedCount": 30,
+  "cameraCount": 3,
+  "progressEvents": 21,
+  "maxPositionError": 0.0029245519390342155,
+  "processingMs": 2375.6999999750406,
+  "hashFailureExit": 2,
+  "checked": [
+    "relative video paths",
+    "CalibrationManifest",
+    "JobProgress NDJSON",
+    "OtcResult",
+    "run identity and hashes",
+    "AudienceMap",
+    "AdminSnapshot map insertion",
+    "debug consistency",
+    "30 known positions including ID 0",
+    "hash failure without output or complete event"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "evidence": "synthetic",
+  "case": "clean",
+  "seed": 7,
+  "participants": 1500,
+  "statuses": {
+    "localized": 1500
+  },
+  "wrongLocalizedIds": [],
+  "positionErrorTolerance": 0.015,
+  "maximumPositionError": 0.0005854409361926471,
+  "wallMs": 30826.050199975725,
+  "processingMs": 30268.01230001729,
+  "workersRequested": 3,
+  "cameraWorkerProcesses": 3,
+  "parentPeakResidentBytes": 63041536,
+  "parentMemoryMethod": "GetProcessMemoryInfo(self).PeakWorkingSetSize",
+  "peakSampledProcessTreeResidentBytes": 844615680,
+  "processTreeMemoryMethod": "Toolhelp32 descendants + sum of live WorkingSetSize",
+  "memorySamplingIntervalMs": 100,
+  "memorySamples": 242,
+  "incompleteMemorySamples": 0,
+  "maximumSampledProcessCount": 4,
+  "memorySamplingError": null,
+  "memorySamplingCaveat": "Sampled process-resident sum; shared pages may be counted more than once; peaks between samples can be missed. Incomplete samples are excluded from the peak.",
+  "python": "3.13.15",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "av": "18.1.0",
+  "opencv": "4.13.0",
+  "numpy": "2.4.6",
+  "inputHashes": [
+    {
+      "cameraId": "camera-left",
+      "sha256": "b7c710bb4c5e8e2270ec47909178427aec3f333a1a5b9a1a563fd467e75ae064"
+    },
+    {
+      "cameraId": "camera-center",
+      "sha256": "0cf974703216aa0964c0beff0d0a0afb6e97b9862e9c790043d77c9e206a2cc8"
+    },
+    {
+      "cameraId": "camera-right",
+      "sha256": "f87bfc29777bfa49162079d4588d72dee18fd622af388d5ff9c362b30713228c"
+    }
+  ],
+  "debugArtifactsEnabled": false
+}

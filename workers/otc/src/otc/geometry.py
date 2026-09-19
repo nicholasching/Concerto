@@ -141,7 +141,10 @@ def build_mappings(manifest, dimensions, observations):
                     if candidate:
                         best, best_count = candidate, len(common)
             if best is not None:
-                source_maps.insert(0, best)
+                # Preserve independent primary-column anchors. Replacing them
+                # with a neighbour's overlap can make conflicting ROIs appear
+                # to agree; overlap extends coverage outside the primary ROI.
+                source_maps.append(best)
                 changed = True
         if not changed:
             break
@@ -186,13 +189,15 @@ def fuse_locations(manifest, observations, mappings, blocked):
                 base["status"] = "ambiguous"
                 warnings.append(f"Device {device_id}: camera positions or columns conflict")
             else:
-                position = np.average(positions, axis=0, weights=[max(item[2], .01) for item in mapped])
+                preferred = max(mapped, key=lambda item: (
+                    item[1].mode == "manual-anchors", item[2]
+                ))
+                position = preferred[0]
                 residuals = [item[1].residual_px for item in mapped if item[1].residual_px is not None]
                 base.update(
                     status="localized", x=float(position[0]), y=float(position[1]),
                     column=COLUMNS[next(iter(columns))],
-                    mappingMode=("overlap" if any(m[1].mode == "overlap" for m in mapped)
-                                 else "manual-anchors"),
+                    mappingMode=preferred[1].mode,
                     mappingResidualPx=max(residuals) if residuals else None,
                     sourceCameraIds=sorted({item[3] for item in mapped}),
                     decodeScore=max(item[2] for item in mapped),

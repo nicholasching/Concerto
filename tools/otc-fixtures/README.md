@@ -11,6 +11,8 @@ bun scripts/python.ts process --manifest runtime/otc-demo/manifest.json --output
 
 Use a new folder for each generated fixture. Defaults: three 640x360 cameras, 30 fps, 13.5 seconds, 10x16-pixel phones, 200 ms symbols and staggered camera start offsets. IDs include 0, 2047 and 1024. Anchors reverse stage-view orientation into the audience coordinate system. Frame rate options are 24/30/60; dimensions/count/seed are configurable for scale tests. Identical toolchains/seeds produce deterministic scenes; encoded hashes may differ across codec/platform versions, so use the newly generated manifest.
 
+For the backend/admin producer-consumer handoff, run `bun tools/otc-fixtures/verify-handoff.ts`. It creates a fresh runtime folder, generates 30-phone clips, runs the actual three-camera Python CLI, parses its manifest/progress/result/map through the shared TypeScript schemas, verifies positions and debug consistency, and injects a bad hash to check failure behavior. The final output names the artifact directory. It requires no running backend or frontend, and does not establish live UI integration.
+
 | Case | Evidence exercised |
 | --- | --- |
 | `clean` | Native small screens, three views/overlap, compression, static colored distractor |
@@ -56,6 +58,14 @@ Open `overview.mp4` for the entire crowd, or `camera-left.mp4`, `camera-center.m
 This scene uses 30 curved rows, with seats increasing from 22 to 78 per row, three blocks, 0.58 m seat pitch and an additional 1.2 m gap at each aisle. Row radii run from 10 to 36.1 m; an increasing tier rise preserves sightlines in this stylized bowl. Every screen is 8x16 cm, projected as a quadrilateral facing the stage. Horizontal and vertical spacing therefore follow the row geometry and viewing perspective. Neutral seat backs and terrace edges make the sweep visible without transmitting IDs. The overview uses a 94-degree horizontal field of view; the three close views use 54 degrees from a common fixed stage origin, aimed at -27/0/+27 degrees.
 
 These are explicit synthetic assumptions, not measurements extracted from the photograph. Balcony seating, people/body occlusion, hand movement, sensor effects and translated-camera parallax are omitted. The three-camera manifest intentionally has null anchors: the curved, raked bowl does not define a single planar audience homography. It can exercise ID decoding/coarse outcomes, but do not use the old full-coordinate benchmark to claim 1,500 localized seats from this scene. The overview is a viewing artifact, not a fourth manifest camera. Large media stays in ignored runtime; the generator is reproducible from Git.
+
+The v1.2 [integration audit](../../.devcontext/evidence/otc-localization/20260919-integration-audit.md) recovered all 1,500 IDs from these three views, with 2,606 accepted observations and no independent identity mismatches. Without anchors, 448 locations are coarse and 1,052 are ambiguous; none has invented row coordinates. To verify a processed result against the projected phone geometry:
+
+```powershell
+.\.venv\Scripts\python.exe tools/otc-fixtures/check_auditorium.py --manifest runtime/otc-fixtures/auditorium-1500/manifest.json --truth runtime/otc-fixtures/auditorium-1500/ground-truth.json --result runtime/otc-fixtures/auditorium-1500/audit-v12/result.json
+```
+
+Run the worker first with fresh output/debug paths. The checker requires all IDs to be recovered, checks each accepted ID against the nearest clipped screen and its own polygon, applies the 2 px center tolerance to fully in-frame phones, and verifies coarse columns. Partial-screen centroid errors are reported separately because their full-screen centers can lie outside the frame. This is synthetic identity/column evidence, not a full localization or physical recall test.
 
 The original constant-size grid remains useful for comparing processing performance:
 

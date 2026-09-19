@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from otc.geometry import (
-    build_mappings, fit_overlap, fuse_locations, manual_mapping, reject_duplicates,
+    Mapping, build_mappings, fit_overlap, fuse_locations, manual_mapping, reject_duplicates,
 )
 
 
@@ -63,6 +63,61 @@ def test_unanchored_camera_can_use_validated_overlap():
         observations += [observation(device_id, "a", x, y), observation(device_id, "b", x+3, y+3)]
     mappings = build_mappings({"cameras": cameras}, {"a": (100, 100), "b": (100, 100)}, observations)
     assert mappings["b"][0].mode == "overlap"
+
+
+def test_overlap_cannot_hide_conflicting_primary_column_anchors():
+    cameras = [camera("a", "left"), camera("b", "right")]
+    points = [(x, y) for y in (20, 50, 80) for x in (20, 50, 80)]
+    observations = [observation(device_id, item["cameraId"], x, y)
+                    for device_id, (x, y) in enumerate(points) for item in cameras]
+    manifest = {"cameras": cameras, "participantIds": list(range(len(points)))}
+    mappings = build_mappings(manifest, {"a": (100, 100), "b": (100, 100)}, observations)
+    locations, warnings = fuse_locations(manifest, observations, mappings, set())
+    # Perfect image correspondences do not resolve contradictory operator anchors.
+    # Overlap must not overwrite both primary ROIs into apparent agreement.
+    assert all(location["status"] == "ambiguous" for location in locations)
+    assert all(location["x"] is None and location["y"] is None for location in locations)
+    assert len(warnings) == len(points)
+
+
+def test_overlap_extends_coverage_outside_primary_roi():
+    cameras = [camera("a", "left"), camera("b", "center")]
+    cameras[1]["anchors"] = [{"x": 90, "y": 90}, {"x": 50, "y": 90},
+                             {"x": 50, "y": 10}, {"x": 90, "y": 10}]
+    points = [(x, y) for y in (20, 50, 80) for x in (20, 30, 40)]
+    observations = [observation(device_id, item["cameraId"], x, y)
+                    for device_id, (x, y) in enumerate(points) for item in cameras]
+    observations.append(observation(9, "b", 70, 50))
+    manifest = {"cameras": cameras, "participantIds": list(range(10))}
+    mappings = build_mappings(manifest, {"a": (100, 100), "b": (100, 100)}, observations)
+    assert [mapping.mode for mapping in mappings["b"]] == ["manual-anchors", "overlap"]
+    # B also sees A's column outside its own anchors; it may map that shared hull.
+    assert mappings["b"][0].project([30, 50]) is None
+    assert np.allclose(mappings["b"][1].project([30, 50]), [.25, .5])
+    locations, warnings = fuse_locations(manifest, observations, mappings, set())
+    assert all(location["status"] == "localized" for location in locations)
+    assert locations[4]["column"] == "left"
+    assert locations[9]["column"] == "center"
+    assert not warnings
+
+
+def test_agreeing_views_prefer_primary_roi_before_decode_score():
+    cameras = [camera("a", "left"), camera("b", "center", anchors=False)]
+    primary = manual_mapping(cameras[0], 100, 100)
+    matrix = primary.matrix.copy()
+    matrix[1, 2] += .02
+    secondary = Mapping(matrix, primary.support, "overlap", 1.0)
+    observations = [observation(0, "a"), observation(0, "b")]
+    observations[0]["decodeScore"] = .9
+    observations[1]["decodeScore"] = 1.0
+    manifest = {"cameras": cameras, "participantIds": [0]}
+    mappings = {"a": [primary], "b": [secondary]}
+    locations, warnings = fuse_locations(manifest, observations, mappings, set())
+    assert locations[0]["status"] == "localized"
+    assert locations[0]["mappingMode"] == "manual-anchors"
+    assert np.allclose([locations[0]["x"], locations[0]["y"]], [1/6, .5])
+    assert locations[0]["sourceCameraIds"] == ["a", "b"]
+    assert not warnings
 
 
 def test_duplicates_conflicts_and_unseen_never_get_coordinates():
