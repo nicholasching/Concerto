@@ -2,6 +2,8 @@
 
 Date: 2026-09-19. Owner: captain. Current implementation: main after the four feature merges.
 
+Latest mapping update: the four-device recording now plots IDs 14/15/17/21 and is committed as map revision 10. The live Assign console supports click, box/lasso and movable left/center/right dividers, verified with a 2/1/1 split. Calibration geometry is restored from uploaded metadata and editable using a completed job's preview; processing saves dirty edits. Stage-facing full-frame anchors are an explicit approximate preset, not measured seats. See the [operator guide](../../../docs/audience-mapping.md) and [verification/handoff journal](journal/20260919-seat-map-selection.md). Decoder behavior and musical assignments are unchanged; current mapping is later than the historical two-device uncommitted sample below.
+
 Current user updates: shows now use **Melody, Vocals and Percussion** with a shared **512 MiB decoded-audio budget per phone**. The live show has been saved with six tracks/clips, approximately 304.1 MiB, preserving device routing and uploaded audio. All three JS gates and the real-worker E2E pass; public desktop-browser loading verifies 6/6 assets. See [three-channel handoff](journal/20260919-three-channels.md) and [budget evidence](journal/20260919-decoded-audio-budget.md). Older phone pages need refreshing for the larger budget. Historical four-channel references below describe the previous checkpoint.
 
 ## Run

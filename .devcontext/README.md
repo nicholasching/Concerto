@@ -22,6 +22,8 @@ First physical camera clip: after the [worker failure investigation](teams/integ
 
 The user's current concert uses **Melody, Vocals and Percussion**, with one shared **512 MiB decoded-audio budget per phone**. See the [channel migration](teams/integration/journal/20260919-three-channels.md), [budget verification](teams/integration/journal/20260919-decoded-audio-budget.md), [channel decision](decisions/20260919-three-show-channels.md) and [budget decision](decisions/20260919-decoded-audio-budget.md). The four development teams are unchanged.
 
+The current four-device camera recording now has visible coordinates in committed map revision 10. The operator supports calibration from a saved preview, an explicit stage-facing approximate frame preset, and click/box/lasso or movable left/center/right divider selection. One to three camera views work independently. See the [mapping guide](../docs/audience-mapping.md), [decision](decisions/20260919-seat-layout-and-regions.md), and [physical-file/UI verification](teams/integration/journal/20260919-seat-map-selection.md). Image-based positions are approximate; measured venue seat accuracy is still unverified.
+
 ### Historical foundation checkpoint
 
 - Software foundation is verified and ready for four teams. Canonical baseline: Git tag `foundation-v1`; resolve its SHA with `git rev-parse foundation-v1` and record it in your first journal. The immutable tag avoids embedding its own commit hash inside itself.

@@ -58,7 +58,7 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
   return (
     <section>
       <h2>Assign</h2>
-      <p className="muted">Draw a box on the map to select phones, assign them to a channel, and schedule the change. Unknowns (coarse/unseen) stay out of the selection. Undo restores the previous assignment for the selected devices.</p>
+      <p className="muted">Select mapped devices by clicking, drawing a box/lasso, or moving the left/center/right dividers. Assign each group to Melody, Vocals or Percussion. Column-only devices can be selected explicitly below. Undo restores previous assignments.</p>
       {error && <p role="alert" className="error">Error: {error}</p>}
       {status && <p className="status">{status}</p>}
       <MapPanel
@@ -66,6 +66,7 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
         assignments={snapshot.assignments}
         channels={snapshot.show.channels}
         drawable
+        selection={selected}
         onSelection={setSelected}
       />
       <div className="actions">{(["left", "center", "right"] as const).map(column => <button key={column} onClick={() => setSelected({ mapRevision: snapshot.audienceMap.mapRevision,

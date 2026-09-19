@@ -1,53 +1,89 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Geometry } from "../lib/adapter";
+import { anchorsError, frameAnchors, type CameraView } from "../lib/camera-geometry";
 
 const labels = ["front-left", "front-right", "back-right", "back-left"];
-export function CameraGeometry({ file, value, onChange }: { file: File | null; value: Geometry; onChange: (geometry: Geometry) => void }) {
+export function CameraGeometry({ file, preview, value, disabled, onChange }: {
+  file: File | null; preview?: { url: string; rotationDegrees: number }; value: Geometry;
+  disabled?: boolean; onChange: (geometry: Geometry) => void;
+}) {
   const video = useRef<HTMLVideoElement>(null);
+  const still = useRef<HTMLImageElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [url, setUrl] = useState("");
-  const [exclusions, setExclusions] = useState("[]");
+  const [view, setView] = useState<CameraView>("from-stage");
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const savedExclusions = JSON.stringify(value.exclusionRois);
+  const [exclusions, setExclusions] = useState(savedExclusions);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => { setExclusions(savedExclusions); setError(null); }, [savedExclusions]);
   useEffect(() => {
     if (!file) { setUrl(""); return; }
     const source = URL.createObjectURL(file); setUrl(source);
     return () => URL.revokeObjectURL(source);
   }, [file]);
   function paint() {
-    const source = video.current, target = canvas.current;
-    if (!source || !target || !source.videoWidth) return;
-    const rotated = value.rotationDegrees === 90 || value.rotationDegrees === 270;
-    target.width = rotated ? source.videoHeight : source.videoWidth;
-    target.height = rotated ? source.videoWidth : source.videoHeight;
+    const source = url ? video.current : still.current, target = canvas.current;
+    if (!source || !target) return;
+    const width = source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth;
+    const height = source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight;
+    if (!width || !height) return;
+    // Review previews have already had the recorded rotation applied.
+    const rotation = (value.rotationDegrees - (url ? 0 : preview?.rotationDegrees ?? 0) + 360) % 360;
+    const rotated = rotation === 90 || rotation === 270;
+    target.width = rotated ? height : width; target.height = rotated ? width : height;
+    setDimensions(previous => previous.width === target.width && previous.height === target.height ? previous : { width: target.width, height: target.height });
     const ctx = target.getContext("2d"); if (!ctx) return;
-    ctx.save(); ctx.translate(target.width / 2, target.height / 2); ctx.rotate(value.rotationDegrees * Math.PI / 180);
-    ctx.drawImage(source, -source.videoWidth / 2, -source.videoHeight / 2); ctx.restore();
-    ctx.font = `${Math.max(14, target.width / 80)}px sans-serif`;
+    ctx.save(); ctx.translate(target.width / 2, target.height / 2); ctx.rotate(rotation * Math.PI / 180);
+    ctx.drawImage(source, -width / 2, -height / 2); ctx.restore();
+    if ((value.anchors?.length ?? 0) > 1) {
+      ctx.strokeStyle = "#ffdd00"; ctx.lineWidth = Math.max(2, target.width / 500); ctx.beginPath();
+      value.anchors!.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
+      if (value.anchors?.length === 4) ctx.closePath(); ctx.stroke();
+    }
+    ctx.font = `bold ${Math.max(16, target.width / 65)}px sans-serif`;
     for (const [index, point] of (value.anchors ?? []).entries()) {
       ctx.fillStyle = "#ffdd00"; ctx.beginPath(); ctx.arc(point.x, point.y, Math.max(5, target.width / 250), 0, Math.PI * 2); ctx.fill();
-      ctx.fillText(`${index + 1} ${labels[index]}`, point.x + 10, point.y);
+      const text = `${index + 1} ${labels[index]}`;
+      ctx.fillText(text, Math.max(4, Math.min(point.x + 10, target.width - ctx.measureText(text).width - 4)), Math.max(24, point.y - 10));
     }
   }
-  useEffect(paint, [value]);
-  return <details><summary>Camera orientation and seating anchors</summary>
+  useEffect(paint, [value, url, preview?.url]);
+  const geometryError = anchorsError(value.anchors, dimensions.width || undefined, dimensions.height || undefined);
+  const hasImage = !!url || !!preview?.url;
+  return <details open={hasImage && (value.anchors?.length ?? 0) < 4}><summary>Set seat coordinates — camera orientation and seating corners</summary>
+    <fieldset disabled={disabled}>
+    <p>Each camera maps its audience column independently. One or two recordings work without the missing views.</p>
     <label>Clockwise rotation <select value={value.rotationDegrees} onChange={e => onChange({ ...value, rotationDegrees: Number(e.target.value) as Geometry["rotationDegrees"], anchors: null })}>
       {[0, 90, 180, 270].map(degrees => <option key={degrees} value={degrees}>{degrees}°</option>)}
     </select></label>
-    {url && <><video ref={video} src={url} controls preload="auto" muted playsInline onLoadedData={paint} onSeeked={paint} style={{ width: "100%" }} />
-      <p>Pause on a clear frame. Click the seating corners in audience order: front-left, front-right, back-right, back-left.</p>
+    {url && <video ref={video} src={url} controls preload="auto" muted playsInline onLoadedData={paint} onSeeked={paint} style={{ width: "100%" }} />}
+    {!url && preview?.url && <img ref={still} src={preview.url} onLoad={paint} alt="Recorded camera frame for seating calibration" style={{ display: "none" }} />}
+    {hasImage ? <>
+      <p>For perspective correction, mark the four corners of this column's seating area: front-left, front-right, back-right, back-left, as the audience faces the stage. Include every seat you want to map.</p>
+      <p>{value.anchors?.length === 4 ? "Four corners selected. Save geometry and process the recordings." : `Next corner: ${labels[value.anchors?.length ?? 0]}.`}</p>
       <canvas ref={canvas} style={{ width: "100%", cursor: "crosshair" }} onClick={event => {
+        if (disabled) return;
         const target = event.currentTarget, rect = target.getBoundingClientRect();
-        const point = { x: (event.clientX - rect.left) / rect.width * target.width, y: (event.clientY - rect.top) / rect.height * target.height };
+        const point = { x: Math.min(target.width - 1, Math.max(0, (event.clientX - rect.left) / rect.width * target.width)), y: Math.min(target.height - 1, Math.max(0, (event.clientY - rect.top) / rect.height * target.height)) };
         onChange({ ...value, anchors: [...(value.anchors?.length === 4 ? [] : value.anchors ?? []), point] });
-      }} aria-label="Mark seating anchors" /></>}
-    <p>{value.anchors?.length ?? 0}/4 anchors. Without all four anchors, row positions may remain unknown.</p>
+      }} role="img" aria-label="Mark seating anchors" />
+      <label>Camera faces <select value={view} onChange={e => setView(e.target.value as CameraView)}>
+        <option value="from-stage">From the stage toward the audience</option><option value="from-back">From the back toward the stage</option>
+      </select></label>
+      <button disabled={!dimensions.width} onClick={() => onChange({ ...value, anchors: frameAnchors(dimensions.width, dimensions.height, view) })}>Use full frame for approximate layout</button>
+      <p className="muted">The frame preset uses observed image positions, not measured seats. Mark actual seating corners for better front/back placement. From-stage cameras mirror audience-left/right.</p>
+    </> : <p>Choose the original recording, or process it once to get a camera frame here. Then set seating corners to turn decoded IDs into map positions.</p>}
+    <p>{value.anchors?.length ?? 0}/4 seating corners. Without a camera transform, decoded devices have a column but no row position.</p>
+    {geometryError && <p role="alert">{geometryError}</p>}
     <button onClick={() => onChange({ ...value, anchors: null })}>Clear anchors</button>
-    <label>Exclude stage or lights (pixel polygons, JSON)<textarea value={exclusions} onChange={e => {
+    <details><summary>Advanced light/stage exclusions</summary><label>Pixel polygons (JSON)<textarea value={exclusions} onChange={e => {
       setExclusions(e.target.value);
       try { const polygons = JSON.parse(e.target.value); if (!Array.isArray(polygons) || polygons.some((polygon: unknown) => !Array.isArray(polygon) || polygon.length < 3 || polygon.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y)))) throw new Error("Use an array of polygons with at least three {x,y} points each.");
         onChange({ ...value, exclusionRois: polygons }); setError(null);
       } catch (cause) { setError(String(cause)); }
-    }} /></label>{error && <p role="alert">{error}</p>}
+    }} /></label>{error && <p role="alert">{error}</p>}</details>
+    </fieldset>
   </details>;
 }

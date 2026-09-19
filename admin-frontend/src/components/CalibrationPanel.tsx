@@ -7,15 +7,17 @@ import type { AdminSnapshotData, OtcResultData } from "@orchestra/contracts";
 import { MapPanel } from "./MapPanel";
 import { CameraGeometry } from "./CameraGeometry";
 import { jobMessage } from "../lib/job-message";
+import { anchorsError, usesFrameAnchors } from "../lib/camera-geometry";
 
-interface Slot { cameraId: string; column: Column; file: File | null; geometry: Geometry; progress: number; busy: boolean; error: string | null }
+interface Slot { cameraId: string; column: Column | null; file: File | null; geometry: Geometry | null; progress: number; busy: boolean; error: string | null }
 const columns: Column[] = ["left", "center", "right"];
+const emptySlots = (): Slot[] => columns.map(column => ({ cameraId: `camera-${column}`, column: null, file: null,
+  geometry: null, progress: 0, busy: false, error: null }));
 export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; snapshot: AdminSnapshotData | null }) {
   const adapter = useAdapter();
   const run = snapshot?.calibration;
   const runId = run?.plan.runId;
-  const [slots, setSlots] = useState<Slot[]>(() => columns.map(column => ({ cameraId: `camera-${column}`, column, file: null,
-    geometry: { rotationDegrees: 0, anchors: null, exclusionRois: [] }, progress: 0, busy: false, error: null })));
+  const [slots, setSlots] = useState<Slot[]>(emptySlots);
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ stage: string; progress: number; message: string } | null>(null);
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
@@ -35,6 +37,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   const barrier = snapshot?.preparations.find(item => item.domain === "calibration" && item.preparationId === run?.preparationId);
   useEffect(() => { const timer = setInterval(() => setTick(value => value + 1), 250); return () => clearInterval(timer); }, []);
   useEffect(() => {
+    setSlots(emptySlots());
     setCandidate(null); setProgress(null); setDiagnostics([]); setChecked(false); setJobId(null); setExcludedUploads([]);
     if (runId) { try { setJobId(sessionStorage.getItem(`orchestra:job:${runId}`)); } catch { /* no storage */ } }
   }, [runId]);
@@ -80,11 +83,11 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   }
   async function upload(index: number) {
     if (!runId) return;
-    const slot = slots[index];
+    const slot = resolvedSlot(index);
     const update = (patch: Partial<Slot>) => setSlots(current => current.map((item, i) => i === index ? { ...item, ...patch } : item));
     update({ busy: true, error: null, progress: 0 });
     try {
-      if (slot.geometry.anchors && slot.geometry.anchors.length !== 4) throw new Error("Mark all four anchors or clear them for a coarse map.");
+      const invalid = anchorsError(slot.geometry.anchors); if (invalid) throw new Error(invalid);
       await adapter.uploadCamera(runId, slot.cameraId, slot.column, slot.file, slot.geometry, fraction => update({ progress: fraction }));
       update({ progress: 1 }); refresh();
     } catch (cause) { update({ error: cause instanceof Error ? cause.message : String(cause) }); }
@@ -93,16 +96,35 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   async function processClips() {
     if (!run) return;
     if (!selectedUploads.length || repeatedRecording) throw new Error("Select one recording per camera view.");
+    for (const uploaded of selectedUploads) {
+      const slot = resolvedSlot(slots.findIndex(item => item.cameraId === uploaded.cameraId));
+      const invalid = anchorsError(slot.geometry.anchors); if (invalid) throw new Error(invalid);
+      // A process request includes the visible geometry edits, even if the separate Save button was missed.
+      if (slot.column !== uploaded.primaryColumn || JSON.stringify(slot.geometry) !== JSON.stringify({ rotationDegrees: uploaded.rotationDegrees, anchors: uploaded.anchors, exclusionRois: uploaded.exclusionRois })) {
+        await adapter.updateCamera(run.plan.runId, uploaded.uploadId, slot.column, slot.geometry);
+      }
+    }
     const job = await adapter.createJob(run.plan.runId, selectedUploads.map(upload => upload.uploadId), evidence);
     setJobId(job.jobId); setProgress(job); setDiagnostics([]); setCandidate(null); setChecked(false);
     try { sessionStorage.setItem(`orchestra:job:${run.plan.runId}`, job.jobId); } catch { /* page-only */ }
   }
+  function resolvedSlot(index: number) {
+    const slot = slots[index];
+    const uploaded = run?.uploads.find(upload => upload.cameraId === slot.cameraId);
+    return { ...slot, column: slot.column ?? uploaded?.primaryColumn ?? columns[index], geometry: slot.geometry ?? {
+      rotationDegrees: uploaded?.rotationDegrees ?? 0, anchors: uploaded?.anchors ?? null, exclusionRois: uploaded?.exclusionRois ?? [],
+    } };
+  }
+  const geometryDirty = selectedUploads.some(uploaded => {
+    const slot = resolvedSlot(slots.findIndex(item => item.cameraId === uploaded.cameraId));
+    return slot.column !== uploaded.primaryColumn || JSON.stringify(slot.geometry) !== JSON.stringify({ rotationDegrees: uploaded.rotationDegrees, anchors: uploaded.anchors, exclusionRois: uploaded.exclusionRois });
+  });
   const activeJob = progress && !["complete", "failed", "cancelled"].includes(progress.stage);
   const now = tick >= 0 && clockReady() ? nowServerMs() : null;
   const finishedCapture = run?.startServerMs !== null && run?.startServerMs !== undefined && now !== null && now >= run.startServerMs + 11000;
   return <section>
     <h2>Calibration and map review</h2>
-    <p>Record three fixed cameras with a few seconds of margin. Use original files. The phone pattern lasts 11 seconds; participants may skip and choose a column.</p>
+    <p>Use one, two or three fixed cameras with a few seconds of margin. Each view maps its chosen audience column; omitted views do not block the others. The phone pattern lasts 11 seconds.</p>
     {error && <p role="alert" className="error">{error}</p>}
     {!run && <><label>Target device IDs (optional, comma separated) <input value={targetIds} placeholder="All ready phones" onChange={event => setTargetIds(event.target.value)} /></label><button disabled={busy || !snapshot} onClick={() => void act(prepare)}>Prepare calibration</button></>}
     {run && <>
@@ -114,20 +136,24 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
       {run.status === "created" && <button disabled={busy || !barrier?.readyIds.length || !clockReady()} onClick={() => void act(() => adapter.armCalibration(run.plan.runId, run.preparationId, futureServerMs(4)))}>Cameras recording — arm ready phones</button>}
       {run.startServerMs !== null && now !== null && <p role="status">{now < run.startServerMs ? `Starts in ${((run.startServerMs - now) / 1000).toFixed(1)} s` : !finishedCapture ? `Pattern running · ${Math.max(0, (run.startServerMs + 11000 - now) / 1000).toFixed(1)} s remaining` : "Pattern finished. Stop recordings after the trailing margin, then upload."}</p>}
       <button disabled={busy || !!activeJob} onClick={() => void act(() => adapter.discardCalibration(run.plan.runId))}>Discard run and retry</button>
-      <div className="slots">{slots.map((slot, index) => {
+      <div className="slots">{slots.map((_, index) => {
+        const slot = resolvedSlot(index);
         const uploaded = run.uploads.find(upload => upload.cameraId === slot.cameraId);
+        const previewIndex = candidate?.cameras.findIndex(camera => camera.cameraId === slot.cameraId) ?? -1;
         return <div className="slot" key={slot.cameraId}><h3>Camera {index + 1}</h3>
           <label>Audience column <select value={slot.column} disabled={!!activeJob} onChange={e => setSlots(current => current.map((item, i) => i === index ? { ...item, column: e.target.value as Column } : item))}>{columns.map(column => <option key={column}>{column}</option>)}</select></label>
           <input type="file" accept="video/*" aria-label={`Camera ${index + 1} video`} disabled={!!activeJob} onChange={e => setSlots(current => current.map((item, i) => i === index ? { ...item, file: e.target.files?.[0] ?? null } : item))} />
-          <CameraGeometry file={slot.file} value={slot.geometry} onChange={geometry => setSlots(current => current.map((item, i) => i === index ? { ...item, geometry } : item))} />
+          <CameraGeometry file={slot.file} preview={previews[previewIndex] ? { url: previews[previewIndex], rotationDegrees: uploaded?.rotationDegrees ?? 0 } : undefined}
+            value={slot.geometry} disabled={busy || !!activeJob} onChange={geometry => setSlots(current => current.map((item, i) => i === index ? { ...item, geometry } : item))} />
           <button disabled={!slot.file || slot.busy || !!uploaded || !finishedCapture} onClick={() => void upload(index)}>{uploaded ? "Uploaded and hashed" : slot.busy ? `Uploading ${Math.round(slot.progress * 100)}%` : "Upload recording"}</button>
-          {uploaded && <p>{uploaded.label} · {(uploaded.byteSize / 1e6).toFixed(1)} MB · {uploaded.anchors ? "four anchors" : "coarse geometry"}</p>}
+          {uploaded && <p>{uploaded.label} · {(uploaded.byteSize / 1e6).toFixed(1)} MB · {uploaded.anchors ? "seating transform saved" : "Column only — set seating corners above for map positions"}</p>}
           {uploaded && <label><input type="checkbox" disabled={!!activeJob || busy} checked={!excludedUploads.includes(uploaded.uploadId)} onChange={event => {
             setExcludedUploads(current => event.target.checked ? current.filter(id => id !== uploaded.uploadId) : [...current, uploaded.uploadId]);
             setCandidate(null); setChecked(false); setJobId(null); setProgress(null); setDiagnostics([]);
             sessionStorage.removeItem(`orchestra:job:${run.plan.runId}`);
           }} /> Include Camera {index + 1} in processing</label>}
           {uploaded && <button disabled={busy || !!activeJob} onClick={() => void act(async () => {
+            const invalid = anchorsError(slot.geometry.anchors); if (invalid) throw new Error(invalid);
             await adapter.updateCamera(run.plan.runId, uploaded.uploadId, slot.column, slot.geometry);
             setCandidate(null); setChecked(false); setJobId(null); setProgress(null);
             sessionStorage.removeItem(`orchestra:job:${run.plan.runId}`);
@@ -142,7 +168,10 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
       {progress?.stage === "failed" && diagnostics.length > 0 && <details><summary>Processing diagnostics</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{diagnostics.join("\n")}</pre></details>}
       {activeJob && jobId && <button onClick={() => void act(() => adapter.cancelJob(jobId))}>Cancel processing</button>}
       {candidate && snapshot && <div><h3>Candidate map — awaiting your review</h3>
+        {geometryDirty && <p role="alert">Camera geometry has changed. Process the recordings again before committing this map.</p>}
         <p>Evidence: {candidate.evidence}. {decodedCount} devices decoded; {candidate.locations.filter(location => location.status === "localized").length} with seat coordinates; {candidate.locations.filter(location => location.status === "coarse").length} with column only. {candidate.locations.length} eligible phones. Processing {(candidate.processingMs / 1000).toFixed(1)} s.</p>
+        {candidate.cameras.some(camera => usesFrameAnchors(run.uploads.find(upload => upload.cameraId === camera.cameraId)?.anchors ?? null, camera.frameWidth, camera.frameHeight)) && <p role="status">Approximate frame layout: dots follow the recorded screens. A raised phone can appear farther back. Mark the actual seating corners and hold phones at a consistent height for better row placement.</p>}
+        {candidate.locations.some(location => location.status === "coarse") && <p role="status">Decoded IDs are ready. Set four seating corners on each camera frame above, or use the approximate frame preset, then process again to place them on the map.</p>}
         <MapPanel map={{ mapRevision: candidateRevision, runId: candidate.runId, evidence: candidate.evidence, locations: candidate.locations }} assignments={[]} channels={snapshot.show.channels} drawable={false} />
         {candidate.cameras.map((camera, index) => <details key={camera.cameraId}><summary>{camera.cameraId}: {camera.acceptedTracks} accepted / {camera.rejectedTracks} rejected</summary>
           {previews[index] && <img src={previews[index]} alt={`Decoded tracks for ${camera.cameraId}`} style={{ width: "100%" }} />}
@@ -153,8 +182,8 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
           {candidate.observations.filter(observation => observation.status !== "accepted").map((observation, index) => <p key={index}>{observation.cameraId}/{observation.trackId}: {observation.reasons.join(", ")}</p>)}
         </details>
         {candidate.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
-        <label><input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} /> I checked camera orientation, known seats, and the unresolved list.</label>
-        <button disabled={!checked || busy || candidateRevision !== snapshot.audienceMap.mapRevision} onClick={() => void act(async () => {
+        <label><input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} /> I reviewed mapped positions, audience orientation, and unresolved devices.</label>
+        <button disabled={!checked || busy || geometryDirty || candidateRevision !== snapshot.audienceMap.mapRevision} onClick={() => void act(async () => {
           await adapter.commitMap(run.plan.runId, jobId!, candidateRevision); setCandidate(null); setJobId(null);
         })}>Commit reviewed map</button>
         {candidateRevision !== snapshot.audienceMap.mapRevision && <p>The map changed during review. Process again against the current map before committing.</p>}

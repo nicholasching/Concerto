@@ -27,6 +27,29 @@ def test_manual_mapping_preserves_audience_orientation_and_support():
     assert mapping.project([0, 50]) is None
 
 
+@pytest.mark.parametrize("camera_count", [1, 2, 3])
+def test_stage_facing_seating_coordinates_work_with_each_available_camera(camera_count):
+    cameras = [camera(f"view-{index}", column)
+               for index, column in enumerate(("left", "center", "right")[:camera_count])]
+    # Same four-anchor order used by the stage-facing UI. Near seats are at image-bottom,
+    # and audience-left is image-right. Each camera maps its column independently.
+    observations = [observation(index * 2, item["cameraId"], 70, 70)
+                    for index, item in enumerate(cameras)]
+    observations += [observation(index * 2 + 1, item["cameraId"], 30, 30)
+                     for index, item in enumerate(cameras)]
+    manifest = {"cameras": cameras, "participantIds": list(range(camera_count * 2))}
+    mappings = build_mappings(manifest, {item["cameraId"]: (100, 100) for item in cameras}, observations)
+    locations, warnings = fuse_locations(manifest, observations, mappings, set())
+    assert not warnings
+    assert len(locations) == camera_count * 2
+    for index in range(camera_count):
+        near, far = locations[index * 2:index * 2 + 2]
+        assert near["status"] == far["status"] == "localized"
+        assert near["column"] == far["column"] == cameras[index]["primaryColumn"]
+        assert near["x"] < far["x"]
+        assert np.allclose([near["y"], far["y"]], [.25, .75])
+
+
 @pytest.mark.parametrize("points", [
     [(10, 10), (20, 20), (30, 30), (40, 40)],
     [(10, 10), (90, 90), (10, 90), (90, 10)],

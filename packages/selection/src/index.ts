@@ -2,6 +2,17 @@ import type { LocationData } from "@orchestra/contracts";
 
 export interface SelectionPoint { x: number; y: number }
 export interface DeviceSelection { mapRevision: number; deviceIds: number[] }
+export type AudienceRegion = "left" | "center" | "right";
+
+/** Vertical partitions have disjoint boundaries, so a phone belongs to exactly one region. */
+export function selectRegion(locations: LocationData[], region: AudienceRegion, dividers: [number, number], mapRevision: number): DeviceSelection {
+  const [left, right] = dividers;
+  if (!(left >= 0 && left < right && right <= 1)) throw new RangeError("Region dividers must be ordered within the audience map.");
+  return { mapRevision, deviceIds: [...new Set(locations.filter(location => {
+    if (location.status !== "localized") return false;
+    return region === "left" ? location.x < left : region === "center" ? location.x >= left && location.x < right : location.x >= right;
+  }).map(location => location.deviceId))] };
+}
 
 // Pure geometry: turn a drawn shape into an explicit device-ID set plus the map revision it was
 // drawn on. No React, no canvas, no network. Map coordinates are normalized [0,1]: x=0 is the
