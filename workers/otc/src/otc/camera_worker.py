@@ -25,7 +25,9 @@ def process_camera(index, camera, path, manifest, debug_dir, report):
         "cameraId": camera_id, "frameWidth": scan.width, "frameHeight": scan.height,
         "phasePtsMs": phase, "acceptedTracks": 0, "rejectedTracks": 0,
         "messages": [f"{scan.frame_count} frames; PTS relative to first decoded frame",
-                     "Rotation applied clockwise from manifest, once"] + messages,
+                     "Rotation applied clockwise from manifest, once",
+                     f"Discarded {scan.discarded_fragments} expired fragments below the decoder's "
+                     "minimum sample count"] + messages,
     }
     artifact = None
     if debug_dir is not None:

@@ -1,0 +1,5 @@
+# Physical clip: expired track accumulation
+
+Captain follow-up on main 6e1f4d4, authorized by the user's camera-processing failure report. Original physical 1080p H.264 footage hit the cumulative 8192-track guard after 8.9285 seconds, with 7650 expired fragments below the existing 40-sample phase minimum. Decoder v1.3 retires those impossible fragments, preserving active/decodable tracks, unique IDs, ambiguity flags and identity thresholds. Camera diagnostics report the retired count. The memory/resource guard remains.
+
+`gate:otc` passed: 82 Python tests, Ruff and shared checks. The unchanged 43.524-second original now processes completely; real console retry finished in 53.5 seconds for three duplicate uploads. It recovers zero IDs (523 rejected tracks per copy), so physical acceptance remains unfulfilled. This fixes the crash, not the real-scene segmentation/association limitations. No map committed. See [captain evidence and next experiment](../../integration/journal/20260919-camera-worker-failure.md); raw video/frames stay in ignored runtime paths.

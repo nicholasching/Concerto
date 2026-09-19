@@ -2,6 +2,8 @@
 
 An offline worker now decodes actual video files into protocol-v1 observations and audience locations. Synthetic MP4s let this branch run independently while Team 2 builds phone flashing. Physical camera validation is still outstanding.
 
+Physical follow-up (decoder v1.3): expired fragments below the unchanged phase-decoder sample minimum are retired rather than accumulated against the 8192 retained-track limit. Active/decodable tracks and ambiguity checks are preserved; diagnostics report discarded fragments. The first original 1080p clip now processes without the former track-limit crash, but yields no accepted identities. Real-scene segmentation/association needs further work; successful processing is not successful optical calibration. See [evidence](../../.devcontext/teams/integration/journal/20260919-camera-worker-failure.md).
+
 ## Run from the repository root
 
 Install Bun 1.3.14 and Python 3.13, then:

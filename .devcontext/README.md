@@ -12,6 +12,8 @@ Read [integration status/handoff](teams/integration/handoff.md), [verification](
 
 Cloudflare device testing now uses a single audience origin for HTTP/audio/WSS and a saved public QR URL. Read the [setup guide](../docs/cloudflare-tunnel.md), [routing decision](decisions/20260919-cloudflare-audience-origin.md) and [verified tunnel journal](teams/integration/journal/20260919-cloudflare-testing.md). Next servers require Node 22+; backend/tooling remain Bun. A real Quick Tunnel and desktop browser passed; physical phone evidence remains outstanding.
 
+First physical camera clip: the [worker failure investigation](teams/integration/journal/20260919-camera-worker-failure.md) fixed expired-track accumulation and hidden error details. The original clip now completes, but no identities are accepted. This is an observed real-scene detection/tracking limitation; the empty candidate was not committed and physical calibration is not verified.
+
 ### Historical foundation checkpoint
 
 - Software foundation is verified and ready for four teams. Canonical baseline: Git tag `foundation-v1`; resolve its SHA with `git rev-parse foundation-v1` and record it in your first journal. The immutable tag avoids embedding its own commit hash inside itself.

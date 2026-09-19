@@ -7,6 +7,7 @@ import math
 import cv2
 import numpy as np
 
+from .sampling import MIN_PHASE_SAMPLES
 from .video import read_frames
 
 
@@ -35,6 +36,7 @@ class CameraScan:
     frame_count: int
     preview: np.ndarray
     preview_pts_ms: float
+    discarded_fragments: int = 0
 
 
 def detect_screens(rgb, pts_ms, excluded):
@@ -79,7 +81,7 @@ def detect_screens(rgb, pts_ms, excluded):
     return screens
 
 
-def associate(tracks, active, detections, pts_ms):
+def associate(tracks, active, detections, pts_ms, track_id_offset=0):
     # Fixed spatial bins avoid an audience-size squared assignment matrix.
     grid = defaultdict(list)
     predictions = {}
@@ -128,9 +130,28 @@ def associate(tracks, active, detections, pts_ms):
             if len(tracks) >= 8192:
                 raise ValueError("Too many screen tracks; inspect exclusions or camera motion")
             index = len(tracks)
-            tracks.append(Track(f"screen-{index}", [detection]))
+            tracks.append(Track(f"screen-{index + track_id_offset}", [detection]))
             next_active.add(index)
     return next_active
+
+
+def retire_fragments(tracks, active, pts_ms):
+    """Release expired fragments that can never meet the existing decoder minimum.
+
+    Keep active tracks and every potentially decodable track, including ambiguous
+    ones. Compaction must remap active indices without recycling public track IDs.
+    """
+    retained, next_active = [], set()
+    for index, track in enumerate(tracks):
+        if (pts_ms - track.samples[-1].pts_ms > 350 and
+                len(track.samples) < MIN_PHASE_SAMPLES):
+            continue
+        if index in active:
+            next_active.add(len(retained))
+        retained.append(track)
+    removed = len(tracks) - len(retained)
+    tracks[:] = retained
+    return next_active, removed
 
 
 def scan_camera(path, camera, progress=None):
@@ -138,6 +159,7 @@ def scan_camera(path, camera, progress=None):
     excluded = preview = None
     width = height = frame_count = best_count = 0
     preview_pts = 0.0
+    discarded_fragments = 0
     for pts_ms, rgb in read_frames(path, camera["rotationDegrees"]):
         if excluded is None:
             height, width = rgb.shape[:2]
@@ -151,7 +173,9 @@ def scan_camera(path, camera, progress=None):
         elif rgb.shape[:2] != (height, width):
             raise ValueError("Video dimensions changed during capture")
         detections = detect_screens(rgb, pts_ms, excluded)
-        active = associate(tracks, active, detections, pts_ms)
+        active, removed = retire_fragments(tracks, active, pts_ms)
+        discarded_fragments += removed
+        active = associate(tracks, active, detections, pts_ms, discarded_fragments)
         if preview is None or len(detections) > best_count or (
             len(detections) == best_count and frame_count % 30 == 0
         ):
@@ -159,4 +183,4 @@ def scan_camera(path, camera, progress=None):
         frame_count += 1
         if progress and frame_count % 90 == 0:
             progress(frame_count, pts_ms)
-    return CameraScan(tracks, width, height, frame_count, preview, preview_pts)
+    return CameraScan(tracks, width, height, frame_count, preview, preview_pts, discarded_fragments)

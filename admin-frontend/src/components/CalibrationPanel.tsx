@@ -6,6 +6,7 @@ import type { Column, Geometry } from "../lib/adapter";
 import type { AdminSnapshotData, OtcResultData } from "@orchestra/contracts";
 import { MapPanel } from "./MapPanel";
 import { CameraGeometry } from "./CameraGeometry";
+import { jobMessage } from "../lib/job-message";
 
 interface Slot { cameraId: string; column: Column; file: File | null; geometry: Geometry; progress: number; busy: boolean; error: string | null }
 const columns: Column[] = ["left", "center", "right"];
@@ -17,6 +18,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
     geometry: { rotationDegrees: 0, anchors: null, exclusionRois: [] }, progress: 0, busy: false, error: null })));
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ stage: string; progress: number; message: string } | null>(null);
+  const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [candidate, setCandidate] = useState<OtcResultData | null>(null);
   const [candidateRevision, setCandidateRevision] = useState(0);
   const [evidence, setEvidence] = useState<"physical" | "synthetic">("physical");
@@ -29,7 +31,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   const barrier = snapshot?.preparations.find(item => item.domain === "calibration" && item.preparationId === run?.preparationId);
   useEffect(() => { const timer = setInterval(() => setTick(value => value + 1), 250); return () => clearInterval(timer); }, []);
   useEffect(() => {
-    setCandidate(null); setProgress(null); setChecked(false); setJobId(null);
+    setCandidate(null); setProgress(null); setDiagnostics([]); setChecked(false); setJobId(null);
     if (runId) { try { setJobId(sessionStorage.getItem(`orchestra:job:${runId}`)); } catch { /* no storage */ } }
   }, [runId]);
   useEffect(() => {
@@ -40,7 +42,8 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
       try {
         const job = await adapter.getJobProgress(jobId);
         if (cancelled) return;
-        setProgress(job.progress);
+        setProgress({ ...job.progress, message: jobMessage(job.progress, job.diagnostics) });
+        setDiagnostics(job.diagnostics);
         if (job.result) { setCandidate(job.result); setCandidateRevision(snapshot?.audienceMap.mapRevision ?? 0); }
         else if (!["failed", "cancelled"].includes(job.progress.stage)) timer = setTimeout(poll, 500);
       } catch (cause) { if (!cancelled) setError(String(cause)); }
@@ -86,7 +89,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   async function processClips() {
     if (!run) return;
     const job = await adapter.createJob(run.plan.runId, run.uploads.map(upload => upload.uploadId), evidence);
-    setJobId(job.jobId); setProgress(job); setCandidate(null); setChecked(false);
+    setJobId(job.jobId); setProgress(job); setDiagnostics([]); setCandidate(null); setChecked(false);
     try { sessionStorage.setItem(`orchestra:job:${run.plan.runId}`, job.jobId); } catch { /* page-only */ }
   }
   const activeJob = progress && !["complete", "failed", "cancelled"].includes(progress.stage);
@@ -125,6 +128,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
       <label>Recording source <select value={evidence} onChange={e => setEvidence(e.target.value as typeof evidence)}><option value="physical">Actual camera recordings</option><option value="synthetic">Generated test clips (synthetic)</option></select></label>
       <button disabled={busy || !run.uploads.length || !!activeJob} onClick={() => void act(processClips)}>{progress?.stage === "failed" || progress?.stage === "cancelled" ? "Retry processing" : "Process uploaded recordings"}</button>
       {progress && <p role="status">{progress.stage} · {Math.round(progress.progress * 100)}% · {progress.message}</p>}
+      {progress?.stage === "failed" && diagnostics.length > 0 && <details><summary>Processing diagnostics</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{diagnostics.join("\n")}</pre></details>}
       {activeJob && jobId && <button onClick={() => void act(() => adapter.cancelJob(jobId))}>Cancel processing</button>}
       {candidate && snapshot && <div><h3>Candidate map — awaiting your review</h3>
         <p>Evidence: {candidate.evidence}. {candidate.locations.filter(location => location.status === "localized").length} localized of {run.plan.participantIds.length}. Processing {(candidate.processingMs / 1000).toFixed(1)} s.</p>

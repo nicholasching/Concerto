@@ -2,6 +2,8 @@
 
 Status: ready for software integration (audited; stage remains in progress pending physical acceptance). Owner: Team 3 human lead (user). Branch: feat/otc-localization. Baseline: foundation-v1, ab59c27105627977ee52dc2bcd4276b4532b9e2a.
 
+Post-merge captain update, 2026-09-19: decoder v1.3 fixes a real-camera crash caused by retaining expired short tracks; 82 Python tests pass. The first original 43.524-second clip now completes but recovers zero IDs. Physical segmentation/association remains unresolved, and no map was committed. Read [physical follow-up](journal/20260919-physical-fragment-cleanup.md). The branch-handoff notes below describe the earlier v1.2 baseline, including its then-missing physical footage.
+
 - Implemented: actual MP4 decoding, conservative identity/tracking, manual/validated-overlap mapping, diagnostics and review artifacts. Default is one spawned process per camera; --workers 1 keeps a serial reference.
 - Perspective fixtures: larger foreground and smaller back-row screens, converging rows; 90/90 review phones localized. Explicit 1x2-pixel rear phones stay unseen. No acceptance threshold was loosened.
 - Viewing fixture: 1,500 phones in 30 curved/rising rows with two aisle gaps; 4K overview and three close views in runtime/otc-fixtures/auditorium-1500. All phones fit in the overview. See [scene evidence](../../evidence/otc-localization/20260919-auditorium-sweep.md) for assumptions.

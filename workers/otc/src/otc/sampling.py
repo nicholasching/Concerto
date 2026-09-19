@@ -6,6 +6,8 @@ import numpy as np
 
 from .protocol import HEADER, PACKET_SYMBOLS, SYMBOL_MS, decode_packet
 
+MIN_PHASE_SAMPLES = 40
+
 
 @dataclass
 class SampledPacket:
@@ -55,7 +57,7 @@ def sample_packet(track, phase_ms, prepared=None):
 
 
 def find_phase(track):
-    if len(track.samples) < 40:
+    if len(track.samples) < MIN_PHASE_SAMPLES:
         return None
     prepared = prepare_samples(track)
     times = prepared[0]

@@ -1,6 +1,7 @@
 import numpy as np
+import pytest
 
-from otc.tracking import Sample, associate, detect_screens
+from otc.tracking import Sample, Track, associate, detect_screens, retire_fragments, scan_camera
 
 
 def screen(pts, x=30, width=10):
@@ -47,3 +48,49 @@ def test_screen_hole_and_nested_island_keep_separate_colors_and_centers():
     excluded = np.zeros((100, 100), np.uint8)
     excluded[10:50, 10:50] = 255
     assert detect_screens(rgb, 10, excluded) == []
+
+
+def test_retirement_preserves_active_and_potentially_decodable_tracks_and_reasons():
+    short = Track("screen-0", [screen(0)])
+    active_track = Track("screen-1", [screen(700)])
+    decodable = Track("screen-2", [screen(i) for i in range(40)], {"ambiguous screen association or merge"})
+    tracks = [short, active_track, decodable]
+    active, removed = retire_fragments(tracks, {0, 1}, 1000)
+    assert removed == 1
+    assert tracks == [active_track, decodable]
+    assert active == {0}
+    assert decodable.reasons == {"ambiguous screen association or merge"}
+    # A new unrelated track must not reuse the retained screen-2 ID after compaction.
+    associate(tracks, active, [screen(1000, x=1000)], 1000, removed)
+    assert tracks[-1].track_id == "screen-3"
+    # The 350 ms association window stays inclusive, exactly as before.
+    active, removed = retire_fragments(tracks, {0, 2}, 1050)
+    assert removed == 0
+
+
+def test_scene_with_over_8192_short_fragments_keeps_the_continuous_phone(monkeypatch):
+    # A textured/moving background continually creates fragments. None can supply
+    # the 40 samples required by the decoder; a real continuous screen stays intact.
+    rgb = np.zeros((100, 100, 3), np.uint8)
+    monkeypatch.setattr("otc.tracking.read_frames", lambda *_: ((i * 33, rgb) for i in range(450)))
+
+    def detections(_rgb, pts, _excluded):
+        frame = pts // 33
+        noise = [screen(pts, x=1000 + (frame * 20 + index) * 100) for index in range(20)]
+        return [screen(pts)] + noise
+
+    monkeypatch.setattr("otc.tracking.detect_screens", detections)
+    scan = scan_camera(None, {"rotationDegrees": 0, "exclusionRois": []})
+    phone = scan.tracks[0]
+    assert phone.track_id == "screen-0"
+    assert len(phone.samples) == 450
+    assert not phone.reasons
+    assert scan.discarded_fragments > 8192
+    assert len(scan.tracks) < 250
+    assert len({track.track_id for track in scan.tracks}) == len(scan.tracks)
+
+
+def test_retained_track_resource_limit_still_refuses_an_overloaded_scene():
+    tracks = [Track(f"screen-{i}", [screen(0)]) for i in range(8192)]
+    with pytest.raises(ValueError, match="Too many screen tracks"):
+        associate(tracks, set(), [screen(1000, x=1000)], 1000)
