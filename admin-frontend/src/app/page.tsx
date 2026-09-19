@@ -17,13 +17,13 @@ export default function Page() {
   const summary = snapshot ? audienceSummary(snapshot) : null;
   const pending = adapter.pending();
   const pendingCount = pending.filter(p => p.status === "pending").length;
-  const notDetected = !snapshot && !loading && !!error;
+  const disconnected = !loading && !!error;
 
   return (
     <main>
       <p className="eyebrow">AUDIENCE ORCHESTRA / TEAM 4</p>
       <h1>Admin console</h1>
-      {notDetected && (
+      {disconnected && (
         <p role="alert" className="error">
           Real server not detected at {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}.
           The console is ready; start the real control server (Team 1, port 8080) to use these
@@ -65,7 +65,7 @@ export default function Page() {
       )}
 
       {tab === "calibration" && (
-        <CalibrationPanel refresh={refresh} mapRevision={snapshot?.audienceMap.mapRevision ?? 0} />
+        <CalibrationPanel refresh={refresh} snapshot={snapshot} />
       )}
 
       {tab === "review" && (

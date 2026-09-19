@@ -14,7 +14,7 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
   const endMs = Math.max(1, ...show.clips.map(c => c.timelineStartMs + c.durationMs));
   const widthMs = endMs;
 
-  function futureMs(delaySeconds: number) { return (snapshot.serverMs ?? 0) + delaySeconds * 1000; }
+  function futureMs(delaySeconds: number) { return nowServerMs() + Math.max(3, delaySeconds) * 1000; }
 
   // Drive the playhead from the shared clock for playing state only.
   useEffect(() => {
@@ -29,7 +29,7 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
     setError(null); setStatus(null);
     try {
       const pos = action === "stop" ? 0 : (positionMsArg ?? showPositionMs(transport));
-      await adapter.sendTransport({ action, showRevision: show.showRevision, positionMs: pos, effectiveServerMs: futureMs(0) });
+      await adapter.sendTransport({ action, showRevision: show.showRevision, positionMs: pos, effectiveServerMs: futureMs(3) });
       setStatus(`${action} sent — pending.`);
       refresh();
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
@@ -39,7 +39,7 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
     setError(null);
     try {
       const channels = show.channels.map(c => c.channelId === channelId ? { ...c, ...patch } : c);
-      await adapter.sendMix({ masterGain: 1, channels, effectiveServerMs: futureMs(0) });
+      await adapter.sendMix({ masterGain: 1, channels, effectiveServerMs: futureMs(3) });
       refresh();
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }

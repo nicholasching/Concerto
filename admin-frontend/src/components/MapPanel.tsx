@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { AdminSnapshotData } from "@orchestra/contracts";
 import { selectRectangle } from "@orchestra/selection";
+import type { DeviceSelection } from "@orchestra/selection";
+import { canvasToMap, MAP_CANVAS, mapToCanvas } from "../lib/mapGeometry";
 
 type AssignmentData = AdminSnapshotData["assignments"][number];
 type AudienceMapData = AdminSnapshotData["audienceMap"];
@@ -12,13 +14,13 @@ interface Props {
   assignments: AssignmentData[];
   channels: ChannelData[];
   drawable: boolean; // true on Assign; false on Review
-  onSelection?: (deviceIds: number[]) => void;
+  onSelection?: (selection: DeviceSelection) => void;
 }
 
 const STATUS_COLOR: Record<string, string> = {
   localized: "#71d0b0", coarse: "#f2c76d", ambiguous: "#e08a8a", unseen: "#5a6b86",
 };
-const W = 900, H = 360;
+const W = MAP_CANVAS.width, H = MAP_CANVAS.height;
 
 export function MapPanel({ map, assignments, channels, drawable, onSelection }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,7 +32,7 @@ export function MapPanel({ map, assignments, channels, drawable, onSelection }: 
 
   function toMap(e: React.MouseEvent<HTMLCanvasElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
-    return { x: ((e.clientX - rect.left) / rect.width), y: ((e.clientY - rect.top) / rect.height) };
+    return canvasToMap({ x: e.clientX - rect.left, y: e.clientY - rect.top }, rect);
   }
 
   // Draw dots + selection. Dots colored by assignment channel if assigned, else by localization status.
@@ -44,7 +46,7 @@ export function MapPanel({ map, assignments, channels, drawable, onSelection }: 
     const highlightSet = highlight ? new Set(highlight) : null;
     for (const loc of map.locations) {
       if (loc.status !== "localized") continue;
-      const cx = 20 + loc.x * 860, cy = 30 + loc.y * 310;
+      const { x: cx, y: cy } = mapToCanvas(loc);
       const ch = assignedChannel.get(loc.deviceId);
       ctx.fillStyle = ch ? channelColor.get(ch) ?? STATUS_COLOR.localized : STATUS_COLOR[loc.status];
       if (highlightSet && highlightSet.has(loc.deviceId)) { ctx.fillStyle = "#ffffff"; }
@@ -52,8 +54,9 @@ export function MapPanel({ map, assignments, channels, drawable, onSelection }: 
     }
     // selection rectangle overlay
     if (drag) {
-      const x = Math.min(drag.x0, drag.x1) * W, y = Math.min(drag.y0, drag.y1) * H;
-      const w = Math.abs(drag.x1 - drag.x0) * W, h = Math.abs(drag.y1 - drag.y0) * H;
+      const start = mapToCanvas({ x: drag.x0, y: drag.y0 }), end = mapToCanvas({ x: drag.x1, y: drag.y1 });
+      const x = Math.min(start.x, end.x), y = Math.min(start.y, end.y);
+      const w = Math.abs(start.x - end.x), h = Math.abs(start.y - end.y);
       ctx.strokeStyle = "#9db8ff"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
       ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
     }
@@ -73,7 +76,7 @@ export function MapPanel({ map, assignments, channels, drawable, onSelection }: 
   function onUp() {
     if (!drag) return;
     const sel = selectRectangle(map.locations, { x: Math.min(drag.x0, drag.x1), y: Math.min(drag.y0, drag.y1) }, { x: Math.max(drag.x0, drag.x1), y: Math.max(drag.y0, drag.y1) }, map.mapRevision);
-    onSelection?.(sel.deviceIds);
+    onSelection?.(sel);
     setDrag(null);
   }
 

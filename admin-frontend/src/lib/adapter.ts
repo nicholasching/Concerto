@@ -6,7 +6,7 @@
 // never show a local change as success before the server confirms it.
 
 import {
-  AdminSnapshot, AssignmentRequest, CalibrationArmRequest, CalibrationCreateRequest,
+  AdminSnapshot, AssignmentRequest, CalibrationArmRequest, CalibrationCreateRequest, CommandAccepted,
   CommitMapRequest, CreateJobRequest, MixRequest, PanicRequest, TransportRequest,
   type AdminSnapshotData,
 } from "@orchestra/contracts";
@@ -20,7 +20,7 @@ export class AdapterError extends Error {
 export interface PendingCommand {
   commandId: string;
   domain: "assignment" | "transport" | "mix" | "calibration" | "panic";
-  status: "pending" | "confirmed" | "error";
+  status: "pending" | "accepted" | "scheduled" | "effective" | "error" | "obsolete";
   error?: string;
   sentAt: number;
   sentRevision: number;
@@ -31,10 +31,14 @@ export interface TransportArgs { action: "prepare" | "play" | "pause" | "seek" |
 export interface MixArgs { masterGain: number; channels: AdminSnapshotData["show"]["channels"]; effectiveServerMs: number; }
 
 const PROTOCOL_VERSION = 1 as const;
+type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
-export function createAdapter(baseUrl: string) {
+export function createAdapter(baseUrl: string, fetcher: Fetcher = fetch) {
   let session = { sessionId: "demo", serverEpoch: "", revision: 0 };
   const pending = new Map<string, PendingCommand>();
+  let newestRequest = 0;
+  let newestAcceptedRequest = 0;
+  let newestSnapshot: AdminSnapshotData | null = null;
 
   function newCommandId() { return `cmd-${Math.random().toString(36).slice(2, 12)}`; }
 
@@ -42,7 +46,7 @@ export function createAdapter(baseUrl: string) {
   // error instead of a raw TypeError. This is the "not detected" path: the console tries the real
   // server, and if nothing is listening it reports that honestly rather than faking success.
   async function safeFetch(url: string, init?: RequestInit): Promise<Response> {
-    try { return await fetch(url, init); }
+    try { return await fetcher(url, init); }
     catch { throw new AdapterError("SERVER_UNREACHABLE", `Real server not detected at ${baseUrl}`, false, 0); }
   }
 
@@ -56,32 +60,47 @@ export function createAdapter(baseUrl: string) {
   }
 
   async function getSnapshot(): Promise<AdminSnapshotData> {
+    const requestId = ++newestRequest;
     const response = await safeFetch(`${baseUrl}/api/sessions/demo/snapshot`);
     if (!response.ok) await parseError(response);
     const data = AdminSnapshot.parse(await response.json());
+    // A late HTTP response must never roll the console back across a newer snapshot/epoch.
+    if (requestId < newestAcceptedRequest && newestSnapshot) return newestSnapshot;
+    if (newestSnapshot && data.serverEpoch === newestSnapshot.serverEpoch && data.revision < newestSnapshot.revision) return newestSnapshot;
+    if (session.serverEpoch && data.serverEpoch !== session.serverEpoch) {
+      for (const command of pending.values()) if (command.status !== "effective" && command.status !== "error") command.status = "obsolete";
+    }
+    newestAcceptedRequest = requestId;
+    newestSnapshot = data;
     session = { sessionId: data.sessionId, serverEpoch: data.serverEpoch, revision: data.revision };
-    // Any pending commands whose effect is now reflected in the confirmed snapshot are confirmed.
+    // A revision is global, so it cannot confirm a particular command. Only the command's own
+    // pending action can establish scheduling; its later disappearance establishes effectiveness.
     for (const [, cmd] of pending) {
-      if (cmd.status === "pending") {
-        // A command is confirmed once the server revision advances past the revision we sent it
-        // against. The server bumps revision on accept and again on apply.
-        if (data.revision > cmd.sentRevision) { cmd.status = "confirmed"; }
+      if (cmd.status === "pending" || cmd.status === "accepted" || cmd.status === "scheduled") {
+        if (data.pendingActions.some(action => action.commandId === cmd.commandId)) cmd.status = "scheduled";
+        else if (cmd.status === "scheduled") cmd.status = "effective";
       }
     }
     return data;
   }
 
-  async function sendJson<T>(path: string, body: Record<string, unknown>, commandId: string, domain: PendingCommand["domain"], sentRevision: number): Promise<T> {
+  async function sendJson<T>(path: string, body: Record<string, unknown>, commandId: string, domain: PendingCommand["domain"], sentRevision: number, validateAccepted = true): Promise<T> {
     const cmd: PendingCommand = { commandId, domain, status: "pending", sentAt: Date.now(), sentRevision };
     pending.set(commandId, cmd);
-    const response = await safeFetch(`${baseUrl}${path}`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    });
-    if (!response.ok) {
+    try {
+      const response = await safeFetch(`${baseUrl}${path}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      if (!response.ok) { cmd.status = "error"; await parseError(response); }
+      const result = await response.json();
+      if (validateAccepted) CommandAccepted.parse(result);
+      cmd.status = "accepted";
+      return result as T;
+    } catch (error) {
       cmd.status = "error";
-      await parseError(response);
+      cmd.error = error instanceof Error ? error.message : String(error);
+      throw error;
     }
-    return response.json() as Promise<T>;
   }
 
   function context(commandId: string) {
@@ -97,7 +116,7 @@ export function createAdapter(baseUrl: string) {
 
     async createCalibration(participantIds: number[], palette: { zero: string; one: string; neutral: string }, paletteVersion: string) {
       const commandId = newCommandId();
-      return sendJson<{ runId: string; runTag: number; revision: number }>("/api/calibrations", { ...context(commandId), participantIds, palette, paletteVersion }, commandId, "calibration", session.revision);
+      return sendJson<{ runId: string; runTag: number; revision: number }>("/api/calibrations", { ...context(commandId), participantIds, palette, paletteVersion }, commandId, "calibration", session.revision, false);
     },
     async armCalibration(runId: string, preparationId: string, effectiveServerMs: number) {
       const commandId = newCommandId();
@@ -114,7 +133,7 @@ export function createAdapter(baseUrl: string) {
     },
     async createJob(runId: string, uploadIds: string[]) {
       const commandId = newCommandId();
-      return sendJson<{ jobId: string; revision: number }>(`/api/calibrations/${runId}/jobs`, { ...context(commandId), runId, uploadIds }, commandId, "calibration", session.revision);
+      return sendJson<{ jobId: string; revision: number }>(`/api/calibrations/${runId}/jobs`, { ...context(commandId), runId, uploadIds }, commandId, "calibration", session.revision, false);
     },
     async getJobProgress(jobId: string) {
       const response = await safeFetch(`${baseUrl}/api/jobs/${jobId}`);

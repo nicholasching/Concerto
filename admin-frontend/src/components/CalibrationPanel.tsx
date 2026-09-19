@@ -2,12 +2,13 @@
 import { useRef, useState } from "react";
 import { useAdapter } from "../lib/useSnapshot";
 import type { Column } from "../lib/adapter";
+import type { AdminSnapshotData } from "@orchestra/contracts";
 
 interface Slot { index: number; cameraId: string; column: Column; status: "idle" | "uploading" | "done" | "error"; uploadId: string | null; file: File | null; error?: string; }
 
 const COLUMNS: Column[] = ["left", "center", "right"];
 
-export function CalibrationPanel({ refresh, mapRevision }: { refresh: () => void; mapRevision: number }) {
+export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; snapshot: AdminSnapshotData | null }) {
   const adapter = useAdapter();
   const fileRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [runId, setRunId] = useState<string | null>(null);
@@ -24,7 +25,11 @@ export function CalibrationPanel({ refresh, mapRevision }: { refresh: () => void
   async function startRun() {
     setError(null);
     try {
-      const participantIds = Array.from({ length: 30 }, (_, i) => i); // demo subset
+      if (!snapshot) throw new Error("Wait for an authoritative session snapshot before preparing calibration.");
+      const participantIds = snapshot.devices
+        .filter(device => device.connected && device.foreground && device.clockReady && device.audioUnlocked)
+        .map(device => device.deviceId);
+      if (participantIds.length === 0) throw new Error("No eligible participants: require connected, foreground, clock-synced, audio-unlocked phones.");
       const palette = { zero: "#0000ff", one: "#ff0000", neutral: "#000000" };
       const result = await adapter.createCalibration(participantIds, palette, "palette-v1");
       setRunId(result.runId); setRunTag(result.runTag);
@@ -74,7 +79,7 @@ export function CalibrationPanel({ refresh, mapRevision }: { refresh: () => void
     if (!runId || !jobId) return;
     setError(null);
     try {
-      await adapter.commitMap(runId, jobId, mapRevision);
+      await adapter.commitMap(runId, jobId, snapshot?.audienceMap.mapRevision ?? 0);
       refresh();
       setRunId(null); setRunTag(null); setJobId(null); setProgress(null);
       setSlots(prev => prev.map(s => ({ ...s, status: "idle", uploadId: null, file: null, error: undefined })));
@@ -92,7 +97,7 @@ export function CalibrationPanel({ refresh, mapRevision }: { refresh: () => void
       {error && <p role="alert" className="error">Error: {error}</p>}
       {!runId && <button onClick={startRun}>Start calibration run</button>}
       {runId && <>
-        <p>Run <code>{runId}</code> (tag {runTag}). Map revision before commit: {mapRevision}.</p>
+        <p>Run <code>{runId}</code> (tag {runTag}). Map revision before commit: {snapshot?.audienceMap.mapRevision ?? 0}.</p>
         <div className="slots">
           {slots.map(slot => (
             <div key={slot.index} className={`slot slot-${slot.status}`}>

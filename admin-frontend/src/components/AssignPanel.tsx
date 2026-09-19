@@ -3,28 +3,36 @@ import { useState } from "react";
 import { useAdapter } from "../lib/useSnapshot";
 import { MapPanel } from "./MapPanel";
 import type { AdminSnapshotData } from "@orchestra/contracts";
+import type { DeviceSelection } from "@orchestra/selection";
+import { nowServerMs } from "../lib/clock";
 
 export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData; refresh: () => void }) {
   const adapter = useAdapter();
-  const [selected, setSelected] = useState<number[]>([]);
+  const [selected, setSelected] = useState<DeviceSelection | null>(null);
   const [channelId, setChannelId] = useState<string>(snapshot.show.channels[0]?.channelId ?? "");
   const [effectiveDelay, setEffectiveDelay] = useState(3);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [undo, setUndo] = useState<{ deviceIds: number[]; channelId: string | null } | null>(null);
+  const [undo, setUndo] = useState<Map<string | null, number[]> | null>(null);
 
   function futureMs(delaySeconds: number) {
     // Schedule relative to the server clock; the harness applies when serverMs reaches it.
-    return (snapshot.serverMs ?? 0) + delaySeconds * 1000;
+    return nowServerMs() + Math.max(3, delaySeconds) * 1000;
   }
 
-  async function assign(channel: string | null, delaySeconds: number, deviceIds: number[]) {
-    if (deviceIds.length === 0) { setError("Draw a selection on the map first."); return; }
+  async function assign(channel: string | null, delaySeconds: number, selection: DeviceSelection | null) {
+    if (!selection || selection.deviceIds.length === 0) { setError("Draw a selection on the map first."); return; }
+    const { deviceIds, mapRevision } = selection;
     setError(null); setStatus(null);
     try {
       // Save a one-step undo of the previous assignment for these devices.
-      setUndo({ deviceIds, channelId: snapshot.assignments.find(a => a.deviceId === deviceIds[0])?.channelId ?? null });
-      const result = await adapter.sendAssignment({ deviceIds, channelId: channel, mapRevision: snapshot.audienceMap.mapRevision, effectiveServerMs: futureMs(delaySeconds) });
+      const previous = new Map<string | null, number[]>();
+      for (const deviceId of deviceIds) {
+        const prior = snapshot.assignments.find(a => a.deviceId === deviceId)?.channelId ?? null;
+        previous.set(prior, [...(previous.get(prior) ?? []), deviceId]);
+      }
+      setUndo(previous);
+      const result = await adapter.sendAssignment({ deviceIds, channelId: channel, mapRevision, effectiveServerMs: futureMs(delaySeconds) });
       setStatus(`Sent assignment of ${deviceIds.length} phones to ${channel ?? "(clear)"} — pending. command ${result.commandId.slice(0, 8)}.`);
       refresh();
     } catch (e) {
@@ -35,8 +43,8 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
   }
 
   async function doUndo() {
-    if (!undo) return;
-    await assign(undo.channelId, 0, undo.deviceIds);
+    if (!undo || !selected) return;
+    for (const [channelId, deviceIds] of undo) await assign(channelId, effectiveDelay, { ...selected, deviceIds });
     setUndo(null);
   }
 
@@ -63,9 +71,9 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
         </label>
         <span className="swatch" style={{ background: channelColor }} />
         <label>Apply in
-          <input type="number" min={0} value={effectiveDelay} onChange={e => setEffectiveDelay(Number(e.target.value))} /> seconds
+        <input type="number" min={3} value={effectiveDelay} onChange={e => setEffectiveDelay(Math.max(3, Number(e.target.value)))} /> seconds
         </label>
-        <button onClick={() => assign(channelId, effectiveDelay, selected)}>Assign {selected.length} phones</button>
+        <button onClick={() => assign(channelId, effectiveDelay, selected)}>Assign {selected?.deviceIds.length ?? 0} phones</button>
         <button onClick={() => assign(null, effectiveDelay, selected)}>Clear assignment</button>
         <button disabled={!undo} onClick={doUndo}>Undo</button>
       </div>

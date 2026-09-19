@@ -27,6 +27,25 @@ test("sendAssignment against a missing server marks the command as error, never 
   await expect(
     adapter.sendAssignment({ deviceIds: [0, 1], channelId: "ch-0", mapRevision: 1, effectiveServerMs: 0 }),
   ).rejects.toMatchObject({ code: "SERVER_UNREACHABLE" });
+  expect(adapter.pending()[0]?.status).toBe("error");
+});
+
+test("an unrelated snapshot revision does not confirm a command that failed to reach the server", async () => {
+  let calls = 0;
+  const snapshot = {
+    protocolVersion: 1, sessionId: "demo", serverEpoch: "epoch-1", revision: 9, serverMs: 9,
+    role: "admin", show: { showId: "show", showRevision: 0, label: "show", tracks: [], channels: [{ channelId: "c", label: "c", color: "#000000", gain: 1, mute: false, solo: false }], clips: [] },
+    transport: { status: "stopped", transportRevision: 0, showRevision: 0, positionMs: 0, startServerMs: null }, pendingActions: [],
+    audienceMap: { mapRevision: 0, runId: null, evidence: "synthetic", locations: [] }, devices: [], assignments: [],
+  };
+  const adapter = createAdapter("http://test", async () => {
+    calls += 1;
+    if (calls === 1) throw new TypeError("offline");
+    return new Response(JSON.stringify(snapshot), { status: 200 });
+  });
+  await expect(adapter.sendAssignment({ deviceIds: [0], channelId: "c", mapRevision: 0, effectiveServerMs: 1 })).rejects.toMatchObject({ code: "SERVER_UNREACHABLE" });
+  await adapter.getSnapshot();
+  expect(adapter.pending()[0]?.status).toBe("error");
 });
 
 test("panic against a missing server surfaces SERVER_UNREACHABLE, not a silent success", async () => {
