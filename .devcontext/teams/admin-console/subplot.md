@@ -4,6 +4,12 @@ This is the plan for building the **admin console** — the screen one operator 
 "Audience Orchestra" concert. It is written in plain words on purpose. The big-picture plan is
 `masterplan.md`; this file is just our focused spec for the admin part.
 
+> **Revision note (2026-09-19):** The fake-input harness described in section 2 was built, then
+> removed at the user's direction. The console now talks to the **real** control server (Team 1,
+> port 8080) only. When the real server isn't running, every action attempts the real call and
+> shows a clean "Real server not detected" error in its catch block — nothing is faked. Section 2
+> is kept as the original spec for history; the live behavior is "real server, graceful failure."
+
 Workflow we follow: **spec first, you review it, then we build slice by slice.** No feature code
 until you approve this spec. After that, each slice is a small, testable step with a success check
 you can run yourself.

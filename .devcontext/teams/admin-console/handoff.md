@@ -13,28 +13,28 @@ and [plan.md](../../../plan.md) before changing code.
 - **Selection** (`packages/selection/src/index.ts`): pure rectangle and polygon geometry. Returns
   explicit device IDs + mapRevision. Inclusive borders; audience-left orientation; coarse/unseen
   excluded; 1,500 points < 100ms. Tests in `packages/selection/tests/selection.test.ts`.
-- **Adapter** (`admin-frontend/src/lib/adapter.ts`): the only server interface. Tracks pending vs
-  confirmed; surfaces server errors as `AdapterError`; rejects stale-map assignments as STALE_MAP.
-  Tests in `admin-frontend/tests/adapter.test.ts`.
-- **Harness** (`tools/admin-demo/server.ts`): in-memory deterministic state. Routes: snapshot,
-  calibration create/arm/uploads/jobs, job progress, commit-map, assignments, transport, mix,
-  panic. Pending actions apply when `effectiveServerMs` is reached. `startAdminHarness(port,count)`
-  is exported for tests.
-- **UI** (`admin-frontend/src/app/page.tsx` + `src/components/`): Session (counts + QR placeholder
-  + panic), Calibration (three fake-camera slots, job progress, commit), Review (read-only map),
-  Assign (canvas selection, channel, scheduled change, undo), Perform (four-lane timeline,
-  shared-clock playhead, transport, gain/mute/solo, panic).
+- **Adapter** (`admin-frontend/src/lib/adapter.ts`): the only server interface. Every fetch goes
+  through `safeFetch`, so a missing server becomes `AdapterError(SERVER_UNREACHABLE)` with message
+  "Real server not detected at <url>". Tracks pending vs confirmed; surfaces server errors
+  honestly; rejects stale-map assignments as STALE_MAP. Tests in `admin-frontend/tests/adapter.test.ts`.
+- **Fake-input harness: REMOVED.** The console talks to the real control server (Team 1, port
+  8080) only. `tools/admin-demo/server.ts` is deleted. `tools/admin-demo/index.ts` is now a
+  standalone real-server status checker.
+- **UI** (`admin-frontend/src/app/page.tsx` + `src/components/`): Session, Calibration, Review,
+  Assign, Perform. When the real server is down, a "Real server not detected" banner shows and
+  each tab/action surfaces the same clean error on click. Calibration slots take a real video file
+  (`accept="video/*"`). No synthetic data, no fake success.
 - **Clock** (`admin-frontend/src/lib/clock.ts`): reads `snapshot.serverMs` for offset; not a second
   estimator. Swap to `SynchronizedClock.toLocalPerformanceMs` when Team 1 ships the sync clock.
 
 ## Verification
 
-- `bun run gate:admin` passes (typecheck, lint, contracts, 8 tests, production build).
-- `admin-frontend/tests/walkthrough.test.ts` drives the full operator flow end to end against the
-  harness and asserts: 1,500-phone snapshot, three uploads, one failed upload keeps the others,
-  job completes, map commits (revision bumps), assignment confirms, transport plays then stops,
-  panic mutes and clears. Plus a stale-map rejection test.
-- This is mock evidence only. Real phones/cameras/venue are producer-owned physical checks.
+- `bun run gate:admin` passes (typecheck, lint, contracts, 13 tests, production build).
+- Adapter tests verify the not-detected path against a dead port (no harness needed). Selection
+  tests cover geometry/orientation/1500-point cost.
+- Verified live: console at :3001, 18084 free (harness gone), 8080 down, adapter returns
+  `SERVER_UNREACHABLE / Real server not detected at http://localhost:8080`.
+- No live-data or physical evidence yet (by design). Real phones/cameras/venue are producer-owned.
 
 ## Changed interfaces/files
 
