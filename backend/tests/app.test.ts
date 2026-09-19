@@ -27,7 +27,7 @@ test("health identifies a foundation, not a running concert", async () => {
   expect((await response.json()).implementation).toBe("foundation");
 });
 test("unfinished mutation routes fail explicitly", async () => {
-  const response = await app().request("/api/assignments", { method: "POST", body: "{}" });
+  const response = await app().request("/api/panic", { method: "POST", body: "{}" });
   expect(response.status).toBe(501);
   expect(ApiError.parse(await response.json()).error.code).toBe("NOT_IMPLEMENTED");
 });

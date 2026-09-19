@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import {
-  ApiError, CommandAccepted, JoinRequest, JoinResponse, PROTOCOL_VERSION, SaveShowRequest, TransportRequest,
+  ApiError, AssignmentRequest, CommandAccepted, JoinRequest, JoinResponse, MixRequest, PROTOCOL_VERSION,
+  SaveShowRequest, TransportRequest,
 } from "@orchestra/contracts";
 import { matchesOperatorSecret } from "./auth";
 import { Barrier } from "./barriers";
@@ -44,6 +45,34 @@ const accepted = (clock: ServerClock, commandId: string, revision: number) =>
     commandId, revision,
   });
 
+// Checks every mutation shares before it touches state.
+const guardCommand = (deps: AppDeps, request: { sessionId: string; serverEpoch: string }) => {
+  if (request.sessionId !== deps.clock.sessionId) {
+    return { body: apiError("WRONG_SESSION", "This server is not serving that concert session."), status: 404 as const };
+  }
+  // A command minted under a previous epoch was scheduled against a clock origin that no longer
+  // exists; its effective time means nothing now.
+  if (request.serverEpoch !== deps.clock.serverEpoch) {
+    return {
+      body: apiError("STALE_EPOCH", "The server restarted; resynchronize and reissue this command.", true),
+      status: 409 as const,
+    };
+  }
+  return null;
+};
+
+const leadTimeError = (deps: AppDeps, effectiveServerMs: number, nowServerMs: number) => {
+  const leadTimeMs = deps.leadTimeMs ?? DEFAULT_LEAD_TIME_MS;
+  if (effectiveServerMs >= nowServerMs + leadTimeMs) return null;
+  return {
+    body: apiError(
+      "INSUFFICIENT_LEAD_TIME",
+      `A scheduled change must be at least ${leadTimeMs} ms in the future; phones need time to schedule it.`,
+    ),
+    status: 409 as const,
+  };
+};
+
 export function createApp(deps: AppDeps) {
   const app = new Hono();
   const persist = () =>
@@ -52,8 +81,11 @@ export function createApp(deps: AppDeps) {
   app.get("/api/health", c => c.json({ service: "audience-orchestra-control", protocolVersion: 1, implementation: "foundation" }));
   app.get("/api/foundation", c => c.json({
     status: "in progress", owner: "sync-control",
-    implemented: ["health", "foundation-info", "clock-websocket", "join-resume", "role-filtered-snapshots"],
-    next: ["subscriptions", "scheduled commands", "uploads and jobs", "worker adapter"],
+    implemented: [
+      "health", "foundation-info", "clock-websocket", "join-resume", "role-filtered-snapshots",
+      "show-save", "prepared-transport-cues", "assignments", "mix",
+    ],
+    next: ["uploads and jobs", "worker adapter", "map commit", "panic and audio lease", "load harness"],
   }));
 
   app.post("/api/sessions/:sessionId/join", async c => {
@@ -144,14 +176,8 @@ export function createApp(deps: AppDeps) {
     const body = TransportRequest.safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json(apiError("INVALID_REQUEST", "Transport request did not match the protocol v1 schema."), 400);
     const request = body.data;
-    if (request.sessionId !== deps.clock.sessionId) {
-      return c.json(apiError("WRONG_SESSION", "This server is not serving that concert session."), 404);
-    }
-    // A command minted under a previous epoch was scheduled against a clock origin that no
-    // longer exists; its effective time means nothing now.
-    if (request.serverEpoch !== deps.clock.serverEpoch) {
-      return c.json(apiError("STALE_EPOCH", "The server restarted; resynchronize and reissue this command.", true), 409);
-    }
+    const guard = guardCommand(deps, request);
+    if (guard) return c.json(guard.body, guard.status);
 
     const replayed = deps.commands.get<unknown>(request.commandId);
     if (replayed) return c.json(replayed);
@@ -186,13 +212,8 @@ export function createApp(deps: AppDeps) {
       return c.json(ack);
     }
 
-    const leadTimeMs = deps.leadTimeMs ?? DEFAULT_LEAD_TIME_MS;
-    if (request.effectiveServerMs < now + leadTimeMs) {
-      return c.json(apiError(
-        "INSUFFICIENT_LEAD_TIME",
-        `A cue must be at least ${leadTimeMs} ms in the future; phones need time to schedule it.`,
-      ), 409);
-    }
+    const leadTime = leadTimeError(deps, request.effectiveServerMs, now);
+    if (leadTime) return c.json(leadTime.body, leadTime.status);
 
     // Starting playback is the only action gated on readiness. Stopping or pausing must never
     // wait for a phone that is not answering.
@@ -215,7 +236,7 @@ export function createApp(deps: AppDeps) {
       effectiveServerMs: request.effectiveServerMs,
     });
 
-    const superseded = deps.state.schedule({
+    const superseded = deps.state.scheduleTransport({
       domain: "transport", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
       supersedesCommandId: null, transport,
     });
@@ -227,6 +248,107 @@ export function createApp(deps: AppDeps) {
     }));
     if (request.action !== "play") deps.preparations.clear("transport");
     const ack = accepted(deps.clock, request.commandId, transport.transportRevision);
+    deps.commands.remember(request.commandId, ack);
+    return c.json(ack);
+  });
+
+  app.post("/api/assignments", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Assigning devices requires the operator secret."), 401);
+    }
+    const body = AssignmentRequest.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(apiError("INVALID_REQUEST", "Assignment request did not match the protocol v1 schema."), 400);
+    const request = body.data;
+    const guard = guardCommand(deps, request);
+    if (guard) return c.json(guard.body, guard.status);
+
+    const replayed = deps.commands.get<unknown>(request.commandId);
+    if (replayed) return c.json(replayed);
+
+    const now = deps.clock.nowServerMs();
+    deps.state.applyDue(now);
+    if (request.expectedRevision !== deps.state.assignmentRevision) {
+      return c.json(apiError(
+        "REVISION_CONFLICT", `Assignments are at revision ${deps.state.assignmentRevision}; reload before assigning.`,
+      ), 409);
+    }
+    // A selection made against an older map may name devices that have since moved or been
+    // relocalized. The operator reselects rather than the server guessing.
+    if (request.mapRevision !== deps.state.mapRevision) {
+      return c.json(apiError("STALE_MAP", `Audience map is at revision ${deps.state.mapRevision}; reselect.`), 409);
+    }
+    if (request.channelId !== null && !deps.state.show.channels.some(channel => channel.channelId === request.channelId)) {
+      return c.json(apiError("UNKNOWN_CHANNEL", "No such channel in the current show."), 409);
+    }
+    const unknown = request.deviceIds.filter(deviceId => !deps.state.isRegistered(deviceId));
+    if (unknown.length > 0) {
+      return c.json(apiError("UNKNOWN_DEVICE", `Not registered in this session: ${unknown.join(", ")}.`), 409);
+    }
+    const leadTime = leadTimeError(deps, request.effectiveServerMs, now);
+    if (leadTime) return c.json(leadTime.body, leadTime.status);
+
+    const assignmentRevision = deps.state.assignmentRevision + 1;
+    const assignments = request.deviceIds.map(deviceId => ({
+      deviceId, channelId: request.channelId, assignmentRevision, mapRevision: request.mapRevision,
+    }));
+    const superseded = deps.state.scheduleAssignments({
+      commandId: request.commandId, effectiveServerMs: request.effectiveServerMs, assignments,
+    });
+
+    // Each phone is told about its own assignment only.
+    for (const assignment of assignments) {
+      deps.connections.sendToParticipants([assignment.deviceId], JSON.stringify({
+        ...envelope(deps.clock), type: "assignment.commit", revision: deps.state.revision,
+        effectiveServerMs: request.effectiveServerMs,
+        payload: {
+          domain: "assignment", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
+          supersedesCommandId: deps.state.pendingAssignmentFor(assignment.deviceId)?.supersedesCommandId ?? null,
+          assignments: [assignment],
+        },
+      }));
+    }
+
+    const ack = accepted(deps.clock, request.commandId, assignmentRevision);
+    deps.commands.remember(request.commandId, ack);
+    return c.json({ ...ack, supersededCommandIds: superseded });
+  });
+
+  app.post("/api/mix", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Mix control requires the operator secret."), 401);
+    }
+    const body = MixRequest.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(apiError("INVALID_REQUEST", "Mix request did not match the protocol v1 schema."), 400);
+    const request = body.data;
+    const guard = guardCommand(deps, request);
+    if (guard) return c.json(guard.body, guard.status);
+
+    const replayed = deps.commands.get<unknown>(request.commandId);
+    if (replayed) return c.json(replayed);
+
+    const now = deps.clock.nowServerMs();
+    deps.state.applyDue(now);
+    if (request.expectedRevision !== deps.state.mixRevision) {
+      return c.json(apiError("REVISION_CONFLICT", `Mix is at revision ${deps.state.mixRevision}; reload before changing it.`), 409);
+    }
+    const leadTime = leadTimeError(deps, request.effectiveServerMs, now);
+    if (leadTime) return c.json(leadTime.body, leadTime.status);
+
+    const mixRevision = deps.state.mixRevision + 1;
+    const superseded = deps.state.scheduleMix({
+      domain: "mix", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
+      supersedesCommandId: null, mixRevision, masterGain: request.masterGain, channels: request.channels,
+    });
+    deps.connections.sendToParticipants(deps.state.connectedDeviceIds(), JSON.stringify({
+      ...envelope(deps.clock), type: "mix.commit", revision: deps.state.revision,
+      effectiveServerMs: request.effectiveServerMs,
+      payload: {
+        domain: "mix", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
+        supersedesCommandId: superseded, mixRevision, masterGain: request.masterGain, channels: request.channels,
+      },
+    }));
+
+    const ack = accepted(deps.clock, request.commandId, mixRevision);
     deps.commands.remember(request.commandId, ack);
     return c.json(ack);
   });

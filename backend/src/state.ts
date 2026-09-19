@@ -1,14 +1,22 @@
 import { z } from "zod";
 import {
-  AdminSnapshot, Assignment, DeviceReadiness, Location, ParticipantSnapshot, PendingAction, PROTOCOL_VERSION, Show, Transport,
+  AdminSnapshot, Assignment, Channel, DeviceReadiness, Location, ParticipantSnapshot, PendingAction, PROTOCOL_VERSION, Show, Transport,
   type AdminSnapshotData, type ParticipantSnapshotData, type ShowData,
 } from "@orchestra/contracts";
 import type { ServerClock } from "./clock";
 
 type DeviceReadinessData = z.infer<typeof DeviceReadiness>;
 type AssignmentData = z.infer<typeof Assignment>;
+type ChannelData = z.infer<typeof Channel>;
 type LocationData = z.infer<typeof Location>;
 type PendingActionData = z.infer<typeof PendingAction>;
+
+interface PendingAssignment {
+  commandId: string;
+  effectiveServerMs: number;
+  supersedesCommandId: string | null;
+  assignment: AssignmentData;
+}
 
 // Every snapshot must carry a show holding at least one channel, so a session starts with an
 // obviously empty placeholder. Team 4's first saved show replaces it wholesale.
@@ -40,7 +48,13 @@ export class SessionState {
   private revisionCounter = 0;
   private savedShow: ShowData | null = null;
   private transportState = stoppedTransport(0, 0);
-  private readonly pending = new Map<PendingActionData["domain"], PendingActionData>();
+  private pendingTransport: Extract<PendingActionData, { domain: "transport" }> | null = null;
+  private pendingMix: Extract<PendingActionData, { domain: "mix" }> | null = null;
+  private readonly pendingAssignments = new Map<number, PendingAssignment>();
+  private assignmentRevisionCounter = 0;
+  private mixRevisionCounter = 0;
+  private channelState: ChannelData[] | null = null;
+  private masterGainState = 1;
   private readonly readiness = new Map<number, DeviceReadinessData>();
   private readonly assignments = new Map<number, AssignmentData>();
   private readonly locations = new Map<number, LocationData>();
@@ -49,8 +63,17 @@ export class SessionState {
     return this.revisionCounter;
   }
 
+  // Committed mix lives on the show's channels, which is where the contract can express it.
+  // Asset timing is never touched by a mix change.
   get show(): ShowData {
-    return this.savedShow ?? PLACEHOLDER_SHOW;
+    const base = this.savedShow ?? PLACEHOLDER_SHOW;
+    return this.channelState ? { ...base, channels: this.channelState } : base;
+  }
+
+  // The snapshot has no field for master gain, so a reconnecting client cannot recover it from
+  // state; it only ever sees it on a mix.commit broadcast. Recorded as a contract gap.
+  get masterGain(): number {
+    return this.masterGainState;
   }
 
   // Null until an operator saves a show; the placeholder is not worth persisting.
@@ -81,30 +104,101 @@ export class SessionState {
   }
 
   get pendingActions(): PendingActionData[] {
-    return [...this.pending.values()];
+    const actions: PendingActionData[] = [];
+    if (this.pendingTransport) actions.push(this.pendingTransport);
+    if (this.pendingMix) actions.push(this.pendingMix);
+    // Devices scheduled by one command are reported as that one pending action.
+    const byCommand = new Map<string, PendingAssignment[]>();
+    for (const entry of this.pendingAssignments.values()) {
+      const group = byCommand.get(entry.commandId) ?? [];
+      group.push(entry);
+      byCommand.set(entry.commandId, group);
+    }
+    for (const [commandId, group] of byCommand) {
+      actions.push(PendingAction.parse({
+        domain: "assignment", commandId, effectiveServerMs: group[0].effectiveServerMs,
+        supersedesCommandId: group[0].supersedesCommandId,
+        assignments: group.map(entry => entry.assignment).sort((a, b) => a.deviceId - b.deviceId),
+      }));
+    }
+    return actions;
   }
 
   pendingIn(domain: PendingActionData["domain"]): PendingActionData | undefined {
-    return this.pending.get(domain);
+    return this.pendingActions.find(action => action.domain === domain);
   }
 
-  // One pending change per domain. A replacement cancels the previous change in that domain and
-  // says which command it superseded; an unrelated domain is untouched, so a mix update cannot
-  // cancel a transport start that was already accepted.
-  schedule(action: PendingActionData): string | null {
-    const superseded = this.pending.get(action.domain)?.commandId ?? null;
-    this.pending.set(action.domain, PendingAction.parse({ ...action, supersedesCommandId: superseded }));
+  pendingAssignmentFor(deviceId: number): PendingAssignment | undefined {
+    return this.pendingAssignments.get(deviceId);
+  }
+
+  // A replacement cancels only the previous change in the same domain. An unrelated domain is
+  // untouched, so scheduling a mix change cannot cancel a transport start that was already
+  // accepted, however close together the two commands arrive.
+  scheduleTransport(action: Extract<PendingActionData, { domain: "transport" }>): string | null {
+    const superseded = this.pendingTransport?.commandId ?? null;
+    this.pendingTransport = PendingAction.parse({ ...action, supersedesCommandId: superseded }) as typeof action;
     this.revisionCounter++;
     return superseded;
+  }
+
+  scheduleMix(action: Extract<PendingActionData, { domain: "mix" }>): string | null {
+    const superseded = this.pendingMix?.commandId ?? null;
+    this.pendingMix = PendingAction.parse({ ...action, supersedesCommandId: superseded }) as typeof action;
+    this.mixRevisionCounter = action.mixRevision;
+    this.revisionCounter++;
+    return superseded;
+  }
+
+  // One pending assignment per device: reassigning a device cancels only that device's pending
+  // change, leaving other devices in the earlier command still scheduled.
+  scheduleAssignments(input: {
+    commandId: string;
+    effectiveServerMs: number;
+    assignments: AssignmentData[];
+  }): string[] {
+    const superseded = new Set<string>();
+    for (const assignment of input.assignments) {
+      const previous = this.pendingAssignments.get(assignment.deviceId);
+      if (previous) superseded.add(previous.commandId);
+      this.pendingAssignments.set(assignment.deviceId, {
+        commandId: input.commandId,
+        effectiveServerMs: input.effectiveServerMs,
+        supersedesCommandId: previous?.commandId ?? null,
+        assignment: Assignment.parse(assignment),
+      });
+    }
+    this.assignmentRevisionCounter = input.assignments[0]?.assignmentRevision ?? this.assignmentRevisionCounter;
+    this.revisionCounter++;
+    return [...superseded];
+  }
+
+  get assignmentRevision(): number {
+    return this.assignmentRevisionCounter;
+  }
+
+  get mixRevision(): number {
+    return this.mixRevisionCounter;
   }
 
   // Promotes any pending action whose moment has arrived. Called from the scheduler and before
   // building a snapshot, so a reader never sees a pending action whose time has already passed.
   applyDue(nowServerMs: number): void {
-    for (const [domain, action] of [...this.pending]) {
-      if (action.effectiveServerMs > nowServerMs) continue;
-      if (action.domain === "transport") this.transportState = action.transport;
-      this.pending.delete(domain);
+    if (this.pendingTransport && this.pendingTransport.effectiveServerMs <= nowServerMs) {
+      this.transportState = this.pendingTransport.transport;
+      this.pendingTransport = null;
+      this.revisionCounter++;
+    }
+    if (this.pendingMix && this.pendingMix.effectiveServerMs <= nowServerMs) {
+      this.channelState = this.pendingMix.channels;
+      this.masterGainState = this.pendingMix.masterGain;
+      this.pendingMix = null;
+      this.revisionCounter++;
+    }
+    for (const [deviceId, entry] of [...this.pendingAssignments]) {
+      if (entry.effectiveServerMs > nowServerMs) continue;
+      this.assignments.set(deviceId, entry.assignment);
+      this.pendingAssignments.delete(deviceId);
       this.revisionCounter++;
     }
   }
@@ -133,6 +227,28 @@ export class SessionState {
 
   readinessOf(deviceId: number): DeviceReadinessData | undefined {
     return this.readiness.get(deviceId);
+  }
+
+  isRegistered(deviceId: number): boolean {
+    return this.readiness.has(deviceId);
+  }
+
+  assignmentOf(deviceId: number): AssignmentData | undefined {
+    return this.assignments.get(deviceId);
+  }
+
+  // Membership is derived from committed assignments only. A phone joins a channel by being
+  // assigned to it, never by asking for it.
+  channelMembers(channelId: string): number[] {
+    return [...this.assignments.values()]
+      .filter(assignment => assignment.channelId === channelId)
+      .map(assignment => assignment.deviceId)
+      .sort((a, b) => a - b);
+  }
+
+  // Team 3 commits the real map in a later slice; until then every device is unlocalized.
+  get mapRevision(): number {
+    return 0;
   }
 
   // Only connected phones are expected to answer a preparation. An operator console is not a

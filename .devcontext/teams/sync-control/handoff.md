@@ -64,10 +64,39 @@ and the ready subset is what runs.
 A phone that missed a broadcast is not stranded: the same cue is in `pendingActions` in its
 snapshot, with the same `effectiveServerMs`.
 
-**Open contract gap for the captain and Team 4:** the server tracks ready, expected and excluded
-counts per preparation, but `AdminSnapshot` has no field to report them, so the console cannot show
-"1,420 ready, 80 not answering" yet. This needs a schema addition or a new server message agreed
-with the captain. Committing does not depend on it.
+## Assignments and mix
+
+```text
+POST /api/assignments   header x-operator-secret   deviceIds + channelId + mapRevision
+POST /api/mix           header x-operator-secret   masterGain + channels
+```
+
+Both are scheduled under the same lead-time rule as transport, and both are revision-checked
+against their own domain: `expectedRevision` is the current assignment revision or mix revision.
+
+A phone joins a channel only by being assigned to it; membership is server-owned and a phone cannot
+subscribe by asking. Each phone is told about its own assignment and nothing else. Unassigning is
+explicit (`channelId: null`), and an unassigned device stays silent rather than defaulting to a
+channel. Reassigning a device cancels only that device's pending change: other devices in an
+earlier command stay scheduled. Last committed assignment wins for overlapping selections.
+
+A mix change lands on channel gain, mute and solo without touching clip timing, and never cancels
+an accepted transport cue: the domains are independent.
+
+`mapRevision` is 0 until Team 3 commits a real map. The stale-map check is live now, so selections
+built against an old map will start being refused as soon as map commits exist.
+
+## Two open contract gaps for the captain and Team 4
+
+Both concern what the operator can see, and neither blocks the server.
+
+1. **Preparation counts have nowhere to go.** The server tracks ready, expected and excluded per
+   preparation, but `AdminSnapshot` has no field for it, so the console cannot show "1,420 ready,
+   80 not answering" — the number the operator needs before firing a cue.
+   [ADR](../../decisions/20260919-114500-sync-control-preparation-counts.md).
+2. **Effective master gain has nowhere to go.** `MixRequest` and the mix pending action carry it,
+   but once applied there is no field in the snapshot. Channel gains are fine; they live on
+   `Show.channels`. A phone that reconnects after a mix change cannot recover the master gain.
 
 ## What Teams 2 and 4 can consume now
 

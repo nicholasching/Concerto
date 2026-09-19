@@ -210,7 +210,69 @@ the ready subset and the operator decides when. Exposing the counts needs either
 `AdminSnapshot` or a new server message, which is a captain-owned contract change and needs Team 4
 in the conversation. Raised in the handoff; not invented unilaterally.
 
+### Step 3C implemented
+
+- `POST /api/assignments` and `POST /api/mix`, both operator-only, revision-checked, idempotent and
+  scheduled under the same lead-time rule.
+- Pending state restructured: transport and mix hold one pending change each, assignments hold one
+  **per device**, which is what the MVP rule in masterplan section 4 actually requires. Reassigning
+  one device cancels only that device's pending change and leaves the rest of an earlier command
+  scheduled. `pendingActions` groups them back by command for the snapshot.
+- Channel membership is derived from committed assignments only. A phone joins a channel by being
+  assigned, never by asking, and each phone is told only about its own assignment.
+- A committed mix lands on the show's channel gains without touching clip timing.
+
+Decisions taken while implementing:
+
+1. **`mapRevision` is hard-coded to 0 until Team 3 commits a real map.** The stale-map check is
+   live and will start refusing genuinely stale selections the moment map commits exist; it just
+   cannot fail yet. Better a working check against a constant than a check added later under time
+   pressure.
+2. **Unassigning is explicit** (`channelId: null`). An unassigned device stays silent rather than
+   falling back to a default channel, per masterplan section 4.
+3. **No channel-scoped broadcast routing was built.** `channelMembers()` exists and is tested
+   because assignments need it, but nothing routes by channel yet: transport and mix are both
+   session-wide in the contract. Building a routing layer with no message to route would be
+   speculative.
+
+### Checks run
+
+- `bun run gate:sync` - PASS, 113 tests across backend, sync and testkit; backend bundle built.
+- Live end-to-end against the running server, three phones: assigned all three to melody, then
+  reassigned two to bass at the same effective time, then scheduled a mix change while both
+  assignments were still pending. Before anything fired the snapshot held three pending actions
+  across two domains. Phone 0 received one `assignment.commit` and phone 1 received two; every
+  phone received the `mix.commit`. After the moment passed, melody held device 0 and bass held
+  devices 1 and 2, channel gains were 0.5, clip timing was untouched, and pending was empty. A
+  participant's own view showed its channel and carried no assignments list.
+
+### Failure encountered
+
+The foundation test asserting that unimplemented routes return 501 used `/api/assignments` as its
+example, which now returns 401 because it exists and requires the operator secret. Pointed it at
+`/api/panic`, which is genuinely unimplemented until slice 5. Worth noting the test was correct
+both before and after; only its example had been overtaken.
+
+### Second contract gap found
+
+Effective **master gain** has nowhere in the snapshot. `MixRequest` and the mix `PendingAction`
+both carry `masterGain`, but once applied there is no field for it: `snapshotBase` has `show`,
+`transport` and `pendingActions`, and `Show` has no master. Channel gains are fine because they
+live on `Show.channels`.
+
+The consequence is narrow but real: a phone that reconnects after a mix change learns the channel
+gains from its snapshot and the master gain from nothing. It is tracked server-side and only ever
+broadcast. This belongs with the preparation-counts gap in a single conversation with the captain
+and Team 4 about what the operator-facing state actually needs.
+
+## Slice 3 complete
+
+All three steps are implemented, gated and demonstrated live. Not proven: anything physical. The
+cues are scheduled correctly in a state machine on one machine; whether phones emit sound together
+at the scheduled moment is untested and untestable without hardware.
+
 ## Next action
 
-Step 3C: assignments, server-owned channel membership and mix, including the rule that a mix change
-cannot cancel an accepted transport start.
+Slice 4: streamed uploads, hashing, the fake OTC job adapter and then the real CLI adapter, and
+map commit. Write its subplot first. Before that, the captain and Team 4 should resolve the two
+contract gaps, since both shape what the admin console can show.
