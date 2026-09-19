@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
-  AdminSnapshot, Assignment, Channel, DeviceReadiness, Location, ParticipantSnapshot, PendingAction, PROTOCOL_VERSION, Show, Transport,
+  AdminSnapshot, Assignment, AudienceMap, Channel, DeviceReadiness, Location, ParticipantSnapshot, PendingAction,
+  PROTOCOL_VERSION, Show, Transport,
   type AdminSnapshotData, type ParticipantSnapshotData, type ShowData,
 } from "@orchestra/contracts";
 import type { ServerClock } from "./clock";
@@ -9,6 +10,7 @@ type DeviceReadinessData = z.infer<typeof DeviceReadiness>;
 type AssignmentData = z.infer<typeof Assignment>;
 type ChannelData = z.infer<typeof Channel>;
 type LocationData = z.infer<typeof Location>;
+type AudienceMapData = z.infer<typeof AudienceMap>;
 type PendingActionData = z.infer<typeof PendingAction>;
 
 interface PendingAssignment {
@@ -55,6 +57,10 @@ export class SessionState {
   private mixRevisionCounter = 0;
   private channelState: ChannelData[] | null = null;
   private masterGainState = 1;
+  private mapRevisionCounter = 0;
+  private mapRunId: string | null = null;
+  private mapEvidence: AudienceMapData["evidence"] = "synthetic";
+  private committedRunTag: number | null = null;
   private readonly readiness = new Map<number, DeviceReadinessData>();
   private readonly assignments = new Map<number, AssignmentData>();
   private readonly locations = new Map<number, LocationData>();
@@ -246,9 +252,53 @@ export class SessionState {
       .sort((a, b) => a - b);
   }
 
-  // Team 3 commits the real map in a later slice; until then every device is unlocalized.
   get mapRevision(): number {
-    return 0;
+    return this.mapRevisionCounter;
+  }
+
+  // The highest run tag whose result has been committed. A run older than this arriving late must
+  // not overwrite newer locations.
+  get lastCommittedRunTag(): number | null {
+    return this.committedRunTag;
+  }
+
+  get audienceMap(): AudienceMapData {
+    return AudienceMap.parse({
+      mapRevision: this.mapRevisionCounter, runId: this.mapRunId, evidence: this.mapEvidence,
+      locations: [...this.locations.values()],
+    });
+  }
+
+  /**
+   * Replaces locations for the devices this run targeted and leaves everyone else alone. A target
+   * the decoder could not place becomes `unseen`: an unknown position is a real answer and must
+   * never be rounded to a point on the map.
+   */
+  commitMap(input: {
+    runId: string;
+    runTag: number;
+    evidence: AudienceMapData["evidence"];
+    locations: LocationData[];
+    targets: number[];
+  }): number {
+    const decoded = new Map(input.locations.map(location => [location.deviceId, location]));
+    for (const deviceId of input.targets) {
+      this.locations.set(deviceId, decoded.get(deviceId) ?? defaultLocation(deviceId));
+    }
+    this.mapRevisionCounter++;
+    this.mapRunId = input.runId;
+    this.mapEvidence = input.evidence;
+    this.committedRunTag = input.runTag;
+    this.revisionCounter++;
+    return this.mapRevisionCounter;
+  }
+
+  restoreMap(map: AudienceMapData, committedRunTag: number | null): void {
+    this.mapRevisionCounter = map.mapRevision;
+    this.mapRunId = map.runId;
+    this.mapEvidence = map.evidence;
+    this.committedRunTag = committedRunTag;
+    for (const location of map.locations) this.locations.set(location.deviceId, location);
   }
 
   // Only connected phones are expected to answer a preparation. An operator console is not a
@@ -276,9 +326,7 @@ export class SessionState {
   adminSnapshot(clock: ServerClock): AdminSnapshotData {
     return AdminSnapshot.parse({
       ...this.base(clock), role: "admin",
-      // No calibration has run, so the map is empty and labelled synthetic: nothing physical
-      // has been measured yet.
-      audienceMap: { mapRevision: 0, runId: null, evidence: "synthetic", locations: [...this.locations.values()] },
+      audienceMap: this.audienceMap,
       devices: [...this.readiness.values()],
       assignments: [...this.assignments.values()],
     });

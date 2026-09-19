@@ -5,13 +5,15 @@ import { cors } from "hono/cors";
 import { z } from "zod";
 import {
   ApiError, AssignmentRequest, CalibrationArmRequest, CalibrationCreateRequest, CalibrationManifest, CalibrationRun,
-  CommandAccepted, CreateJobRequest, JobProgress, JoinRequest, JoinResponse, MixRequest, PROTOCOL_VERSION,
+  CommandAccepted, CommitMapRequest, CreateJobRequest, JobProgress, JoinRequest, JoinResponse, MixRequest,
+  PROTOCOL_VERSION,
   SaveShowRequest, Track, TransportRequest,
 } from "@orchestra/contracts";
 import type { AssetStore } from "./assets";
 import { matchesOperatorSecret } from "./auth";
 import { Barrier } from "./barriers";
 import { MAX_CAMERAS, type CalibrationRuns } from "./calibration";
+import { identityMismatch } from "./jobs";
 import type { JobRunner } from "./jobs";
 import type { ServerClock } from "./clock";
 import type { CheckpointStore } from "./checkpoint";
@@ -120,7 +122,11 @@ const leadTimeError = (deps: AppDeps, effectiveServerMs: number, nowServerMs: nu
 export function createApp(deps: AppDeps) {
   const app = new Hono();
   const persist = () =>
-    deps.store.save(deps.registry.toCheckpoint(deps.clock.sessionId, deps.state.durableShow));
+    deps.store.save(deps.registry.toCheckpoint(
+      deps.clock.sessionId, deps.state.durableShow,
+      deps.state.mapRevision > 0 ? deps.state.audienceMap : null,
+      deps.state.lastCommittedRunTag,
+    ));
   app.use("/api/*", cors({ origin: ["http://localhost:3000", "http://localhost:3001"] }));
   app.get("/api/health", c => c.json({ service: "audience-orchestra-control", protocolVersion: 1, implementation: "foundation" }));
   app.get("/api/foundation", c => c.json({
@@ -571,6 +577,85 @@ export function createApp(deps: AppDeps) {
     const cancelled = deps.jobs.cancel(c.req.param("jobId"));
     if (!cancelled) return c.json(apiError("JOB_NOT_CANCELLABLE", "That job is unknown or already finished."), 409);
     return c.json({ jobId: c.req.param("jobId"), cancelled: true });
+  });
+
+  // Not in the masterplan's endpoint list, added because without it a failed calibration ends the
+  // session: only one run may be active, so a run nobody can commit blocks every later attempt.
+  app.delete("/api/calibrations/:runId", c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Discarding a run requires the operator secret."), 401);
+    }
+    const run = deps.calibrations.get(c.req.param("runId"));
+    if (!run) return c.json(apiError("UNKNOWN_RUN", "No such calibration run in this session."), 404);
+    if (run.status === "committed") {
+      return c.json(apiError("RUN_ALREADY_COMMITTED", "A committed run cannot be discarded; its map is in use."), 409);
+    }
+    deps.calibrations.setStatus(run.plan.runId, "discarded");
+    deps.preparations.clear("calibration");
+    return c.json({ runId: run.plan.runId, status: "discarded" });
+  });
+
+  app.post("/api/calibrations/:runId/commit-map", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Committing a map requires the operator secret."), 401);
+    }
+    const body = CommitMapRequest.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(apiError("INVALID_REQUEST", "Commit request did not match the protocol v1 schema."), 400);
+    const request = body.data;
+    const guard = guardCommand(deps, request);
+    if (guard) return c.json(guard.body, guard.status);
+
+    const replayed = deps.commands.get<unknown>(request.commandId);
+    if (replayed) return c.json(replayed);
+
+    const run = deps.calibrations.get(c.req.param("runId"));
+    if (!run || run.plan.runId !== request.runId) {
+      return c.json(apiError("UNKNOWN_RUN", "No such calibration run in this session."), 404);
+    }
+    const job = deps.jobs.get(request.jobId);
+    if (!job || job.runId !== run.plan.runId) {
+      return c.json(apiError("UNKNOWN_JOB", "That job does not belong to this run."), 409);
+    }
+    if (job.stage !== "complete" || !job.result) {
+      return c.json(apiError("JOB_NOT_COMPLETE", `That job is ${job.stage}; only a complete job can be committed.`), 409);
+    }
+
+    // Re-check identity at commit, not only when the job finished: this is the last point before
+    // the result changes where the operator believes every phone is sitting.
+    const cameras = [...run.uploads.values()].map(upload => ({ cameraId: upload.cameraId, sha256: upload.sha256 }));
+    const mismatch = identityMismatch(job.result, {
+      ...run.plan, startServerMs: run.startServerMs ?? 0,
+      cameras: cameras.map(camera => ({
+        ...camera, primaryColumn: "left" as const, videoPath: "", rotationDegrees: 0 as const,
+        exclusionRois: [], anchors: null,
+      })),
+    });
+    if (mismatch) return c.json(apiError("RESULT_IDENTITY_MISMATCH", mismatch), 409);
+
+    // A run that started before the one already committed cannot overwrite newer locations,
+    // however late its result arrives.
+    const committedTag = deps.state.lastCommittedRunTag;
+    if (committedTag !== null && run.plan.runTag <= committedTag) {
+      return c.json(apiError(
+        "STALE_RUN", `Run tag ${run.plan.runTag} is not newer than the committed run tag ${committedTag}.`,
+      ), 409);
+    }
+    if (request.expectedMapRevision !== deps.state.mapRevision) {
+      return c.json(apiError(
+        "REVISION_CONFLICT", `Audience map is at revision ${deps.state.mapRevision}; reload before committing.`,
+      ), 409);
+    }
+
+    const mapRevision = deps.state.commitMap({
+      runId: run.plan.runId, runTag: run.plan.runTag, evidence: job.result.evidence,
+      locations: job.result.locations, targets: run.plan.participantIds,
+    });
+    deps.calibrations.setStatus(run.plan.runId, "committed");
+    await persist();
+
+    const ack = accepted(deps.clock, request.commandId, mapRevision);
+    deps.commands.remember(request.commandId, ack);
+    return c.json(ack);
   });
 
   app.post("/api/assignments", async c => {

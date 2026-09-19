@@ -39,6 +39,7 @@ if (restored) {
   registry.restore(restored);
   for (const device of restored.devices) state.register(device.deviceId);
   if (restored.show) state.restoreShow(restored.show);
+  if (restored.map) state.restoreMap(restored.map, restored.committedRunTag);
 }
 if (!process.env.OPERATOR_SECRET) {
   console.warn("OPERATOR_SECRET is unset: every operator request will be refused.");
