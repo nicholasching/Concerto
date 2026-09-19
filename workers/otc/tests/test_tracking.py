@@ -50,6 +50,72 @@ def test_screen_hole_and_nested_island_keep_separate_colors_and_centers():
     assert detect_screens(rgb, 10, excluded) == []
 
 
+@pytest.mark.parametrize("color", [(255, 250, 214), (15, 220, 255)])
+def test_emissive_core_stays_separate_from_dim_surroundings_and_thin_bloom(color):
+    rgb = np.full((120, 160, 3), 9, dtype=np.uint8)
+    rgb[15:95, 30:110] = (25, 60, 95)  # Saturated clothing joins the old mask.
+    rgb[25:65, 50:74] = color
+    rgb[45:46, 74:87] = color  # One-pixel glow bridge to a separate highlight.
+    rgb[40:52, 87:95] = color
+    found = detect_screens(rgb, 10, np.zeros(rgb.shape[:2], np.uint8))
+    core = [p for p in found if abs(p.x-61.5) < 1 and abs(p.y-44.5) < 1]
+    assert len(core) == 1
+    assert (core[0].width, core[0].height, core[0].rgb) == (24, 40, color)
+    assert len(found) == 2  # No larger, competing dim halo around the same screen.
+
+
+def test_dim_and_small_screens_remain_candidates():
+    rgb = np.full((100, 100, 3), 9, dtype=np.uint8)
+    rgb[15:31, 15:25] = (125, 85, 0)
+    rgb[60:66, 70:74] = (0, 50, 125)
+    found = detect_screens(rgb, 10, np.zeros(rgb.shape[:2], np.uint8))
+    assert {(p.width, p.height, p.rgb) for p in found} == {
+        (10, 16, (125., 85., 0.)), (4, 6, (0., 50., 125.)),
+    }
+
+
+def test_small_bright_seed_keeps_the_whole_compressed_screen_footprint():
+    rgb = np.full((100, 100, 3), 9, dtype=np.uint8)
+    rgb[20:36, 30:40] = (185, 150, 0)
+    rgb[22:34, 33:37] = (195, 160, 0)
+    found = detect_screens(rgb, 10, np.zeros(rgb.shape[:2], np.uint8))
+    assert len(found) == 1
+    assert (found[0].x, found[0].y, found[0].width, found[0].height) == (34.5, 27.5, 10, 16)
+
+
+def test_strong_screen_core_does_not_expand_into_a_modest_clothing_halo():
+    rgb = np.full((100, 100, 3), 9, dtype=np.uint8)
+    rgb[20:50, 30:50] = (30, 70, 120)
+    rgb[25:45, 35:45] = (0, 100, 250)
+    found = detect_screens(rgb, 10, np.zeros(rgb.shape[:2], np.uint8))
+    assert len(found) == 1
+    assert (found[0].x, found[0].y, found[0].width, found[0].height) == (39.5, 34.5, 10, 20)
+
+
+def test_adjacent_fragments_do_not_steal_or_poison_a_phone_track():
+    phone = Sample(0, 70, 60, 24, 40, (255, 250, 214))
+    dim = Sample(0, 58, 66, 35, 25, (45, 60, 90))
+    disjoint = Sample(0, 95, 60, 24, 40, (230, 140, 100))
+    tiny = Sample(0, 76, 60, 4, 6, (240, 120, 90))
+    tracks = []
+    active = associate(tracks, set(), [phone, dim, disjoint, tiny], 0)
+    blue = Sample(33, 70, 60, 24, 40, (15, 220, 255))
+    associate(tracks, active, [blue], 33)
+    assert tracks[0].samples == [phone, blue]
+    assert not tracks[0].reasons
+    assert all(len(t.samples) == 1 for t in tracks[1:])
+
+
+def test_screen_can_cross_brightness_mask_threshold_between_pilot_colors():
+    tracks = []
+    amber = Sample(0, 30, 30, 10, 16, (165, 110, 0))
+    blue = Sample(33, 30, 30, 10, 16, (0, 95, 235))
+    active = associate(tracks, set(), [amber], 0)
+    associate(tracks, active, [blue], 33)
+    assert len(tracks) == 1 and tracks[0].samples == [amber, blue]
+    assert not tracks[0].reasons
+
+
 def test_retirement_preserves_active_and_potentially_decodable_tracks_and_reasons():
     short = Track("screen-0", [screen(0)])
     active_track = Track("screen-1", [screen(700)])

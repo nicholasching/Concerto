@@ -1,5 +1,7 @@
 # otc-localization checkpoint
 
+Latest integrated-main follow-up (2026-09-19): decoder **otc-v1.4** recovers both visible screens in the user's original 1080p recording as IDs **9 and 11**, with both passes agreeing and no corrected/erased bits. Live console job completes in 81.88 seconds, yields two column-only locations, and stays uncommitted. **90 Python tests** and the shared OTC gate pass; admin gate and real browser review pass. See [investigation and handoff](journal/20260919-two-physical-screens.md). No new contracts/dependencies; Team 3 should merge origin/main into its working branch before further detector edits. Earlier branch-only checkpoints below are historical. Venue-scale and three-camera physical acceptance remain outstanding.
+
 Status: ready for software integration (audited; stage remains in progress pending physical acceptance). Owner: Team 3 human lead (user). Branch: feat/otc-localization. Baseline: foundation-v1, ab59c27105627977ee52dc2bcd4276b4532b9e2a.
 
 Post-merge captain update, 2026-09-19: decoder v1.3 fixes a real-camera crash caused by retaining expired short tracks; 82 Python tests pass. The first original 43.524-second clip now completes but recovers zero IDs. Physical segmentation/association remains unresolved, and no map was committed. Read [physical follow-up](journal/20260919-physical-fragment-cleanup.md). The branch-handoff notes below describe the earlier v1.2 baseline, including its then-missing physical footage.

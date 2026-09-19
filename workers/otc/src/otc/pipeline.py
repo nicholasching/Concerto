@@ -13,7 +13,7 @@ from .geometry import build_mappings, fuse_locations, reject_duplicates
 from .validation import validate_manifest, validate_result, validate_schema
 from .video import verify_video
 
-DECODER_VERSION = "otc-v1.3"
+DECODER_VERSION = "otc-v1.4"
 
 
 def process_manifest(manifest, base_dir, evidence, *, job_id=None, debug_dir=None, progress=None,

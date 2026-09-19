@@ -1,0 +1,9 @@
+# One-camera physical calibration review
+
+Captain follow-up on main, 2026-09-19. User requests optical calibration against a two-phone original video. All five existing branches were pushed first; changes here belong to integrated main so the team's worktree stays undisturbed.
+
+Observed: the live run contains the same SHA-256 video under left, center and right camera metadata. The console submitted every upload, assigning conflicting primary columns to the same view. Its summary also counted only seat-localized phones, hiding successful column-only optical IDs behind a zero.
+
+Change: per-upload inclusion controls choose the input subset using the existing API; reject duplicate selected recording hashes in the UI and permit processing just one view. Selection changes invalidate the prior displayed candidate. Preserve uploads, run/identity, geometry and explicit map review. Report unique accepted packet IDs separately from seat coordinates and column-only results, using eligible result membership. No shared contract change.
+
+Verification: `gate:admin` passes 21 tests, 14 contracts, shared checks and production build. Live browser: three duplicate selected hashes disable processing and show the explanation; all unchecked disables processing; center-only enables it. Selection invalidates the old displayed candidate. During processing all inclusion controls disable. Final real job `966bee6c-40e4-4bdd-86c4-f57f94b1afb8` contains exactly one camera-center upload and completes in 81.88 seconds. UI shows two devices decoded, zero seat coordinates, two column-only results and four eligible phones; expanded evidence lists 9 and 11 as center/optical-column, 1 and 8 unseen. Review is left open and uncommitted. See the [OTC journal](../../otc-localization/journal/20260919-two-physical-screens.md) for algorithm/evidence.

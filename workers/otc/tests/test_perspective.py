@@ -49,24 +49,22 @@ def test_perspective_mp4_sizes_and_positions_across_depth(capture, case, count, 
     assert_accepted_observations_match_truth(result, phones)
 
 
-def test_crowded_low_resolution_back_rows_keep_uncertain_positions_unknown(capture):
+def test_crowded_low_resolution_back_rows_never_invent_ids_or_positions(capture):
     path, manifest, truth = capture("perspective", count=90, width=640, height=360)
     phones = {phone["deviceId"]: phone for phone in truth["phones"]}
     result = process_manifest(manifest, path, "synthetic")
-    unknown = []
     for point in result["locations"]:
         expected = phones[point["deviceId"]]
         if point["status"] == "localized":
             assert point["column"] == expected["column"]
             assert math.hypot(point["x"]-expected["x"], point["y"]-expected["y"]) < .015
         else:
-            unknown.append(point)
             assert expected["depth"] > 2/3
             assert point["status"] in ("ambiguous", "unseen")
             assert point["x"] is None and point["y"] is None
-    assert unknown  # Keep the demonstrated low-resolution crowding limit visible.
-    assert any("ambiguous screen association or merge" in o["reasons"]
-               for o in result["observations"])
+    # Tighter footprint gates can recover the previously ambiguous nearby-but-
+    # separate rear screens. Every acceptance must still match independent truth;
+    # do not require a false rejection to preserve an old detector's recall limit.
     assert_accepted_observations_match_truth(result, phones)
 
 

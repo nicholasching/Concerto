@@ -1,5 +1,7 @@
 # Team 3 integration handoff
 
+Current integrated-main update: **otc-v1.4**, 90 Python tests passing, two physical screens decoded as 9 and 11 in the user's sample. Read the [two-screen investigation](journal/20260919-two-physical-screens.md) before continuing: bright/dim segmentation and footprint/brightness association changed; packet acceptance did not. The single-camera result is column-only without anchors and remains uncommitted. Merge origin/main into the team branch to obtain these captain fixes. The earlier v1.2 branch evidence below is historical, including its scale measurements.
+
 Branch: feat/otc-localization; baseline foundation-v1 (ab59c27105627977ee52dc2bcd4276b4532b9e2a). Feature commit: resolve with `git log -1 --format=%H -- workers/otc/src/otc/pipeline.py`. **Ready for software integration**, verified against masterplan sections 5/8/9 in the [integration audit](../../evidence/otc-localization/20260919-integration-audit.md). Stage remains in progress pending physical validation. Check Git for publication status; a local commit is not a push.
 
 ## Run independently

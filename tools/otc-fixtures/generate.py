@@ -14,7 +14,7 @@ import numpy as np
 from otc.validation import ROOT, validate_manifest
 
 CASES = ("clean", "degraded", "wrong-tag", "duplicates", "crossing", "rotated", "vfr", "empty",
-         "perspective", "perspective-undersized")
+         "perspective", "perspective-undersized", "emissive-background")
 
 
 def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, height=360, seed=7, manifest_path=None):
@@ -133,6 +133,16 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
                         y += 1.1 * math.cos(pts_ms / 600 + phone["motionPhase"])
                     bit = packets[device_id][slot] if 0 <= slot < 55 else None
                     color = colors[bit]
+                    if case == "emissive-background" and bit is not None:
+                        # Three independent exposure conditions, unrelated to
+                        # detector thresholds: washed amber/cyan over clothing,
+                        # unequal pilot brightness, and a uniformly dim phone.
+                        palettes = (
+                            ((255, 250, 214), (15, 220, 255)),
+                            ((165, 110, 0), (0, 95, 235)),
+                            ((125, 85, 0), (0, 50, 125)),
+                        )
+                        color = np.array(palettes[index % 3][bit], dtype=np.float64)
                     if case == "degraded":
                         color = color * np.array([0.79, 0.91, 0.84])
                         if index == 2 and slot == 25:
@@ -144,6 +154,14 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
                     else:
                         x0, y0 = round(x-5), round(y-8)
                     if 0 <= x0 < width-screen_width and 0 <= y0 < height-screen_height:
+                        if case == "emissive-background" and index % 3 == 0:
+                            rgb[max(0, y0-8):y0+screen_height+12,
+                                max(0, x0-10):x0+screen_width+14] = (25, 60, 95)
+                            # Static bright reflection connected by a thin glow
+                            # during blue symbols; it contains no valid packet.
+                            rgb[y0:y0+8, x0+screen_width+6:x0+screen_width+12] = (15, 220, 255)
+                            if bit == 1:
+                                rgb[y0+3:y0+4, x0+screen_width:x0+screen_width+6] = (15, 220, 255)
                         rgb[y0:y0+screen_height, x0:x0+screen_width] = color.clip(0, 255).astype(np.uint8)
                         if case == "degraded" and index == 5 and 23 <= slot <= 28:
                             rgb[y0:y0+16, x0:x0+5] = 9  # Half-covered phone, then uncovered.

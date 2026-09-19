@@ -17,6 +17,7 @@ For the backend/admin producer-consumer handoff, run `bun tools/otc-fixtures/ver
 | --- | --- |
 | `clean` | Native small screens, three views/overlap, compression, static colored distractor |
 | `degraded` | Hand motion, channel color gains, dropped frames, one-slot erasure, half-cover/uncover, one fully hidden phone |
+| `emissive-background` | Washed-out amber/cyan screens against dim colored clothing and a thin glow bridge; unequal pilot brightness and dim screens in the same capture |
 | `vfr` | Nonuniform presentation times plus missing frames and motion |
 | `rotated` | Raw camera rotation with explicit manifest correction |
 | `wrong-tag` | Valid ID words from a different calibration tag |
@@ -38,6 +39,8 @@ bun scripts/python.ts process --manifest runtime/otc-fixtures/perspective/manife
 Open `camera-0.mp4`, `camera-1.mp4` or `camera-2.mp4` in that folder. This 90-phone sample has front screens of 37x59 pixels and rear screens of 12x18 pixels, about a tenfold difference in area. Its real pipeline result localized all 90 devices; maximum normalized position error was 0.00372. At 640x360, the 60-device automated fixture additionally exercises six-pixel-wide rear screens. All 60 localize correctly, including front/middle/back rows. With `perspective-undersized`, the 12 deliberately tiny last-row phones remain unseen and the other 48 localize correctly. These dimensions are synthetic observations, not a physical camera resolution guarantee.
 
 Reducing the same 90-phone scene to 640x360 exposes a limit: 72 localize, 17 remain ambiguous and one stays unseen. All 196 accepted camera observations still match their true identities/positions; the unresolved positions are rear-row phones. Compressed row spacing, compression artifacts and conservative track association prevent full recall here even though the back screens are six pixels wide. This lower-resolution case remains an automated safety regression: front/middle phones must localize, uncertain positions stay null, and no accepted ID may move to another screen. The 90-phone full-recall test explicitly uses the review clip's 1280x720 resolution.
+
+That recall limit describes v1.2. With v1.4's tighter footprint association, the same 90-phone 640x360 case recovers all phones correctly. Its regression checks every accepted observation against independent projected ID/position truth and permits improved recall; actual crossings, merged tracks and deliberately undersized screens still have separate rejection tests. This improvement is synthetic evidence and does not change the physical resolution caveat.
 
 Perspective truth adds `depth`, `expectedUnresolvable`, and per-camera `cameraScreens` (ideal center, rendered width/height and visibility) to each independently positioned phone. Tests check camera observations against projected truth as well as final normalized locations; a later mapping rejection cannot conceal a wrong accepted ID. The 1x2 case is an explicit isolated resolution-limit injection, not an ordinary equal-size phone under the virtual camera.
 

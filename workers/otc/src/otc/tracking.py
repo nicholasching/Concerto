@@ -39,14 +39,10 @@ class CameraScan:
     discarded_fragments: int = 0
 
 
-def detect_screens(rgb, pts_ms, excluded):
-    hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
-    mask = cv2.inRange(hsv, (0, 55, 50), (179, 255, 255))
-    mask[excluded != 0] = 0
+def _screen_components(rgb, pts_ms, mask):
     # Trace boundaries once, then measure each small ROI instead of allocating
     # and scanning a full-resolution integer label image for every 4K frame.
     contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-    screens = []
     for index, contour in enumerate(contours):
         if hierarchy[0, index, 3] != -1:
             continue
@@ -75,9 +71,47 @@ def detect_screens(rgb, pts_ms, excluded):
             continue
         color = tuple(float(value) for value in np.median(pixels, axis=0))
         center = (x + moments["m10"] / area, y + moments["m01"] / area)
-        screens.append(Sample(pts_ms, *center, width, height, color))
-    if len(screens) > 4096:
-        raise ValueError("Too many screen candidates; add stage/light exclusion ROIs")
+        yield Sample(pts_ms, *center, width, height, color), (x, y, width, height), component
+
+
+def detect_screens(rgb, pts_ms, excluded):
+    hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+    preferred = np.zeros(rgb.shape[:2], np.int32)
+    core_areas = []
+    screens = []
+    # Bright emissive cores survive washed-out amber pilots and separate blue
+    # screens from dim clothing/glare. Keep the original dim-screen path too.
+    # Color values here locate candidates; identity still uses measured pilots.
+    for bright, lower in ((True, (0, 25, 190)), (False, (0, 55, 50))):
+        mask = cv2.inRange(hsv, lower, (179, 255, 255))
+        mask[excluded != 0] = 0
+        # Remove thin glow bridges without enlarging or joining nearby screens.
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+        for sample, (x, y, width, height), component in _screen_components(rgb, pts_ms, mask):
+            claimed = preferred[y:y+height, x:x+width]
+            inside = component != 0
+            if not bright:
+                labels, counts = np.unique(claimed[inside], return_counts=True)
+                overlaps = [(int(label)-1, count) for label, count in zip(labels, counts) if label]
+                if overlaps:
+                    # A compressed/dim screen can have only a small bright seed.
+                    # Recover its full footprint only near the brightness cutoff,
+                    # when one core is almost entirely contained and the
+                    # surrounding component is small. Strong cores stand alone.
+                    # Large clothing/glare halos never replace emissive cores.
+                    if len(overlaps) == 1:
+                        index, overlap = overlaps[0]
+                        core = screens[index]
+                        if (max(core.rgb) < 210 and overlap >= core_areas[index] * 0.8 and
+                                width * height <= core.width * core.height * 4):
+                            screens[index] = sample
+                    continue  # A core must not compete with its own dim halo.
+            screens.append(sample)
+            if bright:
+                claimed[inside] = len(screens)
+                core_areas.append(np.count_nonzero(inside))
+            if len(screens) > 4096:
+                raise ValueError("Too many screen candidates; add stage/light exclusion ROIs")
     return screens
 
 
@@ -107,7 +141,21 @@ def associate(tracks, active, detections, pts_ms, track_id_offset=0):
             for dy in (-1, 0, 1):
                 for index in grid[(gx + dx, gy + dy)]:
                     x, y, radius = predictions[index]
-                    if math.hypot(detection.x - x, detection.y - y) <= radius:
+                    last = tracks[index].samples[-1]
+                    # Proximity alone lets a dim clothing fragment steal a phone
+                    # or make it ambiguous. Require compatible footprint and
+                    # brightness, without assuming either pilot's hue.
+                    area_ratio = detection.width * detection.height / (last.width * last.height)
+                    brightness = (max(detection.rgb), max(last.rgb))
+                    overlap_width = max(0, min(x + last.width / 2, detection.x + detection.width / 2)
+                                        - max(x - last.width / 2, detection.x - detection.width / 2))
+                    overlap_height = max(0, min(y + last.height / 2, detection.y + detection.height / 2)
+                                         - max(y - last.height / 2, detection.y - detection.height / 2))
+                    smaller_area = min(last.width * last.height, detection.width * detection.height)
+                    if (math.hypot(detection.x - x, detection.y - y) <= radius and
+                            0.35 <= area_ratio <= 4 and
+                            min(brightness) >= 0.6 * max(brightness) and
+                            overlap_width * overlap_height >= smaller_area * 0.2):
                         matches[detection_index].append(index)
                         reverse[index].append(detection_index)
     next_active = set(predictions)

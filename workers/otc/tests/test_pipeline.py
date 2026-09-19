@@ -75,6 +75,26 @@ def test_motion_color_shift_partial_cover_and_dropped_frames(capture):
     assert any(o["erasedBits"] > 0 and o["status"] == "accepted" for o in result["observations"])
 
 
+def test_washed_pilots_clothing_glow_and_mixed_brightness_mp4(capture):
+    path, manifest, truth = capture("emissive-background", count=12)
+    result = process_manifest(manifest, path, "synthetic")
+    assert_positions(result, truth, manifest["participantIds"])
+    # Check every accepted camera observation against independent scene geometry;
+    # a downstream geometry rejection must not conceal a wrong screen identity.
+    phones = {p["deviceId"]: p for p in truth["phones"]}
+    for observation in result["observations"]:
+        if observation["status"] != "accepted":
+            continue
+        camera_index = next(i for i, c in enumerate(manifest["cameras"])
+                            if c["cameraId"] == observation["cameraId"])
+        phone = phones[observation["deviceId"]]
+        low, high = camera_index/3 - .1, (camera_index+1)/3 + .1
+        expected_x = truth["width"] * (high-phone["x"]) / (high-low) - .5
+        expected_y = truth["height"] * (.94-.88*phone["y"]) - .5
+        assert math.hypot(observation["centerPx"]["x"]-expected_x,
+                          observation["centerPx"]["y"]-expected_y) < 2
+
+
 @pytest.mark.parametrize("case", ["wrong-tag", "empty"])
 def test_wrong_run_and_no_screens_never_produce_locations(capture, case):
     path, manifest, _ = capture(case)
