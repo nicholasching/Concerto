@@ -11,6 +11,7 @@ import { ConnectionRegistry, OperatorTelemetry, REPLACED_CODE, type ClientSocket
 import { handleClientMessage } from "../src/messages";
 import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
+import { CommandLog } from "../src/commands";
 import { SessionState } from "../src/state";
 
 const SESSION = "session-under-test";
@@ -32,6 +33,7 @@ const harness = () => {
   const state = new SessionState();
   const app = createApp({
     clock, registry, state, operatorSecret: SECRET,
+    commands: new CommandLog(),
     store: new CheckpointStore(joinPath(directory, "checkpoint.json")),
     joins: new RateLimiter(100, 100, () => serverMs),
   });

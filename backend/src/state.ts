@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   AdminSnapshot, Assignment, DeviceReadiness, Location, ParticipantSnapshot, PROTOCOL_VERSION, Show, Transport,
-  type AdminSnapshotData, type ParticipantSnapshotData,
+  type AdminSnapshotData, type ParticipantSnapshotData, type ShowData,
 } from "@orchestra/contracts";
 import type { ServerClock } from "./clock";
 
@@ -17,9 +17,8 @@ export const PLACEHOLDER_SHOW = Show.parse({
   channels: [{ channelId: "placeholder", label: "Unassigned", color: "#6b7280", gain: 1, mute: false, solo: false }],
 });
 
-const STOPPED_TRANSPORT = Transport.parse({
-  status: "stopped", transportRevision: 0, showRevision: 0, positionMs: 0, startServerMs: null,
-});
+const stoppedTransport = (transportRevision: number, showRevision: number) =>
+  Transport.parse({ status: "stopped", transportRevision, showRevision, positionMs: 0, startServerMs: null });
 
 const defaultReadiness = (deviceId: number): DeviceReadinessData => ({
   deviceId, connected: false, foreground: false, clockReady: false,
@@ -38,12 +37,45 @@ const defaultLocation = (deviceId: number): LocationData => ({
 
 export class SessionState {
   private revisionCounter = 0;
+  private savedShow: ShowData | null = null;
+  private transportState = stoppedTransport(0, 0);
   private readonly readiness = new Map<number, DeviceReadinessData>();
   private readonly assignments = new Map<number, AssignmentData>();
   private readonly locations = new Map<number, LocationData>();
 
   get revision(): number {
     return this.revisionCounter;
+  }
+
+  get show(): ShowData {
+    return this.savedShow ?? PLACEHOLDER_SHOW;
+  }
+
+  // Null until an operator saves a show; the placeholder is not worth persisting.
+  get durableShow(): ShowData | null {
+    return this.savedShow;
+  }
+
+  get showRevision(): number {
+    return this.show.showRevision;
+  }
+
+  get transport() {
+    return this.transportState;
+  }
+
+  // The server assigns the revision. A client cannot choose which version of the show it is
+  // writing, only what is in it.
+  saveShow(show: ShowData): ShowData {
+    this.savedShow = Show.parse({ ...show, showRevision: this.showRevision + 1 });
+    this.transportState = stoppedTransport(this.transportState.transportRevision + 1, this.savedShow.showRevision);
+    this.revisionCounter++;
+    return this.savedShow;
+  }
+
+  restoreShow(show: ShowData): void {
+    this.savedShow = Show.parse(show);
+    this.transportState = stoppedTransport(0, this.savedShow.showRevision);
   }
 
   register(deviceId: number): void {
@@ -76,7 +108,7 @@ export class SessionState {
     return {
       protocolVersion: PROTOCOL_VERSION, sessionId: clock.sessionId, serverEpoch: clock.serverEpoch,
       revision: this.revisionCounter, serverMs: clock.nowServerMs(),
-      show: PLACEHOLDER_SHOW, transport: STOPPED_TRANSPORT, pendingActions: [],
+      show: this.show, transport: this.transportState, pendingActions: [],
     };
   }
 

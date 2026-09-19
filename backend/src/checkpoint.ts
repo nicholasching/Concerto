@@ -1,9 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
+import { Show } from "@orchestra/contracts";
 
 export const CheckpointFile = z.strictObject({
-  version: z.literal(1),
+  version: z.literal(2),
   sessionId: z.string().min(1),
   nextDeviceId: z.number().int().min(0).max(2048),
   devices: z.array(
@@ -13,6 +14,7 @@ export const CheckpointFile = z.strictObject({
       joinedServerMs: z.number().nonnegative(),
     }),
   ),
+  show: Show.nullable(),
 });
 export type CheckpointData = z.infer<typeof CheckpointFile>;
 
@@ -33,7 +35,14 @@ export class CheckpointStore {
       if ((cause as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw cause;
     }
-    return CheckpointFile.parse(JSON.parse(raw));
+    try {
+      return CheckpointFile.parse(JSON.parse(raw));
+    } catch (cause) {
+      throw new Error(
+        `Checkpoint at ${this.path} is unreadable. If it predates the current build, delete it to start a fresh session.`,
+        { cause },
+      );
+    }
   }
 
   // Serialized and atomic: a crash leaves either the whole previous file or the whole new one.

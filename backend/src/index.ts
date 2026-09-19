@@ -2,6 +2,7 @@ import { createApp } from "./app";
 import { matchesOperatorSecret } from "./auth";
 import { CheckpointStore, checkpointPath } from "./checkpoint";
 import { createServerClock } from "./clock";
+import { CommandLog } from "./commands";
 import { ConnectionRegistry, OperatorTelemetry } from "./connections";
 import { handleClientMessage } from "./messages";
 import { DeviceRegistry } from "./registry";
@@ -14,6 +15,7 @@ const port = Number(process.env.PORT ?? 8080);
 const clock = createServerClock();
 const registry = new DeviceRegistry();
 const state = new SessionState();
+const commands = new CommandLog();
 const store = new CheckpointStore(checkpointPath());
 const joins = new RateLimiter(JOIN_LIMIT.capacity, JOIN_LIMIT.refillPerSecond, clock.nowServerMs);
 const connections = new ConnectionRegistry();
@@ -26,12 +28,13 @@ if (restored) {
   }
   registry.restore(restored);
   for (const device of restored.devices) state.register(device.deviceId);
+  if (restored.show) state.restoreShow(restored.show);
 }
 if (!process.env.OPERATOR_SECRET) {
   console.warn("OPERATOR_SECRET is unset: every operator request will be refused.");
 }
 
-const app = createApp({ clock, registry, store, joins, state, operatorSecret: process.env.OPERATOR_SECRET });
+const app = createApp({ clock, registry, store, joins, state, commands, operatorSecret: process.env.OPERATOR_SECRET });
 
 const server = Bun.serve<SocketData, string>({
   hostname: process.env.HOST ?? "127.0.0.1",

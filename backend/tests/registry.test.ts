@@ -8,6 +8,7 @@ import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
 import { DeviceRegistry, MAX_DEVICES } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
+import { CommandLog } from "../src/commands";
 import { SessionState } from "../src/state";
 
 const SESSION = "session-under-test";
@@ -35,6 +36,7 @@ const harness = (options: { capacity?: number; refillPerSecond?: number } = {}) 
     store,
     joins: new RateLimiter(options.capacity ?? 100, options.refillPerSecond ?? 100, () => serverMs),
     state: new SessionState(),
+    commands: new CommandLog(),
   });
   return { app, registry, store, clock: serverClock };
 };

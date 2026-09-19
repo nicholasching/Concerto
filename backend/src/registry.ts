@@ -52,12 +52,13 @@ export class DeviceRegistry {
     return this.devices.size;
   }
 
-  toCheckpoint(sessionId: string): CheckpointData {
+  toCheckpoint(sessionId: string, show: CheckpointData["show"] = null): CheckpointData {
     return {
-      version: 1,
+      version: 2,
       sessionId,
       nextDeviceId: this.nextDeviceId,
       devices: [...this.devices.values()],
+      show,
     };
   }
 
