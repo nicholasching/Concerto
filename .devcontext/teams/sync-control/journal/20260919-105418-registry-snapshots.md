@@ -133,8 +133,59 @@ join calls were answered by the old build returning `NOT_IMPLEMENTED`. The log m
 Freed the port and reran. Worth remembering: a manual check that talks to a port proves nothing
 unless the process answering it is the one just built.
 
+### Step 2B implemented
+
+- `backend/src/state.ts`: `SessionState` owning readiness, assignments, locations, the revision
+  counter and both snapshot builders. The placeholder show and a stopped transport live here.
+- `backend/src/connections.ts`: `ConnectionRegistry` (one socket per identity, operator set) and
+  `OperatorTelemetry` (coalescing).
+- `backend/src/auth.ts`: constant-time operator secret comparison, injected rather than read from
+  the environment inside a route, so tests do not mutate process state.
+- `backend/src/messages.ts`: `handleClientMessage` moved out of `clock.ts`, which no longer
+  matched its contents, and extended with `device.status`. `clock.ts` now only creates the clock.
+- `GET /api/sessions/:sessionId/snapshot` with role filtering; `/ws` now authenticates at upgrade.
+
+Decisions taken while implementing:
+
+1. **Sockets authenticate at upgrade via a query parameter**, because the frozen `ClientMessage`
+   union has no authentication message and browsers cannot set headers on a WebSocket handshake.
+   A token in a URL can end up in logs, so the server does not log request URLs. Revisit if a
+   proxy in the venue logs query strings.
+2. **A dropped connection resets that device's claimed readiness** rather than leaving the last
+   values in place. A phone that vanished is not still audio-unlocked, and an operator deciding
+   who is ready must not read a stale claim as current.
+3. **`device.status` is answered with that participant's own snapshot**, giving the client its
+   revision without a second round trip. The contract has no generic acknowledgement message.
+4. **Breaking change for slice 1 consumers:** `/ws` now requires a valid resume token, so a client
+   must join over HTTP before probing. Recorded in the handoff.
+
+### Checks run
+
+- `bun test backend/tests` - 37 pass, 0 fail.
+- `bun run gate:sync` - PASS, 67 tests across backend, sync and testkit; backend bundle built.
+- Live end-to-end against the running server with `OPERATOR_SECRET` set: two devices joined (0 and
+  1); a socket with no token was refused; a coded probe pair returned two `clock.reply` messages and
+  one accepted measurement; `device.status` returned a `state.snapshot`; the same socket reporting
+  for the *other* device was refused with `DEVICE_MISMATCH`; the participant view returned only its
+  own state with no device list present; the operator view returned both devices with correct
+  per-device readiness; an anonymous request and a participant token presented as the operator
+  secret both returned 401; a second socket for the same identity closed the first with code 4001.
+
+### Failure encountered
+
+The live check first reported that the replacement socket had not displaced the original. The
+cause was in the check, not the server: it attached the close listener after awaiting the new
+connection, so a prompt close arrived before anything was listening. Attaching the listener first
+showed close code 4001 as designed. Worth keeping in mind for every later reconnect test: an
+event-ordering mistake in a harness looks exactly like a missing server behavior.
+
+### Typecheck note
+
+`Bun.serve`'s second type parameter is the route-path string, not a record. The first attempt
+failed `tsc` with a constraint error, which the gate caught before commit.
+
 ## Next action
 
-Implement step 2B: socket binding to an authenticated device, the concurrent-connection
-replacement rule, `device.status` readiness, role-filtered snapshots over HTTP and
-`state.snapshot`, and aggregated operator telemetry.
+Slice 3: assignments, assets, calibration, transport and mix as prepare/ready/commit barriers with
+revisions, idempotent commands and future execution times. Write its subplot before implementing.
+Slices 2 and 1 are ready for Teams 2 and 4 to consume.

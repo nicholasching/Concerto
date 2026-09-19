@@ -4,6 +4,7 @@ import { createApp } from "../src/app";
 import { CheckpointStore } from "../src/checkpoint";
 import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
+import { SessionState } from "../src/state";
 
 const app = () =>
   createApp({
@@ -11,6 +12,7 @@ const app = () =>
     registry: new DeviceRegistry(),
     store: new CheckpointStore("/dev/null/unused"),
     joins: new RateLimiter(10, 10, () => 1_000_000),
+    state: new SessionState(),
   });
 
 test("health identifies a foundation, not a running concert", async () => {

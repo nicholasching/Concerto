@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { ClientMessage, PROTOCOL_VERSION } from "@orchestra/contracts";
 import { ClockEstimator, PROBE_CONSTANTS } from "@orchestra/sync";
-import { handleClientMessage, type ServerClock } from "../src/clock";
+import type { ServerClock } from "../src/clock";
+import { handleClientMessage } from "../src/messages";
+import { SessionState } from "../src/state";
 
 const SESSION = "session-under-test";
 const SERVER_SKEW_MS = 4_000_000;
@@ -19,6 +21,12 @@ const probeMessage = (data: { probeGroupId: number; probeGroupIndex: 0 | 1; t0: 
     }),
   );
 
+const boundTo = (deviceId: number) => {
+  const state = new SessionState();
+  state.register(deviceId);
+  return { deviceId, state };
+};
+
 // The handler takes the receipt timestamp and the clock as inputs, so a test can place the
 // server anywhere in time without touching the real wall clock.
 const serverAt = (serverMs: number): ServerClock => ({
@@ -33,6 +41,7 @@ describe("clock.probe handling", () => {
       raw: probeMessage({ probeGroupId: 7, probeGroupIndex: 1, t0: 1000 }),
       receivedServerMs: 5000,
       clock: serverAt(5000),
+      ...boundTo(0),
     });
 
     expect(reply.type).toBe("clock.reply");
@@ -48,6 +57,7 @@ describe("clock.probe handling", () => {
       raw: probeMessage({ probeGroupId: 1, probeGroupIndex: 0, t0: 1000, serverEpoch: "epoch-from-previous-run" }),
       receivedServerMs: 5000,
       clock: serverAt(5000),
+      ...boundTo(0),
     });
 
     expect(reply.type).toBe("clock.reply");
@@ -59,6 +69,7 @@ describe("clock.probe handling", () => {
       raw: probeMessage({ probeGroupId: 1, probeGroupIndex: 0, t0: 1000, sessionId: "another-session" }),
       receivedServerMs: 5000,
       clock: serverAt(5000),
+      ...boundTo(0),
     });
 
     expect(reply.type).toBe("error");
@@ -69,7 +80,7 @@ describe("clock.probe handling", () => {
   test("rejects malformed input without throwing", () => {
     const codes = ["not json at all", JSON.stringify({ type: "clock.probe" }), JSON.stringify({ hello: "world" })].map(
       raw => {
-        const reply = handleClientMessage({ raw, receivedServerMs: 5000, clock: serverAt(5000) });
+        const reply = handleClientMessage({ raw, receivedServerMs: 5000, clock: serverAt(5000), ...boundTo(0) });
         if (reply.type !== "error") throw new Error("expected an error");
         return reply.payload.error.code;
       },
@@ -83,15 +94,12 @@ describe("clock.probe handling", () => {
         protocolVersion: PROTOCOL_VERSION,
         sessionId: SESSION,
         serverEpoch: "epoch-a",
-        messageId: "status-1",
-        type: "device.status",
-        payload: {
-          deviceId: 0, connected: true, foreground: true, clockReady: true,
-          clockUncertaintyMs: 4, clockSampleAgeMs: 120, audioUnlocked: false, decodedTrackHashes: {},
-        },
+        messageId: "assets-1",
+        type: "assets.ready",
+        payload: { preparationId: "prep-1", ready: true, reason: null, showRevision: 0, trackHashes: {} },
       }),
     );
-    const reply = handleClientMessage({ raw, receivedServerMs: 5000, clock: serverAt(5000) });
+    const reply = handleClientMessage({ raw, receivedServerMs: 5000, clock: serverAt(5000), ...boundTo(0) });
 
     if (reply.type !== "error") throw new Error("expected an error");
     expect(reply.payload.error).toMatchObject({ code: "NOT_IMPLEMENTED", owner: "sync-control" });
@@ -117,6 +125,7 @@ describe("two independent clients against the real handler", () => {
         raw: probeMessage({ probeGroupId, probeGroupIndex, t0 }),
         receivedServerMs,
         clock: serverAt(receivedServerMs),
+        ...boundTo(0),
       });
       if (reply.type !== "clock.reply") throw new Error("expected a clock.reply");
       this.localMs += RESIDENCE_MS + this.downMs;

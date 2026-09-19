@@ -1,7 +1,36 @@
 # sync-control handoff
 
 Read [stage brief](../../stages/01-sync-control.md), root rules/masterplan and shared schema notes
-before changing code. Slice 1 is implemented; slices 2 through 5 are not.
+before changing code. Slices 1 and 2 are implemented; slices 3 through 5 are not.
+
+## Joining, and the socket credential
+
+**Breaking change since slice 1:** `/ws` now authenticates at upgrade. A client must join over
+HTTP first and open the socket with that token; an unauthenticated socket is refused with 401.
+
+```text
+POST /api/sessions/<sessionId>/join      body {} or { "resumeToken": "..." }
+  -> { sessionId, serverEpoch, deviceId, resumeToken, revision }
+ws://<host>:8080/ws?resumeToken=<token>            participant socket
+ws://<host>:8080/ws?operatorSecret=<secret>        operator socket, receives coalesced snapshots
+GET  /api/sessions/<sessionId>/snapshot
+  header x-resume-token: <token>      -> that device's ParticipantSnapshot
+  header x-operator-secret: <secret>  -> AdminSnapshot
+```
+
+Device IDs start at **0** and 0 is a real device, never a missing value. IDs are never reissued.
+Keep the resume token: it is the only way back to the same identity, and a second join without it
+allocates a new one. A second socket for one identity closes the first with code **4001**; treat
+that code as "opened elsewhere", not as a network error to retry.
+
+`OPERATOR_SECRET` has no default. Unset means every operator request is refused.
+
+Readiness is reported with `device.status` over the bound socket and answered with that device's
+own snapshot. A socket may only report for the device it authenticated as. A disconnect clears
+that device's claimed readiness, so an operator never reads a vanished phone as audio-ready.
+
+The session starts with a **placeholder show**: one channel, no tracks, no clips, `showRevision` 0.
+Team 4's first saved show replaces it wholesale; it is not content to build on.
 
 ## What Teams 2 and 4 can consume now
 
@@ -31,29 +60,29 @@ Rules for consumers:
    delay, not a bound on true error, and it is not audio accuracy.
 5. Do not apply an audio nudge inside `toLocalPerformanceMs`; that belongs to the audio engine.
 
-Server surface: `ws://<host>:8080/ws` accepts `clock.probe` and replies with `clock.reply`.
-Any other client message returns a structured `error` with `code: "NOT_IMPLEMENTED"` and
-`owner: "sync-control"`. A restart mints a new `serverEpoch`.
+Server surface: `/ws` accepts `clock.probe` and `device.status`. Any other client message returns
+a structured `error` with `code: "NOT_IMPLEMENTED"` and `owner: "sync-control"`. A restart mints a
+new `serverEpoch` and restores identities from the checkpoint.
 
 ## How to run this independently
 
 ```bash
-bun run dev:sync-demo   # backend on 8080, /ws serving clock probes
-bun run gate:sync       # contracts, fixtures, boundaries, typecheck, lint, 54 tests, backend build
+bun run dev:sync-demo   # backend on 8080; set OPERATOR_SECRET for the admin snapshot
+bun run gate:sync       # contracts, fixtures, boundaries, typecheck, lint, 67 tests, backend build
 ```
 
 On a machine without Bun on PATH, install the pinned 1.3.14 from `mise.toml` first.
 
 ## Pending and blockers
 
-Pending: identity registry and authenticated resume, role-filtered snapshots, subscriptions,
-prepare/ready/commit barriers, uploads and jobs, map commit, checkpoint recovery, panic and audio
-lease, and the socket load harness. Team 3 supplies the worker boundary for slice 4.
+Pending: subscriptions by channel, prepare/ready/commit barriers, scheduled transport, mix and
+assignment, uploads and jobs, map commit, panic and audio lease, and the socket load harness.
+Team 3 supplies the worker boundary for slice 4.
 
-No unresolved software dependency blocks slice 2. Two coordination items for the captain:
+No unresolved software dependency blocks slice 3. Two coordination items for the captain:
 `tools/load/` is not a workspace package and cannot resolve `@orchestra/sync`, so slice 5 will need
-a manifest there and a root lockfile update; and slice 2 will define the join and resume HTTP
-surface against the frozen contract, which Teams 2 and 4 should review before it is merged.
+a manifest there and a root lockfile update; and `backend/` imports `zod` without declaring it in
+its manifest, which currently resolves through the root but should be declared.
 
 Not proven: no phones, no audio, no venue network, no load. The deterministic 10 ms p95 clock
 target in masterplan section 8 has not been measured. Passing the gate is not feature completion.
