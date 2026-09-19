@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Show } from "@orchestra/contracts";
 import { FakeClock } from "@orchestra/testkit";
 import showFixture from "../../../fixtures/show.json";
-import { AssetError, AudioContextHost, DecodedBudget, decodedBytes, loadTrack, preloadTracks, scheduleClick, serverMsToAudioTime } from "../src";
+import { AssetError, AudioContextHost, DecodedBudget, decodedBytes, loadTrack, preloadTracks, scheduleClick, serverMsToAudioTime, setPlaybackAudioSession } from "../src";
 import { asAudioContext, FakeAudioContext } from "./fake-audio";
 
 const show = Show.parse(showFixture);
@@ -185,5 +185,18 @@ describe("preload", () => {
     expect(failures[0].trackId).toBe(broken.trackId);
     await preloadTracks([track], options, cache);
     expect(fetches).toBe(2);
+  });
+});
+
+describe("iOS audio session", () => {
+  test("switches the session to playback when the API exists", () => {
+    const nav = { audioSession: { type: "auto" } };
+    expect(setPlaybackAudioSession(nav)).toBe(true);
+    expect(nav.audioSession.type).toBe("playback");
+  });
+
+  test("does nothing where the API is missing", () => {
+    expect(setPlaybackAudioSession({})).toBe(false);
+    expect(setPlaybackAudioSession(undefined)).toBe(false);
   });
 });

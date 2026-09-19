@@ -43,6 +43,7 @@ export class AudioContextHost {
 
   /** Call from a user gesture handler. Resolves only once the context is running. */
   async unlock(): Promise<void> {
+    setPlaybackAudioSession();
     const ctx = this.context();
     if (isAudioContextPaused(ctx.state)) await ctx.resume();
     if (ctx.state !== "running") throw new Error(`AudioContext is ${ctx.state} after unlock`);
@@ -74,4 +75,13 @@ export class AudioContextHost {
       document.addEventListener("visibilitychange", this.visibilityListener);
     }
   }
+}
+
+// iOS 16.4+: the "playback" session lets Web Audio play with the ring/silent switch on silent.
+// Adapted from BeatSync apps/client/src/store/global.tsx (MIT).
+export function setPlaybackAudioSession(nav: unknown = typeof navigator === "undefined" ? undefined : navigator): boolean {
+  const session = (nav as { audioSession?: { type: string } } | undefined)?.audioSession;
+  if (!session) return false;
+  session.type = "playback";
+  return true;
 }

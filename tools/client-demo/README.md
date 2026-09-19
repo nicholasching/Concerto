@@ -23,6 +23,10 @@
 | `POST /__mock__/assets` | `assets.prepare` with the current show |
 | `GET /__mock__/playback` | Transport, assignments, pending actions, ready replies, lease state |
 
+## Testing on a phone
+
+`bun tools/client-demo/phone.ts` (needs `brew install cloudflared`) starts the mock and the page behind two temporary HTTPS tunnels and prints the link to open on the phone. HTTPS is required: over plain `http://<laptop-ip>` the browser disables `crypto.subtle` (the hash check) and the wake lock. Links change every run. Stop `dev:client-demo` first, since both use ports 3000 and 18081. Run the mock controls on the laptop against `localhost:18081`.
+
 In zsh, quote URLs that contain `?`, for example `curl -X POST 'localhost:18081/__mock__/panic'`.
 
 The join/socket behavior is a proposal for Team 1, listed in `.devcontext/teams/audio-client/handoff.md`. The real-HTTP/WebSocket test is `client-frontend/tests/mock-server.test.ts`.
