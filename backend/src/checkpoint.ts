@@ -24,6 +24,8 @@ export const checkpointPath = () => process.env.CHECKPOINT_PATH ?? "runtime/chec
 
 export class CheckpointStore {
   private queue: Promise<unknown> = Promise.resolve();
+  private latest: CheckpointData | null = null;
+  private batch: { promise: Promise<void>; resolve: () => void; reject: (cause: unknown) => void } | null = null;
 
   constructor(private readonly path: string) {}
 
@@ -47,11 +49,39 @@ export class CheckpointStore {
     }
   }
 
-  // Serialized and atomic: a crash leaves either the whole previous file or the whole new one.
+  /**
+   * Serialized, atomic and coalesced. A join wave asks for a save per device, and writing the whole
+   * registry once per join is quadratic: 1,500 joins rewrote a growing file 1,500 times and stalled
+   * the event loop. Callers arriving while a write is merely queued share that write.
+   *
+   * The batch closes before the write begins, so a save recorded during a write waits for the next
+   * one. A caller is never told its data is durable because someone else's write finished.
+   */
   save(data: CheckpointData): Promise<void> {
-    const next = this.queue.catch(() => {}).then(() => this.write(data));
-    this.queue = next.catch(() => {});
-    return next;
+    this.latest = data;
+    if (this.batch) return this.batch.promise;
+
+    let resolve!: () => void;
+    let reject!: (cause: unknown) => void;
+    const promise = new Promise<void>((resolveFn, rejectFn) => {
+      resolve = resolveFn;
+      reject = rejectFn;
+    });
+    this.batch = { promise, resolve, reject };
+
+    this.queue = this.queue.catch(() => {}).then(async () => {
+      const batch = this.batch;
+      const payload = this.latest;
+      this.batch = null;
+      if (!batch || !payload) return;
+      try {
+        await this.write(payload);
+        batch.resolve();
+      } catch (cause) {
+        batch.reject(cause);
+      }
+    });
+    return promise;
   }
 
   private async write(data: CheckpointData): Promise<void> {

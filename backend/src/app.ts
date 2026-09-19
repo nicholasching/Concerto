@@ -6,7 +6,7 @@ import { z } from "zod";
 import {
   ApiError, AssignmentRequest, CalibrationArmRequest, CalibrationCreateRequest, CalibrationManifest, CalibrationRun,
   CommandAccepted, CommitMapRequest, CreateJobRequest, JobProgress, JoinRequest, JoinResponse, MixRequest,
-  PROTOCOL_VERSION,
+  PanicRequest, PROTOCOL_VERSION,
   SaveShowRequest, Track, TransportRequest,
 } from "@orchestra/contracts";
 import type { AssetStore } from "./assets";
@@ -15,6 +15,8 @@ import { Barrier } from "./barriers";
 import { MAX_CAMERAS, type CalibrationRuns } from "./calibration";
 import { identityMismatch } from "./jobs";
 import type { JobRunner } from "./jobs";
+import type { AudioLease } from "./lease";
+import type { LoopLagSampler } from "./loop-lag";
 import type { ServerClock } from "./clock";
 import type { CheckpointStore } from "./checkpoint";
 import type { CommandLog } from "./commands";
@@ -72,6 +74,8 @@ export interface AppDeps {
   uploads: AssetStore;
   calibrations: CalibrationRuns;
   jobs: JobRunner;
+  lease: AudioLease;
+  loopLag?: LoopLagSampler;
   jobWorkspace: string;
   operatorSecret?: string;
   leadTimeMs?: number;
@@ -128,14 +132,25 @@ export function createApp(deps: AppDeps) {
       deps.state.lastCommittedRunTag,
     ));
   app.use("/api/*", cors({ origin: ["http://localhost:3000", "http://localhost:3001"] }));
-  app.get("/api/health", c => c.json({ service: "audience-orchestra-control", protocolVersion: 1, implementation: "foundation" }));
+  app.get("/api/health", c => c.json({
+    service: "audience-orchestra-control", protocolVersion: 1, implementation: "sync-control",
+  }));
   app.get("/api/foundation", c => c.json({
-    status: "in progress", owner: "sync-control",
+    status: "software-complete", owner: "sync-control",
     implemented: [
       "health", "foundation-info", "clock-websocket", "join-resume", "role-filtered-snapshots",
-      "show-save", "prepared-transport-cues", "assignments", "mix",
+      "show-save", "prepared-transport-cues", "assignments", "mix", "assets", "calibration-runs",
+      "camera-uploads", "otc-jobs", "map-commit", "panic", "audio-lease",
     ],
-    next: ["uploads and jobs", "worker adapter", "map commit", "panic and audio lease", "load harness"],
+    next: ["consumer integration", "physical phone, audio and venue tests"],
+    // Diagnostics, not a contract surface: the load harness reads this to report whether the
+    // control process stayed responsive.
+    diagnostics: {
+      devices: deps.registry.size,
+      connectedDevices: deps.state.connectedDeviceIds().length,
+      revision: deps.state.revision,
+      eventLoopLagMs: deps.loopLag?.summary() ?? null,
+    },
   }));
 
   app.post("/api/sessions/:sessionId/join", async c => {
@@ -286,6 +301,8 @@ export function createApp(deps: AppDeps) {
       effectiveServerMs: request.effectiveServerMs,
     });
 
+    // A deliberate transport command is how an operator comes back from a panic.
+    deps.lease.resume();
     const superseded = deps.state.scheduleTransport({
       domain: "transport", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
       supersedesCommandId: null, transport,
@@ -658,6 +675,45 @@ export function createApp(deps: AppDeps) {
     return c.json(ack);
   });
 
+  /**
+   * Immediate by design. Everything else in this server lands at a common future moment because
+   * synchrony matters; this lands now because silence matters more. It is also refused for as few
+   * reasons as possible: an operator reaching for panic must never be told to reload first, so a
+   * stale revision or a stale epoch does not block it.
+   */
+  app.post("/api/panic", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Panic requires the operator secret."), 401);
+    }
+    const body = PanicRequest.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(apiError("INVALID_REQUEST", "Panic request did not match the protocol v1 schema."), 400);
+    if (body.data.sessionId !== deps.clock.sessionId) {
+      return c.json(apiError("WRONG_SESSION", "This server is not serving that concert session."), 404);
+    }
+
+    const replayed = deps.commands.get<unknown>(body.data.commandId);
+    if (replayed) return c.json(replayed);
+
+    const now = deps.clock.nowServerMs();
+    deps.state.panic();
+    deps.lease.suspend(now);
+    deps.preparations.clear("transport");
+
+    const recipients = deps.state.connectedDeviceIds();
+    deps.connections.sendToParticipants(recipients, JSON.stringify({
+      ...envelope(deps.clock), type: "panic", revision: deps.state.revision,
+      payload: { commandId: body.data.commandId },
+    }));
+    // Belt and braces: a phone that misses the broadcast still loses permission to make sound.
+    deps.connections.sendToParticipants(recipients, JSON.stringify({
+      ...envelope(deps.clock), type: "lease.renew", payload: { expiresServerMs: now },
+    }));
+
+    const ack = accepted(deps.clock, body.data.commandId, deps.state.transport.transportRevision);
+    deps.commands.remember(body.data.commandId, ack);
+    return c.json(ack);
+  });
+
   app.post("/api/assignments", async c => {
     if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
       return c.json(apiError("UNAUTHORIZED", "Assigning devices requires the operator secret."), 401);
@@ -701,18 +757,18 @@ export function createApp(deps: AppDeps) {
       commandId: request.commandId, effectiveServerMs: request.effectiveServerMs, assignments,
     });
 
-    // Each phone is told about its own assignment only.
-    for (const assignment of assignments) {
-      deps.connections.sendToParticipants([assignment.deviceId], JSON.stringify({
-        ...envelope(deps.clock), type: "assignment.commit", revision: deps.state.revision,
-        effectiveServerMs: request.effectiveServerMs,
-        payload: {
-          domain: "assignment", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
-          supersedesCommandId: deps.state.pendingAssignmentFor(assignment.deviceId)?.supersedesCommandId ?? null,
-          assignments: [assignment],
-        },
-      }));
-    }
+    // Each phone is told about its own assignment only, in chunks so a thousand-device selection
+    // does not block the server while it serializes a thousand payloads.
+    const byDevice = new Map(assignments.map(assignment => [assignment.deviceId, assignment]));
+    void deps.connections.sendEachToParticipants(request.deviceIds, deviceId => JSON.stringify({
+      ...envelope(deps.clock), type: "assignment.commit", revision: deps.state.revision,
+      effectiveServerMs: request.effectiveServerMs,
+      payload: {
+        domain: "assignment", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
+        supersedesCommandId: deps.state.pendingAssignmentFor(deviceId)?.supersedesCommandId ?? null,
+        assignments: [byDevice.get(deviceId)],
+      },
+    }));
 
     const ack = accepted(deps.clock, request.commandId, assignmentRevision);
     deps.commands.remember(request.commandId, ack);
@@ -760,7 +816,7 @@ export function createApp(deps: AppDeps) {
   });
 
   app.all("/api/*", c => c.json(apiError(
-    "NOT_IMPLEMENTED", "Team 1 owns this endpoint; it is not implemented in this slice.",
+    "NOT_IMPLEMENTED", "That API route is not implemented by the sync-control service.",
   ), 501));
   return app;
 }

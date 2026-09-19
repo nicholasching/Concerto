@@ -1,154 +1,154 @@
 # sync-control handoff
 
-Read [stage brief](../../stages/01-sync-control.md), root rules/masterplan and shared schema notes
-before changing code. Slices 1 and 2 are implemented; slices 3 through 5 are not.
+Status: all five Team 1 software slices implemented on `feat/sync-control`; integration and
+physical acceptance remain. Read the [stage brief](../../stages/01-sync-control.md), root
+rules/masterplan and the linked ADRs before changing behavior.
 
-## Joining, and the socket credential
-
-**Breaking change since slice 1:** `/ws` now authenticates at upgrade. A client must join over
-HTTP first and open the socket with that token; an unauthenticated socket is refused with 401.
+## Join, resume and socket identity
 
 ```text
 POST /api/sessions/<sessionId>/join      body {} or { "resumeToken": "..." }
-  -> { sessionId, serverEpoch, deviceId, resumeToken, revision }
-ws://<host>:8080/ws?resumeToken=<token>            participant socket
-ws://<host>:8080/ws?operatorSecret=<secret>        operator socket, receives coalesced snapshots
-GET  /api/sessions/<sessionId>/snapshot
-  header x-resume-token: <token>      -> that device's ParticipantSnapshot
-  header x-operator-secret: <secret>  -> AdminSnapshot
+ws://<host>:8080/ws?resumeToken=<token>  participant socket
+ws://<host>:8080/ws?operatorSecret=<secret> operator socket
+GET /api/sessions/<sessionId>/snapshot
 ```
 
-Device IDs start at **0** and 0 is a real device, never a missing value. IDs are never reissued.
-Keep the resume token: it is the only way back to the same identity, and a second join without it
-allocates a new one. A second socket for one identity closes the first with code **4001**; treat
-that code as "opened elsewhere", not as a network error to retry.
+Device IDs start at **0**, are never recycled in a session and stop at 2048. Resume credentials
+are stored as hashes. A second authenticated socket for one identity closes the first with code
+4001. Participant snapshots contain only that device; operator snapshots require
+`x-operator-secret`. `OPERATOR_SECRET` has no default: unset refuses every operator request.
 
-`OPERATOR_SECRET` has no default. Unset means every operator request is refused.
+The checkpoint is atomic and carries identities, the show and the committed audience map. A
+restart restores those durable values, mints a new `serverEpoch`, clears pending actions and starts
+stopped. A corrupt or older checkpoint fails loudly instead of reissuing live identities.
 
-Readiness is reported with `device.status` over the bound socket and answered with that device's
-own snapshot. A socket may only report for the device it authenticated as. A disconnect clears
-that device's claimed readiness, so an operator never reads a vanished phone as audio-ready.
+## Clock consumer surface
 
-The session starts with a **placeholder show**: one channel, no tracks, no clips, `showRevision` 0.
-Team 4's first saved show replaces it wholesale; it is not content to build on.
-
-## Commands and cues
-
-```text
-PUT  /api/show        header x-operator-secret   stopped transport only
-POST /api/transport   header x-operator-secret   action prepare | play | pause | seek | stop
-```
-
-Every command carries `commandId`, `expectedRevision` and the current `serverEpoch`.
-
-1. **`expectedRevision` is the revision of the domain you are changing**, not the snapshot's
-   top-level `revision`. A show save names the current `showRevision`; a transport command names
-   the current `transportRevision`. The top-level revision moves every time any phone reports its
-   status, so comparing against it would refuse every command in a full hall. See the
-   [ADR](../../decisions/20260919-112032-sync-control-expected-revision.md).
-2. **Saving a show advances the transport revision.** Re-read the snapshot after a save instead of
-   reusing the revision you had.
-3. **Retry with the same `commandId`** and you get the original result, applied once. Use a new ID
-   only when you mean a new command.
-4. **A command from a previous epoch is refused** with a retryable `STALE_EPOCH`. Resynchronize and
-   reissue rather than retrying blindly.
-5. **Cues must be at least 3000 ms in the future** (configurable, `INSUFFICIENT_LEAD_TIME` below
-   that). Schedule against `effectiveServerMs` using the estimator's clock, never against arrival.
-
-Starting playback requires a preparation: send `prepare`, let phones answer `transport.ready`
-naming that exact `preparationId` with matching show and transport revisions, then send `play`.
-Only phones that acknowledged receive the start cue. Stop, pause and seek need no preparation, so a
-silent phone can never delay a stop. The server never fires on a timeout; the operator decides when,
-and the ready subset is what runs.
-
-A phone that missed a broadcast is not stranded: the same cue is in `pendingActions` in its
-snapshot, with the same `effectiveServerMs`.
-
-## Assignments and mix
-
-```text
-POST /api/assignments   header x-operator-secret   deviceIds + channelId + mapRevision
-POST /api/mix           header x-operator-secret   masterGain + channels
-```
-
-Both are scheduled under the same lead-time rule as transport, and both are revision-checked
-against their own domain: `expectedRevision` is the current assignment revision or mix revision.
-
-A phone joins a channel only by being assigned to it; membership is server-owned and a phone cannot
-subscribe by asking. Each phone is told about its own assignment and nothing else. Unassigning is
-explicit (`channelId: null`), and an unassigned device stays silent rather than defaulting to a
-channel. Reassigning a device cancels only that device's pending change: other devices in an
-earlier command stay scheduled. Last committed assignment wins for overlapping selections.
-
-A mix change lands on channel gain, mute and solo without touching clip timing, and never cancels
-an accepted transport cue: the domains are independent.
-
-`mapRevision` is 0 until Team 3 commits a real map. The stale-map check is live now, so selections
-built against an old map will start being refused as soon as map commits exist.
-
-## Two open contract gaps for the captain and Team 4
-
-Both concern what the operator can see, and neither blocks the server.
-
-1. **Preparation counts have nowhere to go.** The server tracks ready, expected and excluded per
-   preparation, but `AdminSnapshot` has no field for it, so the console cannot show "1,420 ready,
-   80 not answering" — the number the operator needs before firing a cue.
-   [ADR](../../decisions/20260919-114500-sync-control-preparation-counts.md).
-2. **Effective master gain has nowhere to go.** `MixRequest` and the mix pending action carry it,
-   but once applied there is no field in the snapshot. Channel gains are fine; they live on
-   `Show.channels`. A phone that reconnects after a mix change cannot recover the master gain.
-
-## What Teams 2 and 4 can consume now
-
-`@orchestra/sync` exports `ClockEstimator`, which implements the existing `SynchronizedClock`
-interface. Do not write a second estimator.
+`@orchestra/sync` exports `ClockEstimator`, `PROBE_CONSTANTS` and `epochNow`. The estimator is
+per-client and transport/React/audio independent.
 
 ```ts
-const estimator = new ClockEstimator();              // inject { now } in tests
-const groupId = estimator.beginProbeGroup();         // send clock.probe index 0, then index 1
-                                                     // PROBE_CONSTANTS.PROBE_GAP_MS apart
-estimator.accept({ serverEpoch, ...reply.payload }); // returns the accepted measurement or null
-estimator.nowServerMs();                             // server time; offset is 0 until ready
-estimator.quality();                                 // { ready, uncertaintyMs, sampleAgeMs }
-estimator.waitTimeMs(effectiveServerMs);             // never negative
-estimator.nextProbeDelayMs();                        // add your own jitter; you own the timer
+const estimator = new ClockEstimator();
+const probeGroupId = estimator.beginProbeGroup();
+// Send clock.probe indexes 0 and 1 PROBE_CONSTANTS.PROBE_GAP_MS apart.
+estimator.accept({ serverEpoch, ...reply.payload });
+estimator.nowServerMs();
+estimator.toLocalPerformanceMs(serverMs);
+estimator.quality();
+estimator.waitTimeMs(effectiveServerMs);
 ```
 
-Rules for consumers:
+Stamp `t0` when sending. Passing every reply's `serverEpoch` to `accept()` is what discards samples
+from a previous server run. `quality().ready` requires 16 measurements, uncertainty at or below
+20 ms and a sample no older than 3750 ms. Uncertainty is half the best observed round trip under
+the symmetric-delay assumption; it is not proof of acoustic accuracy. Do not put an audio nudge
+inside the clock conversion.
 
-1. Stamp `t0` at the moment of sending, not when the message was built.
-2. `clock.reply.serverEpoch` is authoritative. Passing it to `accept()` is what makes the estimator
-   discard measurements from a previous server run; a probe carrying a stale epoch is answered
-   rather than rejected, so this is the only recovery path.
-3. `quality().ready` requires 16 measurements, uncertainty at or below 20 ms, and a sample no older
-   than 3750 ms. It degrades on its own, so re-read it rather than caching a synced flag.
-4. `uncertaintyMs` is half the best observed round trip. It is a quality signal under symmetric
-   delay, not a bound on true error, and it is not audio accuracy.
-5. Do not apply an audio nudge inside `toLocalPerformanceMs`; that belongs to the audio engine.
+## Commands, cues, assignments and mix
 
-Server surface: `/ws` accepts `clock.probe` and `device.status`. Any other client message returns
-a structured `error` with `code: "NOT_IMPLEMENTED"` and `owner: "sync-control"`. A restart mints a
-new `serverEpoch` and restores identities from the checkpoint.
+```text
+PUT  /api/show
+POST /api/transport       prepare | play | pause | seek | stop
+POST /api/assignments
+POST /api/mix
+POST /api/panic
+```
 
-## How to run this independently
+All operator routes require `x-operator-secret`. Mutation retries reuse the same `commandId` and
+return the original result once. Except for panic, stale epochs and stale domain revisions are
+refused. `expectedRevision` means the revision of the domain being changed, not the snapshot's
+top-level telemetry revision; see the
+[ADR](../../decisions/20260919-112032-sync-control-expected-revision.md).
+
+Normal changes need at least 3000 ms lead time. Play requires a transport preparation, and
+`transport.ready` must name that exact preparation, show revision and transport revision. The
+operator decides when to run the ready subset; the server never fires on a timeout. Stop, pause and
+seek do not wait on a silent phone. A missed broadcast is recoverable from the identical pending
+action in a fresh snapshot.
+
+Membership is server-owned. A phone changes channel only through its authorized assignment and
+receives only its own assignment. Pending assignments are tracked per device; replacing one does
+not cancel the rest of an earlier selection. Transport, mix and assignments are independent
+pending domains.
+
+## Assets, calibration, jobs and map commit
+
+```text
+POST /api/assets
+GET  /api/assets/<trackId>
+POST /api/calibrations
+POST /api/calibrations/<runId>/arm
+POST /api/calibrations/<runId>/uploads
+POST /api/calibrations/<runId>/jobs
+GET  /api/jobs/<jobId>
+DELETE /api/jobs/<jobId>
+POST /api/calibrations/<runId>/commit-map
+DELETE /api/calibrations/<runId>
+```
+
+Uploads stream to temporary files, hash the bytes that arrived and rename only after completion.
+Client labels never become paths. Calibration freezes the connected participant set and allocates
+a run tag that is never reused in the session. At most three camera recordings are accepted, one
+per camera.
+
+The OTC worker is spawned with an argument array, never a shell command. Jobs are serialized,
+bounded by a timeout and cancellable. A result must match the manifest's session, run, run tag and
+every camera hash before it is stored, and identity is checked again at commit. Team 3 replaces
+the synthetic load fixture by setting `OTC_COMMAND` to the real CLI.
+
+Map commit replaces only the targeted devices. A targeted phone the decoder could not locate is
+`unseen`, never `(0,0)`; devices outside the run keep their old locations. Older runs and stale
+`expectedMapRevision` values are refused. Committing a map intentionally makes earlier selections
+stale. `DELETE /api/calibrations/<runId>` frees an uncommitted failed run; a committed run cannot be
+discarded while its map is in use.
+
+## Panic and the audio lease
+
+Panic is immediate: no lead time, no preparation, and no revision/epoch reload requirement. It
+cancels every pending action, stops transport, broadcasts `panic` and sends an already-expired
+lease. Only a wrong session or missing operator secret can block it.
+
+**Team 2 must enforce the lease.** The server sends `lease.renew` every second with an expiry five
+seconds ahead. A phone compares it against its synchronized clock and mutes itself once it passes,
+without waiting for JavaScript control or another network message. This is what silences a phone
+that cannot receive panic because its network disappeared. A deliberate new transport command
+resumes lease issuance after panic.
+
+## Verification
 
 ```bash
-bun run dev:sync-demo   # backend on 8080; set OPERATOR_SECRET for the admin snapshot
-bun run gate:sync       # contracts, fixtures, boundaries, typecheck, lint, 67 tests, backend build
+bun run gate:sync
+bun test tools/load/tests
+
+# Backend terminal for the repeatable synthetic contention run:
+OPERATOR_SECRET=<secret> \
+  OTC_COMMAND="bun tools/load/worker-fixture.ts" \
+  bun run backend/src/index.ts
+
+# Load terminal:
+OPERATOR_SECRET=<secret> \
+  bun run tools/load/index.ts --clients 1500 --duration 300
 ```
 
-On a machine without Bun on PATH, install the pinned 1.3.14 from `mise.toml` first.
+The focused gate currently passes 185 tests; the load metrics add 7 tests. The five-minute load
+report is [load-1500.md](../../evidence/sync-control/load-1500.md). The worker fixture is explicitly
+synthetic and CPU-active: it tests process contention and boundary validation, not optical
+decoding.
 
-## Pending and blockers
+## Captain actions and known limits
 
-Pending: subscriptions by channel, prepare/ready/commit barriers, scheduled transport, mix and
-assignment, uploads and jobs, map commit, panic and audio lease, and the socket load harness.
-Team 3 supplies the worker boundary for slice 4.
+1. `tools/load/` is not a workspace package, so it imports `packages/sync` relatively. The captain
+   should add the workspace/root `test:load` script and lockfile change, then include
+   `tools/load/tests` in `gate:sync`.
+2. `backend/` uses `zod` directly but does not declare it in its manifest; fix this in the
+   captain-owned lock/config change.
+3. Preparation ready/expected/excluded counts have no field in `AdminSnapshot`; see the
+   [ADR](../../decisions/20260919-114500-sync-control-preparation-counts.md). Effective master gain
+   and upload receipts also lack durable/shared contract fields. Team 4 cannot render those
+   honestly until the contracts owner resolves them.
+4. Team 3 still has to supply and verify the real OTC CLI. The load fixture is not a decoder.
 
-No unresolved software dependency blocks slice 3. Two coordination items for the captain:
-`tools/load/` is not a workspace package and cannot resolve `@orchestra/sync`, so slice 5 will need
-a manifest there and a root lockfile update; and `backend/` imports `zod` without declaring it in
-its manifest, which currently resolves through the root but should be declared.
-
-Not proven: no phones, no audio, no venue network, no load. The deterministic 10 ms p95 clock
-target in masterplan section 8 has not been measured. Passing the gate is not feature completion.
+Not proven by this branch: phone audio, browser scheduling, physical clock/acoustic accuracy,
+camera visibility, the real decoder, venue Wi-Fi/HTTPS/WSS reachability or hardware panic/lease
+behavior. Loopback sockets are server-capacity evidence only. Do not present them as a phone or
+venue rehearsal.

@@ -7,6 +7,7 @@ import { createApp } from "../src/app";
 import { AssetStore } from "../src/assets";
 import { CalibrationRuns } from "../src/calibration";
 import { JobRunner } from "../src/jobs";
+import { AudioLease } from "../src/lease";
 import { matchesOperatorSecret } from "../src/auth";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
@@ -44,6 +45,7 @@ const harness = () => {
     uploads: new AssetStore(joinPath(directory, "uploads")),
     calibrations: new CalibrationRuns(),
     jobs: new JobRunner(),
+    lease: new AudioLease(),
     jobWorkspace: joinPath(directory, "jobs"),
     store: new CheckpointStore(joinPath(directory, "checkpoint.json")),
     joins: new RateLimiter(100, 100, () => serverMs),

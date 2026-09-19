@@ -4,6 +4,7 @@ import { createApp } from "../src/app";
 import { AssetStore } from "../src/assets";
 import { CalibrationRuns } from "../src/calibration";
 import { JobRunner } from "../src/jobs";
+import { AudioLease } from "../src/lease";
 import { CheckpointStore } from "../src/checkpoint";
 import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
@@ -26,16 +27,19 @@ const app = () =>
     uploads: new AssetStore("/tmp/orchestra-unused-uploads"),
     calibrations: new CalibrationRuns(),
     jobs: new JobRunner(),
+    lease: new AudioLease(),
     jobWorkspace: "/tmp/orchestra-unused-jobs",
   });
 
-test("health identifies a foundation, not a running concert", async () => {
+test("health identifies the sync-control implementation", async () => {
   const response = await app().request("/api/health");
   expect(response.status).toBe(200);
-  expect((await response.json()).implementation).toBe("foundation");
+  expect((await response.json()).implementation).toBe("sync-control");
 });
-test("unfinished mutation routes fail explicitly", async () => {
-  const response = await app().request("/api/panic", { method: "POST", body: "{}" });
+// Every route the masterplan named is implemented now, so this covers the catch-all itself: an
+// unknown API path must fail as a structured protocol error, not as an HTML 404.
+test("an unknown API route fails explicitly", async () => {
+  const response = await app().request("/api/not-a-real-endpoint", { method: "POST", body: "{}" });
   expect(response.status).toBe(501);
   expect(ApiError.parse(await response.json()).error.code).toBe("NOT_IMPLEMENTED");
 });

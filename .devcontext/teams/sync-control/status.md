@@ -1,40 +1,59 @@
 # sync-control checkpoint
 
-Status: in progress. Slices 1 through 4 of 5 implemented.
-Owner: Team 1, Hansen Cheng.
-Branch: feat/sync-control. Base: foundation-v1 = `ab59c27105627977ee52dc2bcd4276b4532b9e2a`.
+Status: all five software slices implemented; cross-team integration and physical acceptance
+pending. Owner: Team 1, Hansen Cheng.
+Branch: `feat/sync-control`. Base: `foundation-v1` =
+`ab59c27105627977ee52dc2bcd4276b4532b9e2a`. Nothing from this branch has been pushed by this
+agent.
 
-- Owned files: backend/, packages/sync/, tools/load/
-- Implemented:
-  - Per-session `ClockEstimator` with injected clock, coded probe pairing, min-RTT selection,
-    epoch invalidation, sample age and quality.
-  - `/ws` authenticated at upgrade, answering `clock.probe` and `device.status`; one socket per
-    identity, with a replaced socket closed on code 4001.
-  - Device registry: IDs from 0, never recycled, capacity 2048, hashed resume tokens, atomic
-    checkpoint written before a new identity is acknowledged, restore on restart under a new epoch.
-  - Role-filtered snapshots over HTTP; operator access behind a shared secret with no default.
-  - Global join rate limiting and coalesced operator telemetry.
-  - Revision-checked idempotent operator commands; show save with durable persistence.
-  - Preparation barriers and scheduled transport cues with a minimum lead time; the operator, not a
-    timeout, decides when a cue fires, and the ready subset is what runs.
-  - Scheduled assignments with server-owned channel membership, and scheduled mix.
-  - Streamed audio and camera uploads hashed on the way to disk; calibration runs, arming and
-    discard; the OTC worker across a process boundary with queueing, timeout and cancellation;
-    map commit with identity and staleness checks, persisted across restart.
-- Still assigned: panic and the audio lease; the socket load harness.
-- Independent command: `bun run dev:sync-demo`. Gate: `bun run gate:sync` - passing, 168 tests.
-- Evidence: [clock journal](journal/20260919-102847-clock-estimator.md),
-  [registry journal](journal/20260919-105418-registry-snapshots.md),
-  [commands journal](journal/20260919-112032-scheduled-commands.md),
-  [uploads journal](journal/20260919-115710-uploads-jobs-map.md).
-- Open contract decisions: [expectedRevision semantics](../../decisions/20260919-112032-sync-control-expected-revision.md)
-  and [preparation counts](../../decisions/20260919-114500-sync-control-preparation-counts.md),
-  both proposed and awaiting the captain and Team 4.
-- Physical evidence outstanding: two-device BeatSync source baseline, venue QR/HTTP/WSS
-  reachability, real phone connection readiness, load. No hardware check has passed. Capacity is
-  proven by allocation, not by 2,048 live sockets.
-- Next action: write the slice 5 subplot (panic, audio lease, 1,500-socket load harness).
-- Captain coordination needed: `tools/load/` is not a workspace package and cannot resolve
-  `@orchestra/sync`; `zod` is used by `backend/` but not declared in its manifest.
+## Implemented
 
-Update this checkpoint at each handoff. Append experiment history in agent-owned journals.
+- Per-client coded-probe/minimum-RTT clock estimator with epoch invalidation, sample age and
+  quality; fast WebSocket timestamp replies.
+- Device IDs 0–2047, authenticated resume, one socket per identity, capacity refusal, atomic
+  checkpoint and role-filtered snapshots.
+- Revision-checked/idempotent show, transport, assignment and mix commands; preparation barriers,
+  ready-subset delivery, pending snapshot recovery and future effective times.
+- Streamed/hash-verified assets and camera recordings; calibration run/arm/discard; serialized,
+  cancellable OTC process jobs; result identity checks; durable map commit and stale-map refusal.
+- Immediate panic and a one-second-renewed/five-second audio lease.
+- Real loopback load harness with the production estimator, join retries, snapshot recovery,
+  reconnects, asset/camera uploads, CPU-active worker contention, a 1,000-device reassignment,
+  in-process event-loop sampling and an evidence report.
+
+## Verification
+
+- `bun run gate:sync` — PASS: 185 sync-focused tests plus contracts/fixtures/boundaries,
+  typecheck, lint and backend build.
+- `bun test tools/load/tests` — PASS: 7 load-metric tests. Captain still needs to add this
+  directory to the focused gate.
+- Five-minute 1,500-client loopback evidence:
+  [load-1500.md](../../evidence/sync-control/load-1500.md). The authoritative report is the run
+  that names worker stage at cue time and verifies committed reassignment state.
+- Detailed history:
+  [clock](journal/20260919-102847-clock-estimator.md),
+  [registry](journal/20260919-105418-registry-snapshots.md),
+  [commands](journal/20260919-112032-scheduled-commands.md),
+  [uploads/jobs/map](journal/20260919-115710-uploads-jobs-map.md),
+  [panic/lease/load](journal/20260919-122123-panic-lease-load.md).
+
+## Coordination still required
+
+- Captain: add `tools/load/` workspace/root `test:load`/gate wiring and declare backend's direct
+  `zod` dependency; these touch captain-owned root files and the lockfile.
+- Contracts/Team 4: resolve proposed
+  [expectedRevision semantics](../../decisions/20260919-112032-sync-control-expected-revision.md) and
+  [preparation counts](../../decisions/20260919-114500-sync-control-preparation-counts.md), plus the
+  missing effective master-gain and upload-receipt representations.
+- Team 2: consume the estimator and enforce the audio lease through the audio output gate.
+- Team 3: replace the explicitly synthetic worker fixture with the real verified OTC CLI.
+
+## Outstanding evidence
+
+No hardware check has passed: two-device BeatSync source baseline, real phone/browser scheduling,
+acoustic timing, camera recordings/decoder correctness, venue QR/HTTPS/WSS reachability and
+physical panic/lease behavior all remain. The 1,500-client run is loopback server-capacity evidence,
+not a venue rehearsal.
+
+Next action: captain review/integration, then Teams 2/3/4 consumer checks and the physical rehearsal
+matrix in `masterplan.md`.

@@ -11,6 +11,7 @@ import type { ServerClock } from "../src/clock";
 import { CommandLog } from "../src/commands";
 import { ConnectionRegistry } from "../src/connections";
 import { JobRunner, type SpawnWorker } from "../src/jobs";
+import { AudioLease } from "../src/lease";
 import { Preparations } from "../src/preparations";
 import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
@@ -73,6 +74,7 @@ const harness = (spawn: SpawnWorker) => {
   const app = createApp({
     clock, state, calibrations, preparations, connections, store, jobs, operatorSecret: SECRET,
     jobWorkspace: joinPath(directory, "jobs"),
+    lease: new AudioLease(),
     registry: new DeviceRegistry(),
     joins: new RateLimiter(100, 100, () => serverMs),
     commands: new CommandLog(),

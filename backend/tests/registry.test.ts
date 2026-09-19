@@ -7,7 +7,8 @@ import { createApp } from "../src/app";
 import { AssetStore } from "../src/assets";
 import { CalibrationRuns } from "../src/calibration";
 import { JobRunner } from "../src/jobs";
-import { CheckpointStore } from "../src/checkpoint";
+import { AudioLease } from "../src/lease";
+import { CheckpointStore, type CheckpointData } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
 import { DeviceRegistry, MAX_DEVICES } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
@@ -48,6 +49,7 @@ const harness = (options: { capacity?: number; refillPerSecond?: number } = {}) 
     uploads: new AssetStore(joinPath(directory, "uploads")),
     calibrations: new CalibrationRuns(),
     jobs: new JobRunner(),
+    lease: new AudioLease(),
     jobWorkspace: joinPath(directory, "jobs"),
   });
   return { app, registry, store, clock: serverClock };
@@ -183,5 +185,62 @@ describe("durable identity", () => {
 
     const checkpoint = await store.read();
     expect(checkpoint?.devices.map(device => device.deviceId)).toEqual([0, 1, 2]);
+  });
+});
+
+describe("checkpoint write coalescing", () => {
+  test("concurrent saves share a write but every caller waits for its own data", async () => {
+    const path = joinPath(directory, "coalesced.json");
+    const store = new CheckpointStore(path);
+    const registry = new DeviceRegistry();
+
+    // Three joins arriving together, each asking for durability before its client is told.
+    const saves = [0, 1, 2].map(() => {
+      registry.join(undefined, serverMs);
+      return store.save(registry.toCheckpoint(SESSION));
+    });
+    await Promise.all(saves);
+
+    const checkpoint = await store.read();
+    // Whatever the batching did, the last caller's data is on disk before its promise resolved.
+    expect(checkpoint?.devices).toHaveLength(3);
+  });
+
+  test("a save recorded during a write is not acknowledged by that write", async () => {
+    const path = joinPath(directory, "sequenced.json");
+    const store = new CheckpointStore(path);
+    const registry = new DeviceRegistry();
+
+    const writable = store as unknown as { write(data: CheckpointData): Promise<void> };
+    const write = writable.write.bind(store);
+    let announceWrite!: () => void;
+    let releaseWrite!: () => void;
+    const writeStarted = new Promise<void>(resolve => {
+      announceWrite = resolve;
+    });
+    const writeReleased = new Promise<void>(resolve => {
+      releaseWrite = resolve;
+    });
+    let writeCount = 0;
+    writable.write = async data => {
+      writeCount += 1;
+      if (writeCount === 1) {
+        announceWrite();
+        await writeReleased;
+      }
+      await write(data);
+    };
+
+    registry.join(undefined, serverMs);
+    const first = store.save(registry.toCheckpoint(SESSION));
+    await writeStarted;
+
+    registry.join(undefined, serverMs);
+    const second = store.save(registry.toCheckpoint(SESSION));
+    releaseWrite();
+    await Promise.all([first, second]);
+
+    expect(writeCount).toBe(2);
+    expect((await store.read())?.devices).toHaveLength(2);
   });
 });

@@ -42,6 +42,34 @@ export class ConnectionRegistry {
     return delivered;
   }
 
+  /**
+   * Sends a per-device message to many devices without holding the event loop. Assigning a
+   * thousand phones built a thousand distinct payloads in one tick and stalled the server for
+   * hundreds of milliseconds; this yields between chunks instead.
+   *
+   * Nothing awaits this. A missed broadcast is recoverable from a snapshot by design, so delivery
+   * is best effort and correctness never depends on it.
+   */
+  async sendEachToParticipants(
+    deviceIds: readonly number[],
+    build: (deviceId: number) => string,
+    chunkSize = 100,
+  ): Promise<number> {
+    let delivered = 0;
+    for (let index = 0; index < deviceIds.length; index += chunkSize) {
+      for (const deviceId of deviceIds.slice(index, index + chunkSize)) {
+        const socket = this.participants.get(deviceId);
+        // Building the payload only for devices that can receive it: an absent phone learns this
+        // from its snapshot instead.
+        if (!socket) continue;
+        socket.send(build(deviceId));
+        delivered++;
+      }
+      if (index + chunkSize < deviceIds.length) await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    return delivered;
+  }
+
   addOperator(socket: ClientSocket): void {
     this.operators.add(socket);
   }

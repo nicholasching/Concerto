@@ -2,6 +2,8 @@ import { createApp } from "./app";
 import { AssetStore, assetsPath } from "./assets";
 import { CalibrationRuns } from "./calibration";
 import { JobRunner } from "./jobs";
+import { AudioLease } from "./lease";
+import { LoopLagSampler } from "./loop-lag";
 import { matchesOperatorSecret } from "./auth";
 import { CheckpointStore, checkpointPath } from "./checkpoint";
 import { createServerClock } from "./clock";
@@ -30,6 +32,9 @@ const uploads = new AssetStore(process.env.UPLOADS_PATH ?? "runtime/uploads");
 const calibrations = new CalibrationRuns();
 const jobWorkspace = process.env.JOBS_PATH ?? "runtime/jobs";
 const jobs = new JobRunner({ now: clock.nowServerMs });
+const lease = new AudioLease();
+const loopLag = new LoopLagSampler();
+loopLag.start();
 
 const restored = await store.read();
 if (restored) {
@@ -46,7 +51,7 @@ if (!process.env.OPERATOR_SECRET) {
 }
 
 const app = createApp({
-  clock, registry, store, joins, state, commands, connections, preparations, assets, uploads, calibrations, jobs, jobWorkspace,
+  clock, registry, store, joins, state, commands, connections, preparations, assets, uploads, calibrations, jobs, jobWorkspace, lease, loopLag,
   operatorSecret: process.env.OPERATOR_SECRET,
 });
 
@@ -100,6 +105,17 @@ const server = Bun.serve<SocketData, string>({
 
 // Coalesced operator updates: state churn from probes and joins never becomes one broadcast
 // per event.
+// The lease is renewed on its own cadence: it must keep arriving even when nothing else changes,
+// because its absence is the signal.
+setInterval(() => {
+  const expiresServerMs = lease.renew(clock.nowServerMs());
+  if (expiresServerMs === null) return;
+  connections.sendToParticipants(state.connectedDeviceIds(), JSON.stringify({
+    protocolVersion: 1, sessionId: clock.sessionId, serverEpoch: clock.serverEpoch,
+    messageId: crypto.randomUUID(), type: "lease.renew", payload: { expiresServerMs },
+  }));
+}, lease.renewIntervalMs);
+
 setInterval(() => {
   const now = clock.nowServerMs();
   // Scheduled changes become effective on time even when nothing is being read.

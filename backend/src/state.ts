@@ -53,6 +53,7 @@ export class SessionState {
   private pendingTransport: Extract<PendingActionData, { domain: "transport" }> | null = null;
   private pendingMix: Extract<PendingActionData, { domain: "mix" }> | null = null;
   private readonly pendingAssignments = new Map<number, PendingAssignment>();
+  private pendingActionsCache: PendingActionData[] | null = null;
   private assignmentRevisionCounter = 0;
   private mixRevisionCounter = 0;
   private channelState: ChannelData[] | null = null;
@@ -109,11 +110,17 @@ export class SessionState {
     this.transportState = stoppedTransport(0, this.savedShow.showRevision);
   }
 
+  /**
+   * Cached deliberately. Every snapshot reads this, and a snapshot is built on every device status
+   * message, so rebuilding and re-validating a thousand pending assignments here stalled the event
+   * loop under load. The values were already validated when they were scheduled; validating them
+   * again on every read bought nothing.
+   */
   get pendingActions(): PendingActionData[] {
+    if (this.pendingActionsCache) return this.pendingActionsCache;
     const actions: PendingActionData[] = [];
     if (this.pendingTransport) actions.push(this.pendingTransport);
     if (this.pendingMix) actions.push(this.pendingMix);
-    // Devices scheduled by one command are reported as that one pending action.
     const byCommand = new Map<string, PendingAssignment[]>();
     for (const entry of this.pendingAssignments.values()) {
       const group = byCommand.get(entry.commandId) ?? [];
@@ -121,12 +128,13 @@ export class SessionState {
       byCommand.set(entry.commandId, group);
     }
     for (const [commandId, group] of byCommand) {
-      actions.push(PendingAction.parse({
+      actions.push({
         domain: "assignment", commandId, effectiveServerMs: group[0].effectiveServerMs,
         supersedesCommandId: group[0].supersedesCommandId,
         assignments: group.map(entry => entry.assignment).sort((a, b) => a.deviceId - b.deviceId),
-      }));
+      });
     }
+    this.pendingActionsCache = actions;
     return actions;
   }
 
@@ -144,6 +152,7 @@ export class SessionState {
   scheduleTransport(action: Extract<PendingActionData, { domain: "transport" }>): string | null {
     const superseded = this.pendingTransport?.commandId ?? null;
     this.pendingTransport = PendingAction.parse({ ...action, supersedesCommandId: superseded }) as typeof action;
+    this.pendingActionsCache = null;
     this.revisionCounter++;
     return superseded;
   }
@@ -152,6 +161,7 @@ export class SessionState {
     const superseded = this.pendingMix?.commandId ?? null;
     this.pendingMix = PendingAction.parse({ ...action, supersedesCommandId: superseded }) as typeof action;
     this.mixRevisionCounter = action.mixRevision;
+    this.pendingActionsCache = null;
     this.revisionCounter++;
     return superseded;
   }
@@ -175,6 +185,7 @@ export class SessionState {
       });
     }
     this.assignmentRevisionCounter = input.assignments[0]?.assignmentRevision ?? this.assignmentRevisionCounter;
+    this.pendingActionsCache = null;
     this.revisionCounter++;
     return [...superseded];
   }
@@ -187,24 +198,40 @@ export class SessionState {
     return this.mixRevisionCounter;
   }
 
+  /**
+   * Cancels everything scheduled and stops the transport at once. This is the only state change
+   * that does not wait for a common future moment: a scheduled silence is not a panic.
+   */
+  panic(): void {
+    this.pendingTransport = null;
+    this.pendingMix = null;
+    this.pendingAssignments.clear();
+    this.pendingActionsCache = null;
+    this.transportState = stoppedTransport(this.transportState.transportRevision + 1, this.showRevision);
+    this.revisionCounter++;
+  }
+
   // Promotes any pending action whose moment has arrived. Called from the scheduler and before
   // building a snapshot, so a reader never sees a pending action whose time has already passed.
   applyDue(nowServerMs: number): void {
     if (this.pendingTransport && this.pendingTransport.effectiveServerMs <= nowServerMs) {
       this.transportState = this.pendingTransport.transport;
       this.pendingTransport = null;
+      this.pendingActionsCache = null;
       this.revisionCounter++;
     }
     if (this.pendingMix && this.pendingMix.effectiveServerMs <= nowServerMs) {
       this.channelState = this.pendingMix.channels;
       this.masterGainState = this.pendingMix.masterGain;
       this.pendingMix = null;
+      this.pendingActionsCache = null;
       this.revisionCounter++;
     }
     for (const [deviceId, entry] of [...this.pendingAssignments]) {
       if (entry.effectiveServerMs > nowServerMs) continue;
       this.assignments.set(deviceId, entry.assignment);
       this.pendingAssignments.delete(deviceId);
+      this.pendingActionsCache = null;
       this.revisionCounter++;
     }
   }
