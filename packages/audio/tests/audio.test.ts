@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Show } from "@orchestra/contracts";
 import { FakeClock } from "@orchestra/testkit";
 import showFixture from "../../../fixtures/show.json";
-import { AssetError, AudioContextHost, DecodedBudget, decodedBytes, loadTrack, scheduleClick, serverMsToAudioTime } from "../src";
+import { AssetError, AudioContextHost, DecodedBudget, decodedBytes, loadTrack, preloadTracks, scheduleClick, serverMsToAudioTime } from "../src";
 import { asAudioContext, FakeAudioContext } from "./fake-audio";
 
 const show = Show.parse(showFixture);
@@ -168,5 +168,22 @@ describe("schedule", () => {
     result.cancel();
     expect(ctx.sources[0].stopped).toBe(1);
     expect(ctx.sources[0].connected).toBe(false);
+  });
+});
+
+describe("preload", () => {
+  test("loads every track, keeps verified ones and reports failures separately", async () => {
+    const bytes = await toneBytes();
+    const broken = { ...show.tracks[1], sha256: "0".repeat(64) };
+    const tracks = [track, broken];
+    const cache = new Map();
+    let fetches = 0;
+    const options = { ctx: asAudioContext(new FakeAudioContext()), budget: new DecodedBudget(), baseUrl: "http://mock", fetch: async () => { fetches += 1; return new Response(bytes.slice(0)); } };
+    const failures = await preloadTracks(tracks, options, cache);
+    expect([...cache.keys()]).toEqual([track.trackId]);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].trackId).toBe(broken.trackId);
+    await preloadTracks([track], options, cache);
+    expect(fetches).toBe(2);
   });
 });

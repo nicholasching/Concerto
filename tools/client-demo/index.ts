@@ -1,3 +1,3 @@
-import { startMockServer } from "@orchestra/testkit/mock-server";
-const server = startMockServer(18081);
-console.log(`SYNTHETIC client harness: ${server.url}`);
+import { startClientDemoServer } from "./server";
+const server = startClientDemoServer({ port: 18081 });
+console.log(`SYNTHETIC client harness (join/resume): ${server.url}`);

@@ -13,3 +13,7 @@ section { margin: 26px 0; padding: 22px; background: #192336; border: 1px solid 
 svg { width: 100%; background: #101724; border-radius: 8px; }
 .lane { padding: 12px; margin: 8px 0; border-left: 5px solid; background: #222e43; }
 .lane span { float: right; color: #a1b3cc; }
+.checks { list-style: none; padding: 0; }
+.checks .ok { color: #71d0b0; }
+.checks .no { color: #a1b3cc; }
+button { font: inherit; padding: 8px 14px; margin: 4px 8px 4px 0; }

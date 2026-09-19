@@ -12,6 +12,7 @@ Only epochNow is extracted in the software foundation. Source NTP/audio tests an
 | `apps/server/src/routes/websocketHandlers.ts` | `3520f3370c2c998d866272e92c636a7993e07d72f9a540496a496dc13aa0d3cd` | `backend/` | pending Team 1 |
 | `apps/server/src/managers/RoomManager.ts` | `98cf0a0b4446727455571d1118d44f7619d41cc81e0fda1b351c4921f7c16b53` | `backend/` | pending Team 1 |
 | `apps/client/src/lib/audioContextManager.ts` | `b71b602d6e655d9f9dc8f1381be25f13c68d7c4b82eeb4c5fd0dad0b42d9268a` | `packages/audio/src/context.ts`, `timing.ts` | extracted (Team 2 slice 1); see below |
+| `apps/client/src/hooks/useWebSocketReconnection.ts` | `582b1cd3a411fef1bf64bd86693797d6d4df0a1bcdd4ed8e7635bf920a06dfe8` | `client-frontend/src/lib/connection.ts` | backoff/timeout/wake reconnect adapted (Team 2 slice 2); see below |
 | `apps/client/src/store/global.tsx` | `17a59a1b9135ab3091bb9045b7d5f06959535dbc2b19a1df4c9c25ad21b9998d` | `packages/audio/src/assets.ts`, `schedule.ts` | load/decode and scheduled start adapted (slice 1); multichannel playback pending |
 
 The extracted epochNow behavior is unchanged: performance.timeOrigin + performance.now(). Its new test verifies independence from a Date.now wall-clock jump. The sync estimator/audio implementation and associated original tests remain to be ported according to masterplan.md.
@@ -24,3 +25,10 @@ Subplan: [teams/audio-client/plans/01](teams/audio-client/plans/01-audio-context
 - `audioContextManager.ts` `perfTimeToAudioTime` → `packages/audio/src/timing.ts`. Same `getOutputTimestamp()` mapping and `currentTime` fallback. It is the only output-clock method; `global.tsx`'s outputLatency filter and nudge subtraction are deliberately not ported.
 - `global.tsx` fetch/decode and `playAudio` start → `packages/audio/src/assets.ts`, `schedule.ts`. Added SHA-256 and byte-size verification before decode. The three-buffer LRU is replaced by a decoded-byte budget (64 MB default). Past start times are refused instead of started late. Zustand/React state, playlist advance and toasts are not ported.
 - Tests are new (`packages/audio/tests/audio.test.ts`). BeatSync has no tests for the context, output-clock or decode paths; `websocket/__tests__/dispatch.test.ts` only mocks `schedulePlay` for message routing, which belongs to slice 2.
+
+## Team 2 slice 2 (2026-09-19)
+
+Subplan: [teams/audio-client/plans/02](teams/audio-client/plans/02-join-resume-connection.md). Source hashes were rechecked and are unchanged.
+
+- `useWebSocketReconnection.ts` → `client-frontend/src/lib/connection.ts`. Kept: 1 s initial delay, ×1.1 growth, 10 s cap, up to 15% jitter, 15-attempt limit, 5 s connect timeout for Safari's silent drops, and immediate reconnect on visibility/online with a fresh attempt budget. Changed: a plain class with injected timers and socket instead of React refs and the Zustand store; each reconnect re-resumes identity over HTTP before opening the socket; a "replaced" close stops reconnecting.
+- `websocket/dispatch.ts` (sha256 `5b4c97a0430907756cf904eb6b13b96be4e946882d8b1284857a97f44c92c963`): not copied. Messages are validated with the shared `ServerMessage` schema and handled by type.

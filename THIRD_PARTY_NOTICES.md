@@ -2,7 +2,7 @@
 
 ## BeatSync
 
-The epochNow function in packages/sync/src/index.ts and the AudioContext lifecycle and output-clock mapping in packages/audio/src/context.ts and packages/audio/src/timing.ts are derived from the supplied BeatSync source. Further selected extractions must retain this notice and be recorded in .devcontext/beat-sync-extraction.md. The reference code license does not establish rights to bundled music assets, which are not used by this scaffold.
+The epochNow function in packages/sync/src/index.ts and the AudioContext lifecycle and output-clock mapping in packages/audio/src/context.ts and packages/audio/src/timing.ts, and the reconnect backoff in client-frontend/src/lib/connection.ts, are derived from the supplied BeatSync source. Further selected extractions must retain this notice and be recorded in .devcontext/beat-sync-extraction.md. The reference code license does not establish rights to bundled music assets, which are not used by this scaffold.
 
 MIT License
 

@@ -3,6 +3,7 @@ import type { ParticipantSnapshotData } from "@orchestra/contracts";
 export function participantStatus(snapshot: ParticipantSnapshotData): string {
   const { readiness, assignment, show } = snapshot;
   if (!readiness.connected) return "Disconnected";
+  if (!readiness.foreground) return "Page in background";
   if (!readiness.clockReady) return "Clock not ready";
   if (!readiness.audioUnlocked) return "Audio not enabled";
   if (assignment.channelId === null) return "No channel assigned";

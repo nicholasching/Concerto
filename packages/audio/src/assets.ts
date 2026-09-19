@@ -66,3 +66,19 @@ export async function loadTrack(track: TrackData, { ctx, budget, baseUrl, fetch:
   budget.reserve(track.trackId, size);
   return { trackId: track.trackId, sha256: track.sha256, buffer, decodedBytes: size };
 }
+
+export interface PreloadFailure { trackId: string; message: string }
+
+// Loads every track not already cached with the same hash. One bad track does not
+// block the others; only verified tracks enter the cache.
+export async function preloadTracks(tracks: TrackData[], options: LoadTrackOptions, cache: Map<string, LoadedTrack>): Promise<PreloadFailure[]> {
+  const missing = tracks.filter(track => cache.get(track.trackId)?.sha256 !== track.sha256);
+  const results = await Promise.allSettled(missing.map(track => loadTrack(track, options)));
+  const failures: PreloadFailure[] = [];
+  results.forEach((result, index) => {
+    const trackId = missing[index].trackId;
+    if (result.status === "fulfilled") cache.set(trackId, result.value);
+    else failures.push({ trackId, message: result.reason instanceof Error ? result.reason.message : String(result.reason) });
+  });
+  return failures;
+}
