@@ -1,0 +1,63 @@
+{
+  "reviewedHead": "909e42a",
+  "category": "deterministic actual component handlers with hook/HTTP doubles",
+  "checks": [
+    {
+      "issue": "R4",
+      "result": "fixed",
+      "evidence": "Actual drag handlers select visible device 0 at full and half CSS scale."
+    },
+    {
+      "issue": "R3",
+      "result": "fixed captured revision",
+      "evidence": "Selection from map 1 remains map 1 after snapshot map becomes 2."
+    },
+    {
+      "issue": "R1",
+      "result": "fixed zero-lead subcase",
+      "evidence": "Play and mix use at least 3000ms relative to interim clock; shared clock/preparation remain absent."
+    },
+    {
+      "issue": "R5",
+      "result": "fixed fixture-ID subcase",
+      "evidence": "Live non-contiguous eligible IDs 7 and 42 are submitted; disconnected ID 100 is excluded."
+    },
+    {
+      "issue": "R14",
+      "result": "fixed banner subcase",
+      "evidence": "Disconnect alert renders alongside retained snapshot; mutation controls remain enabled."
+    },
+    {
+      "issue": "R9",
+      "result": "partial; still broken",
+      "evidence": "Per-channel groups retained, but second Undo POST uses stale expectedRevision; failure then clears Undo history.",
+      "posts": [
+        {
+          "revision": 100,
+          "channel": "channel-2",
+          "ids": [
+            0,
+            1
+          ],
+          "accepted": true
+        },
+        {
+          "revision": 101,
+          "channel": "channel-0",
+          "ids": [
+            0
+          ],
+          "accepted": true
+        },
+        {
+          "revision": 101,
+          "channel": "channel-1",
+          "ids": [
+            1
+          ],
+          "accepted": false
+        }
+      ]
+    }
+  ]
+}

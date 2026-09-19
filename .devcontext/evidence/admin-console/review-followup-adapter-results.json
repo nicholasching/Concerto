@@ -1,0 +1,47 @@
+{
+  "reviewedHead": "909e42a",
+  "category": "deterministic boundary checks; observed defect assertions are not acceptance",
+  "checks": [
+    {
+      "issue": "R2",
+      "result": "fixed subcase",
+      "evidence": "Undelivered command remains error after unrelated revision."
+    },
+    {
+      "issue": "R2",
+      "result": "still broken",
+      "cancellation": "superseded",
+      "status": "effective",
+      "remainingUntilOriginalDeadlineMs": 60000,
+      "evidence": "Assignment never applied; cancellation is misclassified as effectiveness."
+    },
+    {
+      "issue": "R2",
+      "result": "still broken",
+      "cancellation": "panic",
+      "status": "effective",
+      "remainingUntilOriginalDeadlineMs": 60000,
+      "evidence": "Assignment never applied; cancellation is misclassified as effectiveness."
+    },
+    {
+      "issue": "R10",
+      "result": "fixed subcase",
+      "evidence": "Older in-flight GET cannot roll back a newer accepted GET."
+    },
+    {
+      "issue": "R10",
+      "result": "still broken",
+      "evidence": "Late old-epoch POST reply changes obsolete command back to accepted."
+    },
+    {
+      "issue": "R8",
+      "result": "unchanged",
+      "evidence": "Valid frozen CommandAccepted still yields undefined runId and jobId."
+    },
+    {
+      "issue": "R11",
+      "result": "unchanged",
+      "backwardJumpMs": 400
+    }
+  ]
+}
