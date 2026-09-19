@@ -1,0 +1,5 @@
+REPRODUCED: 8px box enclosing the visible device-0 dot selects zero devices.
+REPRODUCED: IDs selected at map revision 1 are submitted with revision 2 after map replacement.
+REPRODUCED: Undo restores both mixed-channel devices to first device's channel-a; device 1 loses channel-b.
+REPRODUCED: Play and gain commands use snapshot timestamp 100000 with zero lead time, already past once received.
+Four UI regressions reproduced against unchanged HEAD components. This is not browser or physical evidence.

@@ -1,0 +1,37 @@
+{
+  "reviewedHead": "30054a6b8cf310a943dafa8954e24162f57618ba",
+  "checks": [
+    {
+      "case": "undelivered assignment",
+      "afterNetworkFailure": "pending",
+      "afterUnrelatedRevision": "confirmed"
+    },
+    {
+      "case": "future scheduled assignment",
+      "adapterStatus": "confirmed",
+      "serverPendingActions": 1,
+      "millisecondsUntilEffect": 60000
+    },
+    {
+      "case": "out-of-order snapshot across restart",
+      "nextCommandEpoch": "old-epoch",
+      "nextCommandRevision": 30,
+      "expectedEpoch": "new-epoch"
+    },
+    {
+      "case": "contract-compliant mutations",
+      "calibrationRunId": null,
+      "calibrationRunTag": null,
+      "jobId": null,
+      "responseSchema": "CommandAccepted"
+    },
+    {
+      "case": "snapshot clock response latency",
+      "firstServerEstimate": 1000,
+      "trueServerAtFirstReceipt": 1200,
+      "showheadBeforePoll": 2400,
+      "showheadAfterPoll": 2000,
+      "backwardJumpMs": 400
+    }
+  ]
+}
