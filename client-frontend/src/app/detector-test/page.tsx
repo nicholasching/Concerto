@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { detectorColorAt, detectorStageAt } from "../../lib/detector-test";
 
-const COLORS = { amber: "#ffb000", blue: "#0066ff" } as const;
+const COLORS = { red: "#ff0000", blue: "#0066ff" } as const;
 type ColorName = keyof typeof COLORS;
 
 export default function DetectorTestPage() {
-  const [colorName, setColorName] = useState<ColorName>("amber");
+  const [colorName, setColorName] = useState<ColorName>("red");
   const [deviceId, setDeviceId] = useState(1);
   const [runTag, setRunTag] = useState(37);
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -36,12 +36,12 @@ export default function DetectorTestPage() {
     {!active && <section>
       <p className="eyebrow">LOCAL DETECTOR TEST</p>
       <h1>Flash and palette test</h1>
-      <p>Scan this QR code on each test phone. It renders the exact 11-second OTC calibration packet, then holds its selected calibration color.</p>
+      <p>Scan this QR code on each test phone. It renders the frozen 11-second OTC packet slots in red and blue, then holds its selected test color.</p>
       <img className="detector-qr" src="/detector-test/qr" width={280} height={280} alt="Scan to open the detector flash test" />
       <label>Device ID <input type="number" min="0" max="2047" value={deviceId} onChange={event => setDeviceId(Math.max(0, Math.min(2047, Number(event.target.value) || 0)))} /></label>
       <label>Run tag <input type="number" min="0" max="255" value={runTag} onChange={event => setRunTag(Math.max(0, Math.min(255, Number(event.target.value) || 0)))} /></label>
       <label>Hold color <select value={colorName} onChange={event => setColorName(event.target.value as ColorName)}>
-        <option value="amber">Amber / yellow</option><option value="blue">Blue</option>
+        <option value="red">Red</option><option value="blue">Blue</option>
       </select></label>
       <p className="muted">Use a phone-reachable HTTPS URL. A QR code containing localhost works only on this computer.</p>
       <button type="button" onClick={start}>Start flash sequence</button>

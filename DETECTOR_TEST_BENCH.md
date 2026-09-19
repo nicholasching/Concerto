@@ -2,7 +2,7 @@
 
 This is a local physical-test harness for improving optical phone detection. It has two independent parts:
 
-1. **Phone flash bench** — phones open a public QR URL, render the exact existing `otc-v1` calibration packet, then hold amber/yellow or blue.
+1. **Phone flash bench** — phones open a public QR URL, render the exact existing `otc-v1` packet timing with red replacing yellow, then hold red or blue.
 2. **Camera monitor** — a local webcam view with live palette, flash, and blob-size settings.
 
 Neither tool writes an audience map, accepts an optical identity, or replaces the production calibration workflow. The production worker still requires the frozen packet/tag/membership/two-pass identity checks.
@@ -48,13 +48,13 @@ The existing operator console also exposes a **Detector flash test** QR beside t
 - Select the color to hold after the sequence.
 - Select **Start flash sequence** or **Restart flash sequence**.
 
-The page first renders the exact existing `calibrationPacket(deviceId, runTag)` sequence: 55 slots at 200 ms each (about 11 seconds), using the production palette:
+The page first renders the exact existing `calibrationPacket(deviceId, runTag)` sequence: 55 slots at 200 ms each (about 11 seconds). The diagnostic palette replaces yellow with red while leaving blue and neutral unchanged:
 
-- zero: `#FFB000` (amber/yellow)
+- zero: `#FF0000` (red)
 - one: `#0066FF` (blue)
 - neutral: `#111111`
 
-It then holds the chosen amber/yellow or blue color. This is a flashing visual test: warn participants, provide an exit path, and stop immediately if anyone experiences discomfort.
+It then holds the chosen red or blue color. This is a flashing visual test: warn participants, provide an exit path, and stop immediately if anyone experiences discomfort.
 
 ## Run the camera detector monitor
 
@@ -75,14 +75,14 @@ It opens two desktop windows:
 
 - Magenta box: a neutral bright-rise flash seed. It is only a visibility cue.
 - Cyan dot: a currently associated visual track.
-- Green `blue + yellow` box: selected track that has observed at least two amber/yellow and two blue samples. The qualification stays latched while the same blob remains visible, even during a one-colour hold.
+- Green `red + blue` box: selected track that has observed at least two red and two blue samples. The qualification stays latched while the same blob remains visible, even during a one-colour hold; one unambiguous overlapping track fragment inherits the latch.
 
-A selected track is removed after 350 ms without a new palette observation. Several independent phone tracks can be green at once; a static one-color blue or yellow object remains unselected.
+A selected track is removed after 350 ms without a new palette observation. Several independent phone tracks can be green at once; a static red-only or blue-only object remains unselected.
 
 ### Useful live controls
 
-- **Yellow/Blue hue tolerance**: widen cautiously for washed-out screen colors; too wide captures unrelated colored objects.
-- **Palette saturation/brightness**: lower for dim or washed-out phones; this increases background/glare candidates.
+- **Red/Blue hue tolerance**: widen cautiously for washed-out screen colors; too wide captures unrelated colored objects.
+- **Palette saturation/brightness**: lower for dim or washed-out red/blue phones; this increases background/glare candidates.
 - **Flash brightness/max saturation/minimum rise**: tune the neutral white initial-sequence seed detector.
 - **Minimum blob width/height**: smallest accepted contour dimension (default 4 px).
 - **Minimum area**: separate total-pixel filter for noise and tiny regions.

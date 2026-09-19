@@ -13,7 +13,7 @@ from .tracking import (
 
 
 SLIDERS = (
-    ("Yellow hue tolerance", "yellow_hue_tolerance", 45),
+    ("Red hue tolerance", "red_hue_tolerance", 45),
     ("Blue hue tolerance", "blue_hue_tolerance", 45),
     ("Palette saturation", "palette_saturation", 255),
     ("Palette brightness", "palette_value", 255),
@@ -29,11 +29,11 @@ SLIDERS = (
 
 @dataclass(frozen=True)
 class PaletteSettings:
-    """OpenCV HSV hue bands for the default amber/blue calibration palette."""
+    """OpenCV HSV hue bands for the red/blue diagnostic calibration palette."""
 
-    yellow_hue: int = 21  # #ffb000
+    red_hue: int = 0  # #ff0000
     blue_hue: int = 108  # #0066ff
-    yellow_hue_tolerance: int = 20
+    red_hue_tolerance: int = 20
     blue_hue_tolerance: int = 20
     palette_saturation: int = 55
     palette_value: int = 50
@@ -94,18 +94,18 @@ def _hue_band(hsv, center, tolerance, saturation, value):
 
 
 def palette_masks(rgb, detection, palette):
-    """Masks only the amber and blue calibration colors, rather than all hues."""
+    """Masks the red and blue diagnostic calibration colors only."""
     hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
     saturation, value = palette.palette_saturation, palette.palette_value
-    yellow = _hue_band(hsv, palette.yellow_hue, palette.yellow_hue_tolerance, saturation, value)
+    red = _hue_band(hsv, palette.red_hue, palette.red_hue_tolerance, saturation, value)
     blue = _hue_band(hsv, palette.blue_hue, palette.blue_hue_tolerance, saturation, value)
     kernel = np.ones((detection.opening_kernel, detection.opening_kernel), np.uint8)
-    return (cv2.morphologyEx(yellow, cv2.MORPH_OPEN, kernel),
+    return (cv2.morphologyEx(red, cv2.MORPH_OPEN, kernel),
             cv2.morphologyEx(blue, cv2.MORPH_OPEN, kernel))
 
 
 def track_has_both_palette_colors(track: Track, palette: PaletteSettings, now_ms=None) -> bool:
-    """Latch repeated amber/blue evidence while the same visual track remains visible."""
+    """Latch repeated red and blue evidence while the same track remains visible."""
     now_ms = track.samples[-1].pts_ms if now_ms is None else now_ms
     if now_ms - track.samples[-1].pts_ms > SELECTED_TRACK_MAX_AGE_MS:
         return False
@@ -120,10 +120,44 @@ def track_has_both_palette_colors(track: Track, palette: PaletteSettings, now_ms
         return ((distance <= tolerance) & (hsv[:, 1] >= palette.palette_saturation) &
                 (hsv[:, 2] >= palette.palette_value))
 
-    return (np.count_nonzero(matches(palette.yellow_hue, palette.yellow_hue_tolerance)) >=
+    return (np.count_nonzero(matches(palette.red_hue, palette.red_hue_tolerance)) >=
             MIN_PALETTE_SAMPLES_PER_COLOR and
             np.count_nonzero(matches(palette.blue_hue, palette.blue_hue_tolerance)) >=
             MIN_PALETTE_SAMPLES_PER_COLOR)
+
+
+def carry_qualification_to_current_fragment(tracks, qualified_track_ids, now_ms):
+    """Carry a monitor-only latch across one overlapping current track fragment."""
+    visible_ids = {
+        track.track_id for track in tracks
+        if now_ms - track.samples[-1].pts_ms <= SELECTED_TRACK_MAX_AGE_MS
+    }
+    qualified_track_ids.intersection_update(visible_ids)
+    links = {}
+    for child in tracks:
+        current = child.samples[-1]
+        if child.track_id in qualified_track_ids or current.pts_ms != now_ms:
+            continue
+        parents = []
+        for parent in tracks:
+            previous = parent.samples[-1]
+            if parent.track_id not in qualified_track_ids or parent.track_id == child.track_id:
+                continue
+            area_ratio = current.width * current.height / (previous.width * previous.height)
+            overlap_width = max(0, min(previous.x + previous.width / 2, current.x + current.width / 2)
+                                - max(previous.x - previous.width / 2, current.x - current.width / 2))
+            overlap_height = max(0, min(previous.y + previous.height / 2, current.y + current.height / 2)
+                                 - max(previous.y - previous.height / 2, current.y - current.height / 2))
+            if (.2 <= area_ratio <= 6 and
+                    overlap_width * overlap_height >= min(previous.width * previous.height,
+                                                          current.width * current.height) * .1):
+                parents.append(parent.track_id)
+        if len(parents) == 1:
+            links.setdefault(parents[0], []).append(child.track_id)
+    for parent_id, child_ids in links.items():
+        if len(child_ids) == 1:
+            qualified_track_ids.remove(parent_id)
+            qualified_track_ids.add(child_ids[0])
 
 
 def flash_seed_mask(rgb, previous_value, settings):
@@ -174,7 +208,7 @@ def run_camera(camera_index):
         live["settings"] = (settings, palette_settings, flash_settings)
         live["revision"] += 1
         settings_label.configure(text=(
-            f"Applied now — yellow ±{palette_settings.yellow_hue_tolerance}, "
+            f"Applied now — red ±{palette_settings.red_hue_tolerance}, "
             f"blue ±{palette_settings.blue_hue_tolerance}; "
             f"palette S/V {palette_settings.palette_saturation}/{palette_settings.palette_value}; "
             f"flash V/S/rise {flash_settings.flash_value}/{flash_settings.flash_max_saturation}/"
@@ -193,16 +227,16 @@ def run_camera(camera_index):
         slider.grid(row=1 + index // 4, column=index % 4, sticky="ew")
         slider_values[field] = variable
     apply_settings()
-    note = tk.Label(root, text="Yellow = candidate, cyan = track. This window never decodes IDs; close it to stop.")
+    note = tk.Label(root, text="Red/blue = candidate, cyan = track. This window never decodes IDs; close it to stop.")
     note.pack()
-    tracks, active, applied_revision, previous_value, discarded = [], set(), -1, None, 0
+    tracks, active, qualified_track_ids, applied_revision, previous_value, discarded = [], set(), set(), -1, None, 0
 
     def close():
         camera.release()
         root.destroy()
 
     def update():
-        nonlocal tracks, active, applied_revision, previous_value, discarded
+        nonlocal tracks, active, qualified_track_ids, applied_revision, previous_value, discarded
         if not root.winfo_exists():
             return
         ok, frame = camera.read()
@@ -212,12 +246,12 @@ def run_camera(camera_index):
             return
         settings, palette_settings, flash_settings = live["settings"]
         if live["revision"] != applied_revision:
-            tracks, active, previous_value, discarded = [], set(), None, 0
+            tracks, active, qualified_track_ids, previous_value, discarded = [], set(), set(), None, 0
             applied_revision = live["revision"]
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         excluded = np.zeros(rgb.shape[:2], np.uint8)
-        yellow, blue = palette_masks(rgb, settings, palette_settings)
-        palette = cv2.bitwise_or(yellow, blue)
+        red, blue = palette_masks(rgb, settings, palette_settings)
+        palette = cv2.bitwise_or(red, blue)
         flash, previous_value = flash_seed_mask(rgb, previous_value, flash_settings)
         now_ms = time.monotonic() * 1000
         flash_detections = detect_screens(rgb, now_ms, excluded, settings,
@@ -228,25 +262,33 @@ def run_camera(camera_index):
         active, removed = retire_fragments(tracks, active, now_ms)
         discarded += removed
         active = associate(tracks, active, detections, now_ms, discarded)
+        for track in tracks:
+            if track_has_both_palette_colors(track, palette_settings, now_ms):
+                qualified_track_ids.add(track.track_id)
+        carry_qualification_to_current_fragment(tracks, qualified_track_ids, now_ms)
         overlay = cv2.convertScaleAbs(frame, alpha=.25)
         overlay[palette != 0] = frame[palette != 0]
         for candidate in flash_detections:
             x = round(candidate.x - candidate.width / 2)
             y = round(candidate.y - candidate.height / 2)
             cv2.rectangle(overlay, (x, y), (x + candidate.width, y + candidate.height), (255, 0, 255), 2)
-        qualified_tracks = [track for track in tracks if track_has_both_palette_colors(track, palette_settings, now_ms)]
+        qualified_tracks = [
+            track for track in tracks
+            if track.track_id in qualified_track_ids and
+            now_ms - track.samples[-1].pts_ms <= SELECTED_TRACK_MAX_AGE_MS
+        ]
         for track in qualified_tracks:
             sample = track.samples[-1]
             x = round(sample.x - sample.width / 2)
             y = round(sample.y - sample.height / 2)
             cv2.rectangle(overlay, (x, y), (x + sample.width, y + sample.height), (0, 220, 0), 2)
-            cv2.putText(overlay, "blue + yellow", (x, max(14, y - 5)), cv2.FONT_HERSHEY_SIMPLEX,
+            cv2.putText(overlay, "red + blue", (x, max(14, y - 5)), cv2.FONT_HERSHEY_SIMPLEX,
                         .4, (0, 220, 0), 1)
         for track in tracks:
             sample = track.samples[-1]
             cv2.circle(overlay, (round(sample.x), round(sample.y)), 3, (255, 255, 0), -1)
-        panels = [_panel(overlay, f"Flash seeds: {len(flash_detections)}   Palette candidates: {len(palette_detections)}   Qualified blue + yellow: {len(qualified_tracks)}", 960, 540)]
-        for mask, label in ((yellow, "Yellow palette mask"), (blue, "Blue palette mask")):
+        panels = [_panel(overlay, f"Flash seeds: {len(flash_detections)}   Palette candidates: {len(palette_detections)}   Qualified red + blue: {len(qualified_tracks)}", 960, 540)]
+        for mask, label in ((red, "Red palette mask"), (blue, "Blue palette mask")):
             panels.append(_panel(cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR), label))
         composite = np.vstack((panels[0], np.hstack(panels[1:])))
         encoded = cv2.imencode(".png", composite)[1]

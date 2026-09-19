@@ -1,7 +1,7 @@
 import { calibrationPacket, SYMBOL_MS } from "@orchestra/contracts/otc";
 import { symbolColor, type Palette } from "./calibration";
 
-export const DETECTOR_PALETTE: Palette = { zero: "#FFB000", one: "#0066FF", neutral: "#111111" };
+export const DETECTOR_PALETTE: Palette = { zero: "#FF0000", one: "#0066FF", neutral: "#111111" };
 
 export type DetectorStage = "idle" | "packet" | "hold";
 
@@ -10,7 +10,7 @@ export function detectorStageAt(elapsedMs: number, deviceId: number, runTag: num
   return elapsedMs < calibrationPacket(deviceId, runTag).length * SYMBOL_MS ? "packet" : "hold";
 }
 
-/** Uses the exact frozen OTC packet and palette rendered by the production calibration overlay. */
+/** Uses the frozen OTC packet slots with the red/blue diagnostic palette. */
 export function detectorColorAt(elapsedMs: number, holdColor: string, deviceId: number, runTag: number): string {
   const packet = calibrationPacket(deviceId, runTag);
   const slot = Math.floor(elapsedMs / SYMBOL_MS);
