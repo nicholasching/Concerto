@@ -22,6 +22,7 @@
       "name": "@orchestra/admin-frontend",
       "dependencies": {
         "@orchestra/contracts": "workspace:*",
+        "@orchestra/selection": "workspace:*",
         "next": "16.2.7",
         "react": "19.2.7",
         "react-dom": "19.2.7",

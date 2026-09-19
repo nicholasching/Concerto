@@ -1,39 +1,98 @@
 "use client";
-import { useEffect, useState } from "react";
-import { AdminSnapshot, type AdminSnapshotData } from "@orchestra/contracts";
+import { useState } from "react";
+import { useSnapshot, useAdapter } from "../lib/useSnapshot";
 import { audienceSummary } from "../lib/summary";
+import { MapPanel } from "../components/MapPanel";
+import { CalibrationPanel } from "../components/CalibrationPanel";
+import { AssignPanel } from "../components/AssignPanel";
+import { PerformPanel } from "../components/PerformPanel";
 
-const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-const mock = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCKS === "1";
+type Tab = "session" | "calibration" | "review" | "assign" | "perform";
 
 export default function Page() {
-  const [snapshot, setSnapshot] = useState<AdminSnapshotData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!mock) return;
-    const controller = new AbortController();
-    fetch(`${api}/api/sessions/demo/snapshot`, { signal: controller.signal })
-      .then(async response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return AdminSnapshot.parse(await response.json()); })
-      .then(setSnapshot).catch(error => { if (!controller.signal.aborted) setError(String(error)); });
-    return () => controller.abort();
-  }, []);
+  const { snapshot, error, loading, refresh } = useSnapshot(1000);
+  const adapter = useAdapter();
+  const [tab, setTab] = useState<Tab>("session");
+  const mock = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCKS === "1";
+
   const summary = snapshot ? audienceSummary(snapshot) : null;
-  return <main>
-    <p className="eyebrow">AUDIENCE ORCHESTRA / TEAM 4</p>
-    <h1>Admin console</h1>
-    <p className="notice">{mock ? "SYNTHETIC FIXTURE PREVIEW" : "FOUNDATION SHELL"}</p>
-    <p>Shared schemas and this read-only preview are ready. Uploads, selection, assignments, and transport controls are Team 4's implementation work.</p>
-    {error && <p role="alert">Fixture server: {error}</p>}
-    {snapshot && summary && <>
-      <section><h2>Fixture readiness</h2><div className="stats">{Object.entries(summary).map(([label, value]) => <p key={label}><strong>{value}</strong><br />{label}</p>)}</div></section>
-      <section><h2>Audience map / synthetic</h2><p>Stage at top. Audience-left is on the left.</p>
-        <svg viewBox="0 0 900 360" role="img" aria-label="Synthetic audience locations">
-          <rect x="300" y="0" width="300" height="18" fill="#6379ba" />
-          {snapshot.audienceMap.locations.filter(location => location.status === "localized").map(location => <circle key={location.deviceId} cx={20 + (location.x ?? 0) * 860} cy={30 + (location.y ?? 0) * 310} r="2" fill="#71d0b0" />)}
-        </svg>
-      </section>
-      <section><h2>Prepared channel definitions</h2>{snapshot.show.channels.map(channel => <div className="lane" key={channel.channelId} style={{ borderColor: channel.color }}>{channel.label}<span>8 s synthetic test tone</span></div>)}</section>
-    </>}
-    <section><h2>First team milestone</h2><p>Build the calibration review and selection workflow against fixtures. Follow .devcontext/stages/04-admin-console.md.</p></section>
-  </main>;
+  const pending = adapter.pending();
+  const pendingCount = pending.filter(p => p.status === "pending").length;
+
+  return (
+    <main>
+      <p className="eyebrow">AUDIENCE ORCHESTRA / TEAM 4</p>
+      <h1>Admin console</h1>
+      <p className="notice">{mock ? "SYNTHETIC FAKE-INPUT HARNESS" : "FOUNDATION SHELL"}</p>
+      {error && <p role="alert" className="error">Server error: {error}. The console never shows fake success — this is a real error from the harness/server.</p>}
+
+      <nav className="tabs">
+        {(["session", "calibration", "review", "assign", "perform"] as Tab[]).map(t => (
+          <button key={t} className={tab === t ? "tab on" : "tab"} onClick={() => setTab(t)}>{t}</button>
+        ))}
+      </nav>
+
+      {loading && !snapshot && <p>Loading snapshot…</p>}
+
+      {snapshot && summary && tab === "session" && (
+        <section>
+          <h2>Session</h2>
+          <p className="muted">The audience scans the QR code to join. Watch the counts; keep the panic control visible.</p>
+          <div className="stats">
+            <p><strong>{summary.connected}</strong><br />connected</p>
+            <p><strong>{summary.clockReady}</strong><br />clock synced</p>
+            <p><strong>{summary.audioUnlocked}</strong><br />audio unlocked</p>
+            <p><strong>{summary.localized}</strong><br />localized</p>
+            <p><strong>{summary.unresolved}</strong><br />unresolved</p>
+          </div>
+          <div className="qr-box">
+            <pre>{`  █▀▀▀▀█  █▀▀▀▀█
+  █ ███ █  █ ███ █
+  █ ▀▀▀ █  █ ▀▀▀ █
+  ▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀`}</pre>
+            <p className="muted">QR placeholder — phones scan this to join (Team 2 client).</p>
+          </div>
+          <p className="muted">Revision {snapshot.revision}. Pending commands: {pendingCount}. {pendingCount > 0 && "Shown as pending until the server confirms."}</p>
+          <button className="panic" onClick={() => { void adapter.panic(); refresh(); }}>PANIC</button>
+        </section>
+      )}
+
+      {snapshot && tab === "calibration" && (
+        <CalibrationPanel refresh={refresh} mapRevision={snapshot.audienceMap.mapRevision} />
+      )}
+
+      {snapshot && tab === "review" && (
+        <section>
+          <h2>Review</h2>
+          <p className="muted">The audience map after calibration. One dot per phone, colored by status or assignment. Switch to Assign to draw selections.</p>
+          <MapPanel map={snapshot.audienceMap} assignments={snapshot.assignments} channels={snapshot.show.channels} drawable={false} />
+          <div className="legend">
+            <span><i style={{ background: "#71d0b0" }} /> localized</span>
+            <span><i style={{ background: "#f2c76d" }} /> coarse</span>
+            <span><i style={{ background: "#e08a8a" }} /> ambiguous</span>
+            <span><i style={{ background: "#5a6b86" }} /> unseen</span>
+          </div>
+          <p className="muted">Evidence: {snapshot.audienceMap.evidence} (synthetic = from the harness, not real cameras). Run: {snapshot.audienceMap.runId ?? "none"}.</p>
+        </section>
+      )}
+
+      {snapshot && tab === "assign" && (
+        <AssignPanel snapshot={snapshot} refresh={refresh} />
+      )}
+
+      {snapshot && tab === "perform" && (
+        <PerformPanel snapshot={snapshot} refresh={refresh} />
+      )}
+
+      {pending.length > 0 && (
+        <section>
+          <h2>Pending vs confirmed</h2>
+          <p className="muted">Every command starts pending and becomes confirmed once the server reports a newer revision. Nothing is shown as success early.</p>
+          <ul className="pending">
+            {pending.slice(-6).map(p => <li key={p.commandId}>{p.commandId.slice(0, 10)} — {p.domain} — {p.status}</li>)}
+          </ul>
+        </section>
+      )}
+    </main>
+  );
 }
