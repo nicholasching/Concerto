@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { participantLink, participantLinkKey } from "../lib/participant-link";
+import { detectorTestLink, participantLink, participantLinkKey } from "../lib/participant-link";
 
 export function JoinCode({ sessionId }: { sessionId: string }) {
   const [link, setLink] = useState("");
   const [image, setImage] = useState("");
+  const [detectorImage, setDetectorImage] = useState("");
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   function defaultLink() { return participantLink(process.env.NEXT_PUBLIC_PARTICIPANT_URL ?? `${window.location.protocol}//${window.location.hostname}:3000`, sessionId); }
@@ -18,9 +19,12 @@ export function JoinCode({ sessionId }: { sessionId: string }) {
     setLink(next); setDraft(next); setError(null);
   }, [sessionId]);
   useEffect(() => {
-    let current = true; setImage("");
-    if (link) void QRCode.toDataURL(link, { width: 240, margin: 2, errorCorrectionLevel: "M" })
-      .then(value => { if (current) setImage(value); }).catch(() => { if (current) setError("Could not create the QR code for this URL."); });
+    let current = true; setImage(""); setDetectorImage("");
+    if (link) void Promise.all([
+      QRCode.toDataURL(link, { width: 240, margin: 2, errorCorrectionLevel: "M" }),
+      QRCode.toDataURL(detectorTestLink(link), { width: 240, margin: 2, errorCorrectionLevel: "M" }),
+    ]).then(([join, detector]) => { if (current) { setImage(join); setDetectorImage(detector); } })
+      .catch(() => { if (current) setError("Could not create the QR code for this URL."); });
     return () => { current = false; };
   }, [link]);
   function save() {
@@ -34,7 +38,9 @@ export function JoinCode({ sessionId }: { sessionId: string }) {
     try { localStorage.removeItem(participantLinkKey(sessionId)); } catch { /* page-only */ }
     const next = defaultLink(); setLink(next); setDraft(next); setError(null);
   }
+  const testLink = link ? detectorTestLink(link) : "";
   return <div className="qr-box">{image && <img src={image} width={240} height={240} alt="Scan to join this concert" />}
+    {detectorImage && <div><p>Detector flash test</p><img src={detectorImage} width={240} height={240} alt="Scan to open the detector flash test" /><p><a href={testLink} target="_blank" rel="noreferrer">Open detector test</a></p></div>}
     <label>Participant link <input aria-label="Participant link" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") save(); }} /></label>
     <div className="actions"><button type="button" onClick={save}>Use participant link</button><button type="button" onClick={reset}>Reset link</button></div>
     {error && <p role="alert" className="error">{error}</p>}

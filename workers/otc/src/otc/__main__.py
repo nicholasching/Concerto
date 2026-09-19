@@ -11,6 +11,7 @@ import av
 import cv2
 from jsonschema.exceptions import ValidationError
 
+from .diagnostic import run_camera
 from .pipeline import process_manifest
 from .validation import validate_manifest, validate_result
 
@@ -49,8 +50,13 @@ def main() -> int:
             command.add_argument("--debug-dir", type=Path)
             command.add_argument("--workers", type=int, choices=(1, 3), default=3,
                                  help="3: one process per camera; 1: serial reference")
+    diagnostic = commands.add_parser("diagnose-camera", help="Open a local candidate-detection monitor")
+    diagnostic.add_argument("--camera", type=int, default=0, help="Local webcam index (default: 0)")
     args = parser.parse_args()
     try:
+        if args.command == "diagnose-camera":
+            run_camera(args.camera)
+            return 0
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
         validate_manifest(manifest)
         if args.command == "validate-manifest":
@@ -78,7 +84,7 @@ def main() -> int:
             write_result(args.output, result)
             print(json.dumps({"replayed": True, "synthetic": True, "output": str(args.output)}))
         return 0
-    except (OSError, ValueError, ValidationError, av.FFmpegError, cv2.error) as error:
+    except (OSError, RuntimeError, ValueError, ValidationError, av.FFmpegError, cv2.error) as error:
         print(json.dumps({"error": str(error)}), file=sys.stderr)
         return 2
 

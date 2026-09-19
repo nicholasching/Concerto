@@ -39,7 +39,40 @@ class CameraScan:
     discarded_fragments: int = 0
 
 
-def _screen_components(rgb, pts_ms, mask):
+@dataclass(frozen=True)
+class DetectionSettings:
+    """Candidate-mask settings for local diagnostics and tested worker defaults."""
+
+    bright_saturation: int = 25
+    bright_value: int = 190
+    dim_saturation: int = 55
+    dim_value: int = 50
+    opening_kernel: int = 3
+    minimum_dimension_px: int = 4
+    minimum_area_px: int = 12
+    minimum_fill_ratio: float = 0.35
+    faint_core_value: int = 210
+    core_containment_ratio: float = 0.8
+    maximum_recovered_footprint_ratio: float = 4
+
+    def __post_init__(self):
+        if any(not 0 <= value <= 255 for value in (
+            self.bright_saturation, self.bright_value, self.dim_saturation,
+            self.dim_value, self.faint_core_value,
+        )):
+            raise ValueError("HSV and RGB thresholds must be 0..255")
+        if self.opening_kernel < 1 or self.opening_kernel % 2 == 0:
+            raise ValueError("opening_kernel must be a positive odd integer")
+        if self.minimum_dimension_px < 1 or self.minimum_area_px < 1 or not 0 < self.minimum_fill_ratio <= 1:
+            raise ValueError("component thresholds must be positive")
+        if not 0 < self.core_containment_ratio <= 1 or self.maximum_recovered_footprint_ratio < 1:
+            raise ValueError("footprint thresholds are invalid")
+
+
+DEFAULT_DETECTION_SETTINGS = DetectionSettings()
+
+
+def _screen_components(rgb, pts_ms, mask, settings):
     # Trace boundaries once, then measure each small ROI instead of allocating
     # and scanning a full-resolution integer label image for every 4K frame.
     contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
@@ -47,7 +80,7 @@ def _screen_components(rgb, pts_ms, mask):
         if hierarchy[0, index, 3] != -1:
             continue
         x, y, width, height = cv2.boundingRect(contour)
-        if min(width, height) < 4 or not 0.2 <= width / height <= 5:
+        if min(width, height) < settings.minimum_dimension_px or not 0.2 <= width / height <= 5:
             continue
         component = np.zeros((height, width), np.uint8)
         boundaries = [contour]
@@ -59,9 +92,9 @@ def _screen_components(rgb, pts_ms, mask):
         cv2.drawContours(component, boundaries, -1, 255, cv2.FILLED, offset=(-x, -y))
         moments = cv2.moments(component, binaryImage=True)
         area = moments["m00"]
-        if (area < 12 or
+        if (area < settings.minimum_area_px or
                 area > rgb.shape[0] * rgb.shape[1] * 0.15 or
-                area / (width * height) < 0.35):
+                area / (width * height) < settings.minimum_fill_ratio):
             continue
         pad_x, pad_y = max(1, width // 5), max(1, height // 5)
         region = rgb[y+pad_y:y+height-pad_y, x+pad_x:x+width-pad_x]
@@ -74,20 +107,31 @@ def _screen_components(rgb, pts_ms, mask):
         yield Sample(pts_ms, *center, width, height, color), (x, y, width, height), component
 
 
-def detect_screens(rgb, pts_ms, excluded):
+def screen_masks(rgb, excluded, settings=DEFAULT_DETECTION_SETTINGS):
+    """Return the post-processed bright and dim masks used by detection."""
     hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+    masks = []
+    for lower in ((0, settings.bright_saturation, settings.bright_value),
+                  (0, settings.dim_saturation, settings.dim_value)):
+        mask = cv2.inRange(hsv, lower, (179, 255, 255))
+        mask[excluded != 0] = 0
+        mask = cv2.morphologyEx(
+            mask, cv2.MORPH_OPEN, np.ones((settings.opening_kernel, settings.opening_kernel), np.uint8)
+        )
+        masks.append(mask)
+    return tuple(masks)
+
+
+def detect_screens(rgb, pts_ms, excluded, settings=DEFAULT_DETECTION_SETTINGS, masks=None):
     preferred = np.zeros(rgb.shape[:2], np.int32)
     core_areas = []
     screens = []
     # Bright emissive cores survive washed-out amber pilots and separate blue
     # screens from dim clothing/glare. Keep the original dim-screen path too.
     # Color values here locate candidates; identity still uses measured pilots.
-    for bright, lower in ((True, (0, 25, 190)), (False, (0, 55, 50))):
-        mask = cv2.inRange(hsv, lower, (179, 255, 255))
-        mask[excluded != 0] = 0
-        # Remove thin glow bridges without enlarging or joining nearby screens.
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
-        for sample, (x, y, width, height), component in _screen_components(rgb, pts_ms, mask):
+    masks = screen_masks(rgb, excluded, settings) if masks is None else masks
+    for bright, mask in zip((True, False), masks):
+        for sample, (x, y, width, height), component in _screen_components(rgb, pts_ms, mask, settings):
             claimed = preferred[y:y+height, x:x+width]
             inside = component != 0
             if not bright:
@@ -102,8 +146,10 @@ def detect_screens(rgb, pts_ms, excluded):
                     if len(overlaps) == 1:
                         index, overlap = overlaps[0]
                         core = screens[index]
-                        if (max(core.rgb) < 210 and overlap >= core_areas[index] * 0.8 and
-                                width * height <= core.width * core.height * 4):
+                        if (max(core.rgb) < settings.faint_core_value and
+                                overlap >= core_areas[index] * settings.core_containment_ratio and
+                                width * height <= core.width * core.height *
+                                settings.maximum_recovered_footprint_ratio):
                             screens[index] = sample
                     continue  # A core must not compete with its own dim halo.
             screens.append(sample)

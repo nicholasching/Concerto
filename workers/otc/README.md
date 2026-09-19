@@ -17,6 +17,26 @@ bun scripts/python.ts process --manifest runtime/otc-demo/manifest.json --output
 bun run gate:otc
 ```
 
+### Local detector monitor
+
+For camera/palette troubleshooting on a desktop with a webcam, run:
+
+```powershell
+.\.venv\Scripts\python.exe -m otc diagnose-camera --camera 0
+```
+
+It isolates default amber/yellow and blue calibration hue bands, darkens the rest of the
+live image, and displays a separate mask for each palette color. A neutral bright-rise
+detector marks initial white flashes with magenta seed boxes; palette candidates are yellow.
+Hue, flash, and candidate segmentation/component sliders are local diagnostics; changing one
+resets tracks. A green box appears only after a track has at least two amber/yellow and two
+blue observations in the recent 1.2-second window, and disappears within 350 ms when palette
+evidence stops; multiple qualifying tracks are shown independently. Controls open in a separate
+live-settings window. These boxes are **not** decoded identities.
+The monitor never writes a result or map and does not relax packet acceptance. It requires
+the standard Windows Python `tkinter` GUI support and webcam access; use the full
+`process` command to decode a captured calibration recording.
+
 On POSIX use `.venv/bin/python` instead of `.venv\Scripts\python.exe`. If Bun is installed only in the scaffold's local tool directory, invoke `.tools/bun-1.3.14/bun-windows-x64/bun.exe` in place of `bun`. Choose a fresh output path for each processing attempt. `--debug-dir` must be new or empty.
 
 Setup installs the editable worker and pinned dependencies from `requirements-dev.lock`: PyAV 18.1.0, NumPy 2.4.6, OpenCV headless 4.13.0.92, and the existing validation/test tools. Tested Windows wheels include FFmpeg libraries and the H.264 encoder used by the fixture generator. No separate FFmpeg executable is required on this tested installation; codecs on other platforms require verification. Schemas/codebook are read from `packages/contracts/generated`; preserve the repository layout. The Python pins need captain review before merging.
