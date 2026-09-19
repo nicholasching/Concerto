@@ -8,7 +8,9 @@
     "start": "next start -p 3000"
   },
   "dependencies": {
+    "@orchestra/audio": "workspace:*",
     "@orchestra/contracts": "workspace:*",
+    "@orchestra/sync": "workspace:*",
     "next": "16.2.7",
     "react": "19.2.7",
     "react-dom": "19.2.7"

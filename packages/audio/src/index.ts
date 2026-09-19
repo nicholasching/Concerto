@@ -9,3 +9,8 @@ export interface AudioEngine {
   dispose(): void;
 }
 export interface AudioEngineOptions { clock: SynchronizedClock }
+
+export { AudioContextHost, isAudioContextPaused } from "./context";
+export { perfToAudioTime, serverMsToAudioTime } from "./timing";
+export { AssetError, DecodedBudget, DEFAULT_DECODED_BUDGET_BYTES, decodedBytes, loadTrack, sha256Hex, type LoadedTrack, type TrackData } from "./assets";
+export { scheduleClick, type ScheduledClick } from "./schedule";
