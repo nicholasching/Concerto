@@ -1,6 +1,7 @@
 # Stage 01 - Sync and authoritative control
 
-Status: not started (foundation provided). Owner: Team 1 lead, default captain. Branch: feat/sync-control. Base: foundation-v1.
+Status: software slices 1-5 implemented; cross-team integration and physical acceptance pending.
+Owner: Team 1 lead, default captain. Branch: `feat/sync-control`. Base: `foundation-v1`.
 
 ## Agent assignment
 
@@ -8,7 +9,10 @@ Status: not started (foundation provided). Owner: Team 1 lead, default captain. 
 
 ## Available and runnable
 
-Health/foundation-info and typed 501 routes; epochNow/clock interfaces; golden schemas; FakeClock and mock snapshot/media/probe tests. No production sockets, identity/state, jobs or load implementation.
+Production join/resume and authenticated sockets; clock estimator/replies; role-filtered snapshots;
+scheduled show/transport/assignment/mix state; streamed assets/camera uploads; calibration/jobs/map
+commit; panic/audio lease; and a real loopback load harness. The OTC worker used by the committed
+load evidence is explicitly synthetic. Phone/audio/camera/venue evidence remains outstanding.
 
 Run `bun run dev:sync-demo` (8080); verify `bun run gate:sync`.
 
