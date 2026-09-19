@@ -3,6 +3,7 @@ import { ApiError } from "@orchestra/contracts";
 import { createApp } from "../src/app";
 import { AssetStore } from "../src/assets";
 import { CalibrationRuns } from "../src/calibration";
+import { JobRunner } from "../src/jobs";
 import { CheckpointStore } from "../src/checkpoint";
 import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
@@ -24,6 +25,8 @@ const app = () =>
     assets: new AssetStore("/tmp/orchestra-unused-assets"),
     uploads: new AssetStore("/tmp/orchestra-unused-uploads"),
     calibrations: new CalibrationRuns(),
+    jobs: new JobRunner(),
+    jobWorkspace: "/tmp/orchestra-unused-jobs",
   });
 
 test("health identifies a foundation, not a running concert", async () => {

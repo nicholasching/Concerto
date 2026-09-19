@@ -7,6 +7,7 @@ import { ApiError, Track } from "@orchestra/contracts";
 import { createApp } from "../src/app";
 import { AssetStore } from "../src/assets";
 import { CalibrationRuns } from "../src/calibration";
+import { JobRunner } from "../src/jobs";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
 import { CommandLog } from "../src/commands";
@@ -38,6 +39,8 @@ const harness = () => {
     clock, assets, operatorSecret: SECRET,
     uploads: new AssetStore(joinPath(directory, "uploads")),
     calibrations: new CalibrationRuns(),
+    jobs: new JobRunner(),
+    jobWorkspace: joinPath(directory, "jobs"),
     state: new SessionState(),
     registry: new DeviceRegistry(),
     store: new CheckpointStore(joinPath(directory, "checkpoint.json")),

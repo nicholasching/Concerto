@@ -1,6 +1,7 @@
 import { createApp } from "./app";
 import { AssetStore, assetsPath } from "./assets";
 import { CalibrationRuns } from "./calibration";
+import { JobRunner } from "./jobs";
 import { matchesOperatorSecret } from "./auth";
 import { CheckpointStore, checkpointPath } from "./checkpoint";
 import { createServerClock } from "./clock";
@@ -27,6 +28,8 @@ const preparations = new Preparations();
 const assets = new AssetStore(assetsPath());
 const uploads = new AssetStore(process.env.UPLOADS_PATH ?? "runtime/uploads");
 const calibrations = new CalibrationRuns();
+const jobWorkspace = process.env.JOBS_PATH ?? "runtime/jobs";
+const jobs = new JobRunner({ now: clock.nowServerMs });
 
 const restored = await store.read();
 if (restored) {
@@ -42,7 +45,7 @@ if (!process.env.OPERATOR_SECRET) {
 }
 
 const app = createApp({
-  clock, registry, store, joins, state, commands, connections, preparations, assets, uploads, calibrations,
+  clock, registry, store, joins, state, commands, connections, preparations, assets, uploads, calibrations, jobs, jobWorkspace,
   operatorSecret: process.env.OPERATOR_SECRET,
 });
 

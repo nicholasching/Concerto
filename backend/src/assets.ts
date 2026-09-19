@@ -29,11 +29,16 @@ export class AssetStore {
     const hash = createHash("sha256");
     const sink = Bun.file(temporary).writer();
     let byteSize = 0;
+    // An explicit reader rather than `for await`: async iteration is not available on every
+    // ReadableStream implementation a request body can arrive as.
+    const reader = body.getReader();
     try {
-      for await (const chunk of body) {
-        hash.update(chunk);
-        byteSize += chunk.byteLength;
-        sink.write(chunk);
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        hash.update(value);
+        byteSize += value.byteLength;
+        sink.write(value);
       }
       await sink.end();
     } catch (cause) {

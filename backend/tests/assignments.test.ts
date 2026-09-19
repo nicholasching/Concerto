@@ -6,6 +6,7 @@ import { ApiError, CommandAccepted, ParticipantSnapshot, PROTOCOL_VERSION, Serve
 import { createApp, DEFAULT_LEAD_TIME_MS } from "../src/app";
 import { AssetStore } from "../src/assets";
 import { CalibrationRuns } from "../src/calibration";
+import { JobRunner } from "../src/jobs";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
 import { CommandLog } from "../src/commands";
@@ -68,6 +69,8 @@ const prepared = async () => {
     assets: new AssetStore(joinPath(directory, "assets")),
     uploads: new AssetStore(joinPath(directory, "uploads")),
     calibrations: new CalibrationRuns(),
+    jobs: new JobRunner(),
+    jobWorkspace: joinPath(directory, "jobs"),
   });
   await app.request("/api/show", {
     method: "PUT",

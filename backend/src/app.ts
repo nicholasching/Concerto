@@ -1,14 +1,18 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join as joinPath } from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import {
-  ApiError, AssignmentRequest, CalibrationArmRequest, CalibrationCreateRequest, CalibrationRun, CommandAccepted,
-  JoinRequest, JoinResponse, MixRequest, PROTOCOL_VERSION, SaveShowRequest, Track, TransportRequest,
+  ApiError, AssignmentRequest, CalibrationArmRequest, CalibrationCreateRequest, CalibrationManifest, CalibrationRun,
+  CommandAccepted, CreateJobRequest, JobProgress, JoinRequest, JoinResponse, MixRequest, PROTOCOL_VERSION,
+  SaveShowRequest, Track, TransportRequest,
 } from "@orchestra/contracts";
 import type { AssetStore } from "./assets";
 import { matchesOperatorSecret } from "./auth";
 import { Barrier } from "./barriers";
 import { MAX_CAMERAS, type CalibrationRuns } from "./calibration";
+import type { JobRunner } from "./jobs";
 import type { ServerClock } from "./clock";
 import type { CheckpointStore } from "./checkpoint";
 import type { CommandLog } from "./commands";
@@ -29,7 +33,21 @@ const CameraUploadQuery = z.object({
   rotationDegrees: z.coerce.number().int().refine(value => [0, 90, 180, 270].includes(value), "unsupported rotation"),
   byteSize: numeric.int().positive(),
   label: z.string().min(1).max(200),
+  anchors: z.string().optional(),
+  exclusionRois: z.string().optional(),
 });
+
+const Point = z.object({ x: z.number(), y: z.number() });
+const Anchors = z.tuple([Point, Point, Point, Point]);
+const ExclusionRois = z.array(z.array(Point).min(3));
+const parseJson = <T>(schema: z.ZodType<T>, raw: string | undefined, fallback: T): T | null => {
+  if (raw === undefined) return fallback;
+  try {
+    return schema.parse(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+};
 const AssetUpload = z.object({
   commandId: z.string().min(1).max(160),
   label: z.string().min(1).max(200),
@@ -51,6 +69,8 @@ export interface AppDeps {
   assets: AssetStore;
   uploads: AssetStore;
   calibrations: CalibrationRuns;
+  jobs: JobRunner;
+  jobWorkspace: string;
   operatorSecret?: string;
   leadTimeMs?: number;
 }
@@ -443,6 +463,17 @@ export function createApp(deps: AppDeps) {
       return c.json(apiError("TOO_MANY_CAMERAS", `A run accepts at most ${MAX_CAMERAS} recordings.`), 409);
     }
 
+    // Camera geometry is optional: without it Team 3 falls back to the manual column path, which
+    // the masterplan requires to work on its own.
+    const anchors = parseJson(Anchors, query.data.anchors, null);
+    const exclusionRois = parseJson(ExclusionRois, query.data.exclusionRois, []);
+    if (anchors === null && query.data.anchors !== undefined) {
+      return c.json(apiError("INVALID_REQUEST", "Anchors must be four ordered points."), 400);
+    }
+    if (exclusionRois === null) {
+      return c.json(apiError("INVALID_REQUEST", "Exclusion regions must be polygons of at least three points."), 400);
+    }
+
     const body = c.req.raw.body;
     if (!body) return c.json(apiError("INVALID_REQUEST", "Upload had no body."), 400);
 
@@ -460,10 +491,86 @@ export function createApp(deps: AppDeps) {
       primaryColumn: query.data.primaryColumn,
       rotationDegrees: query.data.rotationDegrees as 0 | 90 | 180 | 270,
       sha256: written.sha256, byteSize: written.byteSize, label: query.data.label,
+      anchors, exclusionRois,
     };
     deps.calibrations.addUpload(upload);
     deps.commands.remember(query.data.commandId, upload);
     return c.json(upload);
+  });
+
+  app.post("/api/calibrations/:runId/jobs", async c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Starting a job requires the operator secret."), 401);
+    }
+    const body = CreateJobRequest.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(apiError("INVALID_REQUEST", "Job request did not match the protocol v1 schema."), 400);
+    const request = body.data;
+    const guard = guardCommand(deps, request);
+    if (guard) return c.json(guard.body, guard.status);
+
+    const replayed = deps.commands.get<unknown>(request.commandId);
+    if (replayed) return c.json(replayed);
+
+    const run = deps.calibrations.get(c.req.param("runId"));
+    if (!run || run.plan.runId !== request.runId) {
+      return c.json(apiError("UNKNOWN_RUN", "No such calibration run in this session."), 404);
+    }
+    // Without a start time there is no packet timing to decode against.
+    if (run.startServerMs === null) {
+      return c.json(apiError("RUN_NOT_ARMED", "Arm this run before processing its recordings."), 409);
+    }
+    const uploads = request.uploadIds.map(uploadId => run.uploads.get(uploadId));
+    if (uploads.some(upload => !upload)) {
+      return c.json(apiError("UNKNOWN_UPLOAD", "One or more uploads do not belong to this run."), 409);
+    }
+
+    const cameras = uploads.map(upload => ({
+      cameraId: upload!.cameraId, primaryColumn: upload!.primaryColumn,
+      videoPath: deps.uploads.path(upload!.uploadId)!, sha256: upload!.sha256,
+      rotationDegrees: upload!.rotationDegrees,
+      exclusionRois: upload!.exclusionRois, anchors: upload!.anchors,
+    }));
+    const manifest = CalibrationManifest.parse({ ...run.plan, startServerMs: run.startServerMs, cameras });
+
+    const jobId = crypto.randomUUID();
+    const manifestPath = joinPath(deps.jobWorkspace, `${jobId}.manifest.json`);
+    const outputPath = joinPath(deps.jobWorkspace, `${jobId}.result.json`);
+    await mkdir(deps.jobWorkspace, { recursive: true });
+    await writeFile(manifestPath, JSON.stringify(manifest), "utf8");
+
+    deps.calibrations.setStatus(run.plan.runId, "processing");
+    const record = deps.jobs.enqueue({ jobId, runId: run.plan.runId, manifestPath, outputPath, manifest });
+    const progress = JobProgress.parse({
+      protocolVersion: PROTOCOL_VERSION, jobId, runId: run.plan.runId,
+      stage: record.stage, progress: record.progress, message: record.message,
+    });
+    deps.commands.remember(request.commandId, progress);
+    return c.json(progress);
+  });
+
+  app.get("/api/jobs/:jobId", c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Reading job progress requires the operator secret."), 401);
+    }
+    const record = deps.jobs.get(c.req.param("jobId"));
+    if (!record) return c.json(apiError("UNKNOWN_JOB", "No such job in this session."), 404);
+    return c.json({
+      progress: JobProgress.parse({
+        protocolVersion: PROTOCOL_VERSION, jobId: record.jobId, runId: record.runId,
+        stage: record.stage, progress: record.progress, message: record.message,
+      }),
+      diagnostics: record.diagnostics,
+      result: record.result,
+    });
+  });
+
+  app.delete("/api/jobs/:jobId", c => {
+    if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+      return c.json(apiError("UNAUTHORIZED", "Cancelling a job requires the operator secret."), 401);
+    }
+    const cancelled = deps.jobs.cancel(c.req.param("jobId"));
+    if (!cancelled) return c.json(apiError("JOB_NOT_CANCELLABLE", "That job is unknown or already finished."), 409);
+    return c.json({ jobId: c.req.param("jobId"), cancelled: true });
   });
 
   app.post("/api/assignments", async c => {

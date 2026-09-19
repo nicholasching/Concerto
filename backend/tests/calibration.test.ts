@@ -9,6 +9,7 @@ import {
 import { createApp, DEFAULT_LEAD_TIME_MS } from "../src/app";
 import { AssetStore } from "../src/assets";
 import { CalibrationRuns, MAX_CAMERAS } from "../src/calibration";
+import { JobRunner } from "../src/jobs";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
 import { CommandLog } from "../src/commands";
@@ -61,6 +62,8 @@ const harness = () => {
     commands: new CommandLog(),
     assets: new AssetStore(joinPath(directory, "assets")),
     uploads: new AssetStore(uploadDirectory),
+    jobs: new JobRunner(),
+    jobWorkspace: joinPath(directory, "jobs"),
   });
   const sockets = new Map<number, FakeSocket>();
   for (const deviceId of [0, 1, 2]) {

@@ -6,6 +6,7 @@ import { AdminSnapshot, ApiError, JoinResponse, ParticipantSnapshot, PROTOCOL_VE
 import { createApp } from "../src/app";
 import { AssetStore } from "../src/assets";
 import { CalibrationRuns } from "../src/calibration";
+import { JobRunner } from "../src/jobs";
 import { matchesOperatorSecret } from "../src/auth";
 import { CheckpointStore } from "../src/checkpoint";
 import type { ServerClock } from "../src/clock";
@@ -42,6 +43,8 @@ const harness = () => {
     assets: new AssetStore(joinPath(directory, "assets")),
     uploads: new AssetStore(joinPath(directory, "uploads")),
     calibrations: new CalibrationRuns(),
+    jobs: new JobRunner(),
+    jobWorkspace: joinPath(directory, "jobs"),
     store: new CheckpointStore(joinPath(directory, "checkpoint.json")),
     joins: new RateLimiter(100, 100, () => serverMs),
   });

@@ -15,6 +15,14 @@ export interface CameraUpload {
   sha256: string;
   byteSize: number;
   label: string;
+  // Supplied by the operator at upload time. Without them Team 3 uses the manual column path.
+  anchors: [Point, Point, Point, Point] | null;
+  exclusionRois: Point[][];
+}
+
+interface Point {
+  x: number;
+  y: number;
 }
 
 export type RunStatus = "created" | "armed" | "processing" | "committed" | "discarded";
