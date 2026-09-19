@@ -1,0 +1,3 @@
+# Captain follow-up: Cloudflare participant origin
+
+Baseline main f2d097d; integrated ownership under the user's request. Added participant-only snapshot and WebSocket aliases so the public audience proxy cannot grant an operator role. Existing local operator endpoints and v1 payloads remain compatible. Authentication regressions and `gate:sync` passed (203 focused tests, 14 contracts). Real proxied clock exchange passed locally and over a Quick Tunnel. See the [integration journal](../../integration/journal/20260919-cloudflare-testing.md) and [ADR](../../../decisions/20260919-cloudflare-audience-origin.md) for experiments, scope and handoff. Physical evidence remains outstanding.

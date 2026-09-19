@@ -5,6 +5,11 @@ import { ROOT, run } from "./run";
 export function nextCli(app: string) {
   return createRequire(resolve(ROOT, app, "package.json")).resolve("next/dist/bin/next");
 }
+export function nextRuntime() {
+  const node = Bun.which("node");
+  if (!node) throw new Error("Install Node.js 22 or later to run the Next frontends and their WebSocket proxy.");
+  return node;
+}
 export async function build(target: string) {
   if (target === "all" || target === "sync") {
     const result = await Bun.build({ entrypoints: [resolve(ROOT, "backend/src/index.ts")], outdir: resolve(ROOT, "backend/dist"), target: "bun" });

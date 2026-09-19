@@ -10,6 +10,7 @@ Status: integrated local software on main; physical acceptance pending. Baseline
 - Python OTC receives an immutable manifest and produces candidate results. Job identity, input hashes and unchanged geometry are checked before commit. Worker cancellation stops the process tree. Generated recordings remain synthetic evidence.
 - Restart preserves ID allocation, hashed resume credentials, saved show/map/routing and next calibration tag. It creates a new clock epoch and stops playback. Pending runtime jobs/runs are not resumed; operators repeat capture after a restart.
 - Local dev defaults and tests are documented in root README. Railway deployment is explicitly deferred by the user.
+- Cloudflare local testing publishes only the audience Next origin on port 3000. Explicit participant rewrites carry HTTP, audio and WSS to the backend; participant-only aliases never grant operator privileges. The console/camera uploads remain local. Next runs with Node 22+ because Bun-hosted Next on Windows stalled at WebSocket upgrade. See the [routing ADR](decisions/20260919-cloudflare-audience-origin.md).
 
 ## Historical foundation inventory
 

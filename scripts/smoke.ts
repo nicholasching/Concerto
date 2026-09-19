@@ -1,4 +1,4 @@
-import { nextCli } from "./build";
+import { nextCli, nextRuntime } from "./build";
 import { ROOT } from "./run";
 import { resolve } from "node:path";
 
@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 const children: ReturnType<typeof Bun.spawn>[] = [];
 try {
   children.push(Bun.spawn([process.execPath, "backend/dist/index.js"], { cwd: ROOT, env: { ...process.env, PORT: "18080", SESSION_ID: "smoke-test", OPERATOR_SECRET: crypto.randomUUID(), CHECKPOINT_PATH: resolve(ROOT, "runtime/smoke", crypto.randomUUID(), "checkpoint.json") }, stdout: "ignore", stderr: "inherit" }));
-  for (const [app, port] of [["client-frontend", "13000"], ["admin-frontend", "13001"]]) children.push(Bun.spawn([process.execPath, nextCli(app), "start", app, "--port", port], { cwd: ROOT, env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" }, stdout: "ignore", stderr: "inherit" }));
+  for (const [app, port] of [["client-frontend", "13000"], ["admin-frontend", "13001"]]) children.push(Bun.spawn([nextRuntime(), nextCli(app), "start", app, "--port", port], { cwd: ROOT, env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" }, stdout: "ignore", stderr: "inherit" }));
   for (const [index, port, path, expected] of [[0, 18080, "/api/health", "audience-orchestra-control"], [1, 13000, "/", "Audience client"], [2, 13001, "/", "Admin console"]] as const) {
     const deadline = Date.now() + 30000;
     let passed = false;

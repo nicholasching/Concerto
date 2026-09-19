@@ -11,10 +11,11 @@ import { browserStorage, joinSession } from "../lib/join";
 import { buildReadiness, statusMessage, StatusReporter } from "../lib/readiness";
 import { ShowControl, type PlaybackView } from "../lib/show-control";
 import { participantStatus } from "../lib/status";
+import { participantEndpoints } from "../lib/endpoints";
 import { CalibrationOverlay } from "./calibration-overlay";
 
-const api = process.env.NEXT_PUBLIC_API_URL ?? (typeof window === "undefined" ? "http://localhost:8080" : `${window.location.protocol}//${window.location.hostname}:8080`);
-const wsUrl = process.env.NEXT_PUBLIC_WS_URL ?? `${api.replace(/^http/, "ws")}/ws`;
+const { api, wsUrl } = participantEndpoints(typeof window === "undefined" ? "http://localhost:3000" : window.location.origin,
+  { api: process.env.NEXT_PUBLIC_API_URL, ws: process.env.NEXT_PUBLIC_WS_URL });
 const mock = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCKS === "1";
 const timers = { setTimeout: (callback: () => void, ms: number) => window.setTimeout(callback, ms), clearTimeout: (handle: unknown) => window.clearTimeout(handle as number) };
 

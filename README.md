@@ -23,13 +23,13 @@ Open [the operator console](http://localhost:3001) and enter `local-demo-only`, 
 
 Local state and media live under ignored `runtime/local/`. Restart restores identities, show, map, run-tag allocation and routing, starts a fresh clock epoch, and stays stopped. An unfinished calibration must be repeated after restart. To start a separate concert, set a new `SESSION_ID` and separate `CHECKPOINT_PATH` rather than deleting the existing concert.
 
-The QR defaults to this computer's localhost URL. For actual phones, use reachable HTTPS/WSS endpoints and configure `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL`; each phone's localhost refers to itself. Railway setup and physical device rehearsal are the next milestone.
+For other devices, follow [Cloudflare Tunnel setup](docs/cloudflare-tunnel.md). With the app running, `bun run tunnel:quick` publishes the audience on HTTPS. Paste the printed URL into the console's **Participant link** and click **Use participant link**; it saves the URL and adds the session to the QR. The audience proxies its HTTP API, audio and WebSocket through that same origin, while the operator console and camera uploads stay local. Railway setup remains a separate milestone.
 
 ## Setup
 
-Prerequisites: **Bun 1.3.14** and **Python 3.13** (worker supports Python 3.11+). The locked Python environment includes PyAV, OpenCV, NumPy and the actual decoder. Do not install dependencies inside `beatsync-source/`.
+Prerequisites: **Node.js 22+**, **Bun 1.3.14** and **Python 3.13** (worker supports Python 3.11+). The locked Python environment includes PyAV, OpenCV, NumPy and the actual decoder. Do not install dependencies inside `beatsync-source/`.
 
-Install Bun 1.3.14 using your version manager or `npm install -g bun@1.3.14`, then run from the repository root:
+Install Bun 1.3.14 using your version manager or `npm install -g bun@1.3.14`, then run from the repository root. Node runs the Next servers; Bun runs the backend and tooling:
 
 ```sh
 bun install --frozen-lockfile

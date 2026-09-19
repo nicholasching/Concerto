@@ -1,0 +1,3 @@
+# Captain follow-up: public participant QR
+
+Baseline main f2d097d; integrated ownership under the user's request. Participant link accepts/validates a public HTTP(S) URL, normalizes the current session and saves per browser/session. Use participant link updates the QR; Reset link restores the configured default. `gate:admin` passed (19 focused tests, 14 contracts, production build). Browser save/reload preserved the real Quick Tunnel URL and visible QR; operator controls and camera uploads stay local. See the [integration journal](../../integration/journal/20260919-cloudflare-testing.md) and [setup guide](../../../../docs/cloudflare-tunnel.md). Existing admin-worktree journal remains untouched.

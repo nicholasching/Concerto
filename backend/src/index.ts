@@ -63,9 +63,11 @@ const server = Bun.serve<SocketData, string>({
   maxRequestBodySize: 1024 * 1024 * 1024,
   fetch(request, server) {
     const url = new URL(request.url);
-    if (url.pathname !== "/ws") return app.fetch(request);
+    const participantOnly = url.pathname === "/ws/participant";
+    if (url.pathname !== "/ws" && !participantOnly) return app.fetch(request);
 
     const operatorSecret = url.searchParams.get("operatorSecret");
+    if (participantOnly && operatorSecret !== null) return new Response("This endpoint accepts participant connections only.", { status: 403 });
     if (operatorSecret !== null) {
       if (!matchesOperatorSecret(operatorSecret)) return new Response("Invalid operator secret.", { status: 401 });
       return server.upgrade(request, { data: { role: "operator" } })

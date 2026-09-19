@@ -10,6 +10,8 @@ All four feature branches are merged into main, through merge 5eb08ab. Captain i
 
 Read [integration status/handoff](teams/integration/handoff.md), [verification](evidence/integration/verification.md), [integration journal](teams/integration/journal/20260919-captain-integration.md), [accepted integration boundaries](decisions/20260919-140000-integration-boundaries.md), and [stage 05](stages/05-integration-rehearsal.md). Physical phone/camera/acoustic/venue acceptance is still outstanding. The foundation notes below are historical, not the current implementation inventory.
 
+Cloudflare device testing now uses a single audience origin for HTTP/audio/WSS and a saved public QR URL. Read the [setup guide](../docs/cloudflare-tunnel.md), [routing decision](decisions/20260919-cloudflare-audience-origin.md) and [verified tunnel journal](teams/integration/journal/20260919-cloudflare-testing.md). Next servers require Node 22+; backend/tooling remain Bun. A real Quick Tunnel and desktop browser passed; physical phone evidence remains outstanding.
+
 ### Historical foundation checkpoint
 
 - Software foundation is verified and ready for four teams. Canonical baseline: Git tag `foundation-v1`; resolve its SHA with `git rev-parse foundation-v1` and record it in your first journal. The immutable tag avoids embedding its own commit hash inside itself.

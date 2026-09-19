@@ -1,18 +1,18 @@
 import { resolve } from "node:path";
-import { nextCli } from "./build";
+import { nextCli, nextRuntime } from "./build";
 import { ROOT } from "./run";
 
 const mode = process.argv[2];
 const children: ReturnType<typeof Bun.spawn>[] = [];
-function spawn(args: string[], env: Record<string, string> = {}) {
-  children.push(Bun.spawn([process.execPath, ...args], { cwd: ROOT, env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", ...env }, stdin: "inherit", stdout: "inherit", stderr: "inherit" }));
+function spawn(args: string[], env: Record<string, string> = {}, executable = process.execPath) {
+  children.push(Bun.spawn([executable, ...args], { cwd: ROOT, env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", ...env }, stdin: "inherit", stdout: "inherit", stderr: "inherit" }));
 }
 function frontend(app: string, port: number, mockPort?: number) {
   spawn([nextCli(app), "dev", app, "--webpack", "--port", String(port)], {
     ...(mockPort ? { NEXT_PUBLIC_API_URL: `http://localhost:${mockPort}`, NEXT_PUBLIC_WS_URL: `ws://localhost:${mockPort}/ws` } : {}),
     NEXT_PUBLIC_SESSION_ID: mockPort ? "demo" : process.env.SESSION_ID ?? "dev-session",
     NEXT_PUBLIC_ENABLE_MOCKS: mockPort ? "1" : "0",
-  });
+  }, nextRuntime()); // Next's external WebSocket rewrite stalls under Bun 1.3.14 on Windows.
 }
 if (mode === "sync-demo" || mode === "all") {
   spawn([resolve(ROOT, "backend/src/index.ts")], { OPERATOR_SECRET: process.env.OPERATOR_SECRET ?? "local-demo-only",

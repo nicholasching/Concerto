@@ -9,5 +9,6 @@ Owner: integration captain / main / foundation-v1 plus all four development bran
 - Verification uses unit/contract gates, production HTTP startup, real HTTP/WS/worker E2E, desktop browser walkthrough, source isolation and 1500 socket load. See [verification](../../evidence/integration/verification.md) for exact evidence and limits.
 - User explicitly deferred Railway until after local review. Physical phones, real camera visibility, acoustic timing, venue Wi-Fi, three rehearsals and a demo freeze are outstanding. No stage-ready or deployment claim.
 - Preserved the admin worktree's pre-existing untracked journal. No remote push or history rewrite.
+- Cloudflare follow-up: one audience proxy origin, saved public QR links and Node-based Next startup are verified with unit/build gates, real local/production proxy checks and a live Quick Tunnel. Public browser reached Connected, Clock synced, Audio unlocked and 4/4 verified assets. [Evidence and limits](journal/20260919-cloudflare-testing.md).
 
-Next action: user local review, then follow [handoff](handoff.md) for the separate physical/deployment milestone. Local services are running with four test tones and stopped transport.
+Next action: scan the saved public QR from physical phones, then follow [handoff](handoff.md) for the separate physical/deployment milestone. Local services are running with four test tones and stopped transport. Quick Tunnel URLs are temporary; use the setup guide to create/save a new URL after restarting the tunnel.

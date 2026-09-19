@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join as joinPath, resolve } from "node:path";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import {
@@ -210,22 +210,24 @@ export function createApp(deps: AppDeps) {
 
   // Role filtering happens here, not in the client: a participant is never sent another
   // phone's telemetry, and the operator view needs a credential the QR code does not grant.
-  app.get("/api/sessions/:sessionId/snapshot", c => {
+  const readSnapshot = (allowOperator: boolean) => (c: Context) => {
     if (c.req.param("sessionId") !== deps.clock.sessionId) {
       return c.json(apiError("WRONG_SESSION", "This server is not serving that concert session."), 404);
     }
-    if (matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
+    if (allowOperator && matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {
       return c.json(deps.state.adminSnapshot(deps.clock));
     }
     const resumeToken = c.req.header("x-resume-token");
     const deviceId = resumeToken === undefined ? null : deps.registry.authenticate(resumeToken);
     if (deviceId === null) {
-      return c.json(apiError("UNAUTHORIZED", "Provide a valid resume token or the operator secret."), 401);
+      return c.json(apiError("UNAUTHORIZED", allowOperator ? "Provide a valid resume token or the operator secret." : "Provide a valid participant resume token."), 401);
     }
     const snapshot = deps.state.participantSnapshot(deviceId, deps.clock);
     if (!snapshot) return c.json(apiError("UNKNOWN_DEVICE", "This device is not registered in the current session."), 404);
     return c.json(snapshot);
-  });
+  };
+  app.get("/api/sessions/:sessionId/snapshot", readSnapshot(true));
+  app.get("/api/sessions/:sessionId/participant-snapshot", readSnapshot(false));
 
   app.put("/api/show", async c => {
     if (!matchesOperatorSecret(c.req.header("x-operator-secret"), deps.operatorSecret)) {

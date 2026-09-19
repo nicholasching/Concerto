@@ -1,0 +1,3 @@
+# Captain follow-up: same-origin audience connections
+
+Baseline main f2d097d; integrated ownership under the user's request. Audience API/WS defaults follow the page origin; Next forwards a participant allowlist to the backend. Explicit mock/separate-deployment overrides remain. `gate:client` passed (116 focused tests, 14 contracts, production build). Node-based Next startup fixed a real WebSocket-upgrade stall under Bun on Windows. The public desktop browser connected, synchronized, unlocked audio and verified all four original tones. See the [integration journal](../../integration/journal/20260919-cloudflare-testing.md) and [ADR](../../../decisions/20260919-cloudflare-audience-origin.md). Actual phones still need testing.

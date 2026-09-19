@@ -24,8 +24,11 @@ test("real server sends authenticated initial snapshots before any client messag
     const identity = JoinResponse.parse(await (await fetch(`${url}api/sessions/startup-test/join`, {
       method: "POST", headers: { "content-type": "application/json" }, body: "{}",
     })).json());
-    for (const [credential, role] of [[`resumeToken=${identity.resumeToken}`, "participant"], ["operatorSecret=socket-test-secret", "admin"]] as const) {
-      const socket = new WebSocket(`${url.replace("http:", "ws:")}ws?${credential}`);
+    for (const query of ["operatorSecret=socket-test-secret", `resumeToken=${identity.resumeToken}&operatorSecret=socket-test-secret`, "operatorSecret=socket-test-secret&operatorSecret="]) {
+      expect((await fetch(`${url}ws/participant?${query}`)).status).toBe(403);
+    }
+    for (const [path, credential, role] of [["ws", `resumeToken=${identity.resumeToken}`, "participant"], ["ws/participant", `resumeToken=${identity.resumeToken}`, "participant"], ["ws", "operatorSecret=socket-test-secret", "admin"]] as const) {
+      const socket = new WebSocket(`${url.replace("http:", "ws:")}${path}?${credential}`);
       sockets.push(socket);
       const message = await new Promise<unknown>((resolve, reject) => {
         socket.onmessage = event => resolve(JSON.parse(String(event.data)));

@@ -79,6 +79,16 @@ class FakeSocket implements ClientSocket {
 }
 
 describe("role-filtered snapshots", () => {
+  test("the tunnel snapshot alias never grants the operator role, even with its valid credential", async () => {
+    const { app } = harness();
+    const participant = await join(app);
+    const path = `/api/sessions/${SESSION}/participant-snapshot`;
+    expect((await app.request(path, { headers: { "x-operator-secret": SECRET } })).status).toBe(401);
+    const response = await app.request(path, { headers: { "x-operator-secret": SECRET, "x-resume-token": participant.resumeToken } });
+    const body = ParticipantSnapshot.parse(await response.json());
+    expect(body.role).toBe("participant");
+    expect(body.deviceId).toBe(participant.deviceId);
+  });
   test("pending assignments never reveal other participants", () => {
     const { state } = harness();
     state.register(0);
