@@ -1,6 +1,6 @@
 # Stage 03 - Optical localization
 
-Integrated-main checkpoint, 2026-09-19: v1.4 passes 90 Python tests and decodes the two visible devices (9 and 11) in the original physical sample through the live console. See the [physical investigation](../teams/otc-localization/journal/20260919-two-physical-screens.md). Both results are column-only without anchors; authoritative commit and broader near/far/three-camera/venue acceptance remain separate. The initial branch checkpoints below are historical.
+Integrated-main working-tree checkpoint, 2026-09-19: **v1.5 passes 103 Python tests** and shared OTC gate. Fresh original-file checks recover the new clip's **three completed devices (15/16/17)** and preserve the earlier **two (9/11)**, all with agreeing passes and zero corrected/erased bits. See the [preamble/tracking investigation](../teams/otc-localization/journal/20260919-preamble-tracking.md). Background objects without the complete amber/blue header are no longer published as device tracks. Live runs/maps remain untouched; these single-camera results are column-only without anchors. Broader near/far/three-camera/venue acceptance remains separate. The initial branch checkpoints below are historical.
 
 Status: in progress; software implementation audited and ready for integration. Owner: Team 3 lead. Branch: feat/otc-localization. Base: foundation-v1 (ab59c27105627977ee52dc2bcd4276b4532b9e2a).
 

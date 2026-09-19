@@ -20,6 +20,7 @@ export interface JoinOptions {
 }
 
 export const tokenKey = (sessionId: string) => `orchestra:resume:${sessionId}`;
+export const JOIN_TIMEOUT_MS = 10000;
 
 // Concurrent callers for one session share a request, so a double mount can't burn two IDs.
 const pending = new Map<string, Promise<JoinResult>>();
@@ -37,10 +38,14 @@ export function joinSession(options: JoinOptions): Promise<JoinResult> {
 async function attemptJoin({ api, sessionId, storage, fetch: post = fetch }: JoinOptions): Promise<JoinResult> {
   const saved = read(storage, tokenKey(sessionId));
   const url = new URL(`/api/sessions/${encodeURIComponent(sessionId)}/join`, api).toString();
+  const controller = new AbortController();
+  // An unreachable tunnel can leave fetch pending and block every subsequent retry.
+  const timeout = setTimeout(() => controller.abort(), JOIN_TIMEOUT_MS);
   const send = (resumeToken: string | null) => post(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(resumeToken ? { resumeToken } : {}),
+    signal: controller.signal,
   });
   try {
     let response = await send(saved);
@@ -61,7 +66,9 @@ async function attemptJoin({ api, sessionId, storage, fetch: post = fetch }: Joi
     write(storage, tokenKey(sessionId), join.resumeToken);
     return { status: "joined", join, newDevice: !saved || tokenRejected, tokenRejected };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : String(error) };
+    return { status: "error", message: controller.signal.aborted ? "Join timed out; retrying the connection." : error instanceof Error ? error.message : String(error) };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

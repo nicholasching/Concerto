@@ -18,6 +18,7 @@
     "test:smoke": "bun scripts/smoke.ts",
     "check:tunnel": "bun scripts/check-tunnel.ts",
     "tunnel:quick": "cloudflared tunnel --url http://127.0.0.1:3000",
+    "tunnel:named": "cloudflared tunnel --no-autoupdate run",
     "test": "bun run gate",
     "gate": "bun scripts/gate.ts all",
     "gate:sync": "bun scripts/gate.ts sync",

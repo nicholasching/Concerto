@@ -18,6 +18,7 @@ For the backend/admin producer-consumer handoff, run `bun tools/otc-fixtures/ver
 | `clean` | Native small screens, three views/overlap, compression, static colored distractor |
 | `degraded` | Hand motion, channel color gains, dropped frames, one-slot erasure, half-cover/uncover, one fully hidden phone |
 | `emissive-background` | Washed-out amber/cyan screens against dim colored clothing and a thin glow bridge; unequal pilot brightness and dim screens in the same capture |
+| `reflected-motion` | Larger moving screens with broad reflected blue hand/arm glow and short exposure bands that distort a single frame's centroid |
 | `vfr` | Nonuniform presentation times plus missing frames and motion |
 | `rotated` | Raw camera rotation with explicit manifest correction |
 | `wrong-tag` | Valid ID words from a different calibration tag |

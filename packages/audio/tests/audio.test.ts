@@ -112,6 +112,25 @@ describe("assets", () => {
 });
 
 describe("decoded budget", () => {
+  test("preloads four long stereo buffers with the default phone budget", async () => {
+    const ctx = new FakeAudioContext();
+    ctx.decoded = { length: 48_000 * 276.8, numberOfChannels: 2, sampleRate: 48_000, duration: 276.8 };
+    const tracks = Array.from({ length: 4 }, (_, index) => ({ ...track, trackId: `long-${index}` }));
+    const budget = new DecodedBudget();
+    const cache = new Map();
+    const failures = await preloadTracks(tracks, { ctx: asAudioContext(ctx), budget, baseUrl: "http://mock", fetch: serve(await toneBytes()) }, cache);
+    expect(failures).toEqual([]);
+    expect(cache.size).toBe(4);
+    expect(budget.usedBytes).toBe(4 * 48_000 * 276.8 * 2 * 4);
+  });
+
+  test("keeps the 512 MiB default ceiling and rejects one byte beyond it", () => {
+    const budget = new DecodedBudget();
+    budget.reserve("full", 512 * 1024 * 1024);
+    expect(() => budget.reserve("extra", 1)).toThrow(AssetError);
+    expect(budget.usedBytes).toBe(512 * 1024 * 1024);
+  });
+
   test("counts float32 samples per channel", () => {
     expect(decodedBytes({ length: 48000 * 60, numberOfChannels: 1 })).toBe(11520000);
     expect(decodedBytes({ length: 10, numberOfChannels: 2 })).toBe(80);

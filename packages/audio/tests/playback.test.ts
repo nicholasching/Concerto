@@ -115,9 +115,9 @@ describe("engine", () => {
     engine.load(show, stopped(0), "channel-0", mix);
     engine.setTransport(playing(1, T0 + 1000), T0 + 1000);
     clock.advance(2000); // now T0 + 2000, first segment playing
-    engine.setChannel("channel-3", T0 + 4000);
+    engine.setChannel("channel-2", T0 + 4000);
     const [first, second] = started();
-    expect((second.buffer as { id: string }).id).toBe("tone-3");
+    expect((second.buffer as { id: string }).id).toBe("tone-2");
     expect(startOf(second)).toEqual([audio(T0 + 4000), 3, 5]);
     expect(first.stopped).toBe(0); // the old part keeps sounding until the switch
     expect(segmentGainOf(first).at(audio(T0 + 4000) - 0.001)).toBe(1);

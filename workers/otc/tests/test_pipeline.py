@@ -35,7 +35,10 @@ def test_actual_three_camera_mp4_roundtrip_and_review_artifacts(capture, tmp_pat
     assert result["evidence"] == "synthetic"
     for camera, expected_phase in zip(result["cameras"], truth["cameraPhasePtsMs"]):
         assert abs(camera["phasePtsMs"]-expected_phase) < 40
-    assert any(o["status"] == "rejected" for o in result["observations"])  # Stage light.
+    assert all(not (o["centerPx"]["x"] < 40 and o["centerPx"]["y"] < 20)
+               for o in result["observations"])  # Stage light is not a device track.
+    assert any("without a complete amber/blue preamble" in message
+               for camera in result["cameras"] for message in camera["messages"])
     for event in events:
         validate_schema("JobProgress", event)
         assert event["jobId"] == "job-test"
@@ -93,6 +96,14 @@ def test_washed_pilots_clothing_glow_and_mixed_brightness_mp4(capture):
         expected_y = truth["height"] * (.94-.88*phone["y"]) - .5
         assert math.hypot(observation["centerPx"]["x"]-expected_x,
                           observation["centerPx"]["y"]-expected_y) < 2
+
+
+def test_reflected_blue_glow_motion_and_single_frame_glare_keep_full_packets(capture):
+    path, manifest, truth = capture("reflected-motion", count=6)
+    result = process_manifest(manifest, path, "synthetic")
+    assert_positions(result, truth, manifest["participantIds"])
+    assert all(o["status"] == "accepted" and o["correctedBits"] == 0
+               for o in result["observations"])
 
 
 @pytest.mark.parametrize("case", ["wrong-tag", "empty"])

@@ -4,6 +4,8 @@ import { ClientMessage, ServerMessage } from "./messages";
 
 export * from "./models";
 export * from "./messages";
+export * from "./limits";
+export * from "./show-defaults";
 export const schemas = {
   JoinRequest: models.JoinRequest, JoinResponse: models.JoinResponse, ApiError: models.ApiError,
   CommandAccepted: models.CommandAccepted, Show: models.Show, Transport: models.Transport,

@@ -147,7 +147,7 @@ try {
     assert.equal(location.status, "localized");
     const selected = selectRectangle(current.audienceMap.locations, { x: location.x! - 0.01, y: location.y! - 0.01 }, { x: location.x! + 0.01, y: location.y! + 0.01 }, current.audienceMap.mapRevision);
     assert.deepEqual(selected.deviceIds, [phones[index].id]);
-    await request("/api/assignments", { expectedRevision: current.assignmentRevision, mapRevision: selected.mapRevision, deviceIds: selected.deviceIds, channelId: show.channels[index].channelId, effectiveServerMs: current.serverMs + 4000 });
+    await request("/api/assignments", { expectedRevision: current.assignmentRevision, mapRevision: selected.mapRevision, deviceIds: selected.deviceIds, channelId: show.channels[index % show.channels.length].channelId, effectiveServerMs: current.serverMs + 4000 });
   }
   await until(snapshot, s => s.pendingActions.length === 0);
   current = await snapshot();
@@ -157,10 +157,11 @@ try {
   await request("/api/transport", { expectedRevision: current.transport.transportRevision, action: "play", showRevision: current.show.showRevision, positionMs: 0, effectiveServerMs: current.serverMs + 4000 });
   await until(snapshot, s => s.transport.status === "playing");
   await until(() => phones.every(phone => phone.calls.some(call => call.startsWith("transport:playing:"))), Boolean);
-  check("decoded map selections route exactly one intended ID to each of four channels and schedule a prepared common cue");
+  assert.deepEqual(show.channels.map(channel => channel.label), ["Melody", "Vocals", "Percussion"]);
+  check("decoded map selections route four intended phones across Melody, Vocals and Percussion and schedule a prepared common cue");
   phones[1].audioReady = false; phones[1].status();
   current = await snapshot();
-  const assignment = { expectedRevision: current.assignmentRevision, mapRevision: current.audienceMap.mapRevision, deviceIds: phones.slice(0, 2).map(phone => phone.id), channelId: show.channels[3].channelId, effectiveServerMs: current.serverMs + 6000 };
+  const assignment = { expectedRevision: current.assignmentRevision, mapRevision: current.audienceMap.mapRevision, deviceIds: phones.slice(0, 2).map(phone => phone.id), channelId: show.channels[2].channelId, effectiveServerMs: current.serverMs + 6000 };
   const prep = await request("/api/assignments/prepare", assignment);
   await until(snapshot, s => { const p = s.preparations.find(p => p.domain === "assignment"); return !!p && p.readyIds.length + p.excluded.length === 2; });
   const switchAck = await request("/api/assignments", { ...assignment, preparationId: prep.preparationId });

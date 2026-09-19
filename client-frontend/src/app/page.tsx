@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AudioContextHost, DecodedBudget, isAudioContextPaused, PlaybackEngine, preloadTracks, type LoadedTrack } from "@orchestra/audio";
 import { ClientMessage, type ShowData } from "@orchestra/contracts";
-import { ClockSync } from "@orchestra/sync";
+import { CLOCK_PROFILES, ClockSync } from "@orchestra/sync";
 import { CalibrationSession, type CalibrationPhase } from "../lib/calibration";
 import { browserSocket, ParticipantConnection, type ConnectionState } from "../lib/connection";
 import { FlashRenderer } from "../lib/flash-renderer";
@@ -17,6 +17,7 @@ import { CalibrationOverlay } from "./calibration-overlay";
 const { api, wsUrl } = participantEndpoints(typeof window === "undefined" ? "http://localhost:3000" : window.location.origin,
   { api: process.env.NEXT_PUBLIC_API_URL, ws: process.env.NEXT_PUBLIC_WS_URL });
 const mock = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCKS === "1";
+const clockProfile = process.env.NEXT_PUBLIC_CLOCK_PROFILE === "strict" ? "strict" : "internet";
 const timers = { setTimeout: (callback: () => void, ms: number) => window.setTimeout(callback, ms), clearTimeout: (handle: unknown) => window.clearTimeout(handle as number) };
 
 function calibrationLabel(phase: CalibrationPhase, optedOut: boolean): string {
@@ -60,7 +61,7 @@ function connectionLabel(state: ConnectionState): string {
 
 export default function Page() {
   const connection = useRef<ParticipantConnection | null>(null);
-  const [serverClock] = useState(() => new ClockSync({ send: payload => {
+  const [serverClock] = useState(() => new ClockSync({ profile: clockProfile, send: payload => {
     const snapshot = connection.current?.current.snapshot;
     if (snapshot) connection.current?.send({ protocolVersion: 1, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch,
       messageId: crypto.randomUUID(), type: "clock.probe", payload });
@@ -278,7 +279,10 @@ export default function Page() {
       {conn.snapshot && readiness && <p>{participantStatus({ ...conn.snapshot, readiness })}</p>}
       <ul className="checks">{checks.map(([label, ok]) => <li key={label} className={ok ? "ok" : "no"}>{ok ? "✓" : "✗"} {label}</li>)}</ul>
       <p>Keep this page open and your phone volume up. Calibration uses an eleven-second color pattern; you can skip it and choose your column.</p>
-      {clockQuality.ready && <p>Clock uncertainty: {clockQuality.uncertaintyMs?.toFixed(1)} ms</p>}
+      <p>Timing tolerance: {clockProfile === "internet" ? "Internet / cellular" : "Strict"}</p>
+      {clockQuality.uncertaintyMs !== null && <p>Estimated clock uncertainty: {clockQuality.uncertaintyMs.toFixed(1)} ms</p>}
+      {clockQuality.ready && clockQuality.uncertaintyMs !== null && clockQuality.uncertaintyMs > CLOCK_PROFILES.strict.readyUncertaintyMs &&
+        <p className="notice">Ready with relaxed timing tolerance. Higher network latency may reduce audio and calibration alignment.</p>}
       {identity && audioState !== "running" && <button type="button" onClick={enableSound}>{isAudioContextPaused(audioState) ? "Tap to resume sound" : "Enable sound"}</button>}
       {audioNote && <p role="alert">{audioNote}</p>}
       {assetNote && <p>{assetNote}</p>}

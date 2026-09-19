@@ -2,7 +2,7 @@ import { ServerMessage, type ClientMessageData, type ParticipantSnapshotData, ty
 import type { JoinData, JoinResult } from "./join";
 
 // Backoff adapted from BeatSync apps/client/src/hooks/useWebSocketReconnection.ts (MIT).
-export const BACKOFF = { initialMs: 1000, factor: 1.1, maxMs: 10000, jitter: 0.15, maxAttempts: 15, connectTimeoutMs: 5000 };
+export const BACKOFF = { initialMs: 1000, factor: 1.1, maxMs: 10000, jitter: 0.15, maxAttempts: 15, connectTimeoutMs: 5000, receiveTimeoutMs: 10000 };
 export const REPLACED_CLOSE_CODE = 4001;
 const OPEN = 1;
 
@@ -91,6 +91,7 @@ export class ParticipantConnection {
   private stopped = false;
   private retryTimer: unknown = null;
   private connectTimer: unknown = null;
+  private receiveTimer: unknown = null;
   private readonly timers: Timers;
   private readonly random: () => number;
   private readonly log: (message: string) => void;
@@ -177,7 +178,10 @@ export class ParticipantConnection {
     if (message.type !== "state.snapshot") {
       const current = this.state.snapshot;
       if (this.state.status.kind === "connected" && current && message.sessionId === current.sessionId
-        && message.serverEpoch === current.serverEpoch) this.options.onMessage?.(message);
+        && message.serverEpoch === current.serverEpoch) {
+        this.expectTraffic();
+        this.options.onMessage?.(message);
+      }
       return;
     }
     const snapshot = message.payload;
@@ -192,10 +196,26 @@ export class ParticipantConnection {
       this.attempts = 0;
       if (this.connectTimer !== null) { this.timers.clearTimeout(this.connectTimer); this.connectTimer = null; }
     }
+    this.expectTraffic();
     this.update({ status: { kind: "connected" }, snapshot });
   }
 
+  // Clock replies and leases keep a healthy connection active. Browser close events can
+  // lag behind a Wi-Fi/tunnel outage, so also recover sockets that remain OPEN but silent.
+  private expectTraffic(): void {
+    if (this.receiveTimer !== null) this.timers.clearTimeout(this.receiveTimer);
+    const socket = this.socket;
+    this.receiveTimer = this.timers.setTimeout(() => {
+      this.receiveTimer = null;
+      if (this.stopped || this.socket !== socket || this.state.status.kind !== "connected") return;
+      this.log("server stopped responding; reconnecting");
+      this.dropSocket();
+      this.scheduleRetry();
+    }, BACKOFF.receiveTimeoutMs);
+  }
+
   private scheduleRetry(): void {
+    this.clearTimers();
     this.attempts += 1;
     if (this.attempts >= BACKOFF.maxAttempts) { this.update({ status: { kind: "gave-up" } }); return; }
     this.update({ status: this.state.identity ? { kind: "reconnecting", attempt: this.attempts } : { kind: "joining", attempt: this.attempts } });
@@ -214,8 +234,10 @@ export class ParticipantConnection {
   private clearTimers(): void {
     if (this.retryTimer !== null) this.timers.clearTimeout(this.retryTimer);
     if (this.connectTimer !== null) this.timers.clearTimeout(this.connectTimer);
+    if (this.receiveTimer !== null) this.timers.clearTimeout(this.receiveTimer);
     this.retryTimer = null;
     this.connectTimer = null;
+    this.receiveTimer = null;
   }
 
   private update(patch: Partial<ConnectionState>): void {

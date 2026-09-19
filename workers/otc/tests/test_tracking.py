@@ -34,6 +34,16 @@ def test_long_occlusion_starts_a_new_track_instead_of_guessing_identity():
     assert len(tracks) == 2
 
 
+def test_one_distorted_centroid_does_not_extrapolate_the_track_away_from_the_phone():
+    tracks, active = [], set()
+    for i, x in enumerate((100, 100, 100, 100, 125, 100)):
+        sample = Sample(i*33, x, 100, 40, 80, (0, 100, 255))
+        active = associate(tracks, active, [sample], i*33)
+    assert len(tracks) == 1
+    assert len(tracks[0].samples) == 6
+    assert not tracks[0].reasons
+
+
 def test_screen_hole_and_nested_island_keep_separate_colors_and_centers():
     rgb = np.zeros((100, 100, 3), dtype=np.uint8)
     rgb[10:50, 10:50] = (255, 176, 0)
@@ -104,6 +114,65 @@ def test_adjacent_fragments_do_not_steal_or_poison_a_phone_track():
     assert tracks[0].samples == [phone, blue]
     assert not tracks[0].reasons
     assert all(len(t.samples) == 1 for t in tracks[1:])
+
+
+def test_full_footprint_wins_over_a_smaller_overlapping_reflection():
+    tracks = []
+    active = associate(tracks, set(), [screen(0)], 0)
+    full = screen(33)
+    reflection = screen(33, x=33, width=6)
+    associate(tracks, active, [reflection, full], 33)
+    assert tracks[0].samples == [screen(0), full]
+    assert not tracks[0].reasons
+    associate(tracks, set(range(len(tracks))), [screen(66)], 66)
+    assert tracks[0].samples[-1] == screen(66)
+    assert not tracks[0].reasons
+
+
+def test_blue_screen_isolated_from_a_broad_low_saturation_glow():
+    rgb = np.full((240, 320, 3), 9, np.uint8)
+    rgb[45:125, 140:150] = (150, 140, 245)
+    rgb[115:130, 125:150] = (150, 140, 245)
+    rgb[110:152, 101:125] = (15, 65, 253)
+    found = detect_screens(rgb, 0, np.zeros(rgb.shape[:2], np.uint8))
+    assert len(found) == 1
+    assert (found[0].width, found[0].height) == (24, 42)
+
+
+def test_solid_washed_blue_screen_recovers_its_full_footprint_from_a_small_core():
+    rgb = np.full((120, 160, 3), 9, np.uint8)
+    rgb[30:72, 50:74] = (140, 160, 235)
+    rgb[40:50, 59:65] = (15, 90, 255)
+    found = detect_screens(rgb, 0, np.zeros(rgb.shape[:2], np.uint8))
+    assert len(found) == 1
+    assert (found[0].width, found[0].height) == (24, 42)
+
+
+def test_exposure_band_splitting_blue_saturation_keeps_one_continuous_screen():
+    tracks, active = [], set()
+    for frame in range(8):
+        rgb = np.full((160, 200, 3), 9, np.uint8)
+        rgb[30:110, 60:110] = (15, 65, 253)
+        if frame in (3, 4):
+            rgb[50:54, 60:110] = (180, 200, 250)
+        found = detect_screens(rgb, frame*33, np.zeros(rgb.shape[:2], np.uint8))
+        assert len(found) == 1
+        assert (found[0].width, found[0].height) == (50, 80)
+        active = associate(tracks, active, found, frame*33)
+    assert len(tracks) == 1 and len(tracks[0].samples) == 8
+    assert not tracks[0].reasons
+
+
+def test_bright_bridge_between_two_screens_does_not_resolve_their_merge():
+    rgb = np.full((120, 160, 3), 9, np.uint8)
+    rgb[30:62, 50:66] = (15, 65, 253)
+    rgb[30:62, 70:86] = (15, 65, 253)
+    tracks = []
+    active = associate(tracks, set(), detect_screens(rgb, 0, np.zeros(rgb.shape[:2], np.uint8)), 0)
+    rgb[30:62, 66:70] = (180, 200, 250)
+    associate(tracks, active, detect_screens(rgb, 33, np.zeros(rgb.shape[:2], np.uint8)), 33)
+    assert len(tracks) == 2
+    assert all(t.reasons == {"ambiguous screen association or merge"} for t in tracks)
 
 
 def test_screen_can_cross_brightness_mask_threshold_between_pilot_colors():

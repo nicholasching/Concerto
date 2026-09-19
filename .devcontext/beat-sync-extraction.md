@@ -43,6 +43,7 @@ intervals 50 ms then 2500 ms, response timeout 3750 ms.
 | Probe group counter never restarts, including across `reset()` | A reply that outlives a reconnect cannot match a newly issued group ID |
 | Readiness is recomputed rather than latched: it requires the measurement count, an uncertainty at or below 20 ms, and a sample age within the response timeout | The source latched `isSynced` once 16 measurements existed; masterplan section 6 requires an eligibility threshold and sample age that can degrade |
 | `useNtpHeartbeat` not ported; only its intervals survive, as `nextProbeDelayMs()` | The hook is React-bound. Timer ownership, jitter and staleness handling belong to the client and the load harness |
+| Explicit `internet` readiness profile (150 ms uncertainty / 10 s accepted-sample age), selected by the participant application; strict defaults remain | User requested broader cellular/hotspot eligibility after live tunnel testing. Clock offset, min-RTT selection, 16-pair warmup and 5 ms gap filtering are unchanged. Actual uncertainty stays visible; physical timing targets are not relaxed. See [decision](decisions/20260919-internet-clock-readiness.md) |
 
 ## Team 2 slice 1 (2026-09-19)
 

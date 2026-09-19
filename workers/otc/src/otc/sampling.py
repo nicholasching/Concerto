@@ -36,6 +36,12 @@ def sample_packet(track, phase_ms, prepared=None):
         if selected.sum() < 2:
             return None
         pilots.append(np.median(colors[selected], axis=0))
+    # The wire palette is amber then blue. Learn exposure/white balance from the
+    # pilots, but do not promote arbitrary two-colour lights or reversed pilots.
+    amber, blue = pilots
+    if not (amber[0] - amber[2] >= 0.025 and amber[1] - amber[2] >= 0.025 and
+            blue[2] - blue[0] >= 0.05):
+        return None
     separation = float(np.linalg.norm(pilots[1] - pilots[0]))
     if separation < 0.18:
         return None
@@ -60,22 +66,32 @@ def find_phase(track):
     if len(track.samples) < MIN_PHASE_SAMPLES:
         return None
     prepared = prepare_samples(track)
-    times = prepared[0]
+    times, colors = prepared
     cadence = float(np.median(np.diff(times)))
     # Leading dark guards break tracks before the first two color-zero pilots.
-    estimate = times[0] - 2 * SYMBOL_MS - cadence / 2
-    candidates = []
-    for offset in range(-100, 101, 10):
-        phase = estimate + offset
-        if phase < 0:
+    amber = (colors[:, 0]-colors[:, 2] >= 0.025) & (colors[:, 1]-colors[:, 2] >= 0.025)
+    starts = np.flatnonzero(amber & ~np.r_[False, amber[:-1]])
+    # A status bar or background reflection can keep a candidate alive through
+    # the dark guards. Its first sample is then not the first pilot. Try actual
+    # amber onsets as well, using only the header to choose the packet phase.
+    estimates = [times[0]-2*SYMBOL_MS-cadence/2]
+    estimates.extend(times[index]-2*SYMBOL_MS-cadence/2 for index in starts
+                     if times[index]-times[0] > 100)
+    for estimate in estimates:
+        candidates = []
+        if estimate + 13*SYMBOL_MS > times[-1] + 100:
             continue
-        sampled = sample_packet(track, phase, prepared)
-        if sampled and tuple(sampled.symbols[2:13]) == HEADER:
-            candidates.append(phase)
-    if not candidates:
-        return None
-    # Fit on pilots/preamble only. Never search a phase to fit the requested tag/ID.
-    return sample_packet(track, float(np.median(candidates)), prepared)
+        for offset in range(-100, 101, 10):
+            phase = estimate + offset
+            if phase < 0:
+                continue
+            header = (times >= phase) & (times < phase + 13*SYMBOL_MS)
+            sampled = sample_packet(track, phase, (times[header], colors[header]))
+            if sampled and tuple(sampled.symbols[2:13]) == HEADER:
+                candidates.append(phase)
+        if candidates:
+            return sample_packet(track, float(np.median(candidates)), prepared)
+    return None
 
 
 def decode_tracks(scan, manifest, camera_id):
@@ -93,10 +109,14 @@ def decode_tracks(scan, manifest, camera_id):
             phase = float(np.median(cluster))
     else:
         messages.append("No complete pilot/preamble track; check visibility, colors or capture start")
+    background = sum(packet is None for packet in fitted.values())
+    if background:
+        messages.append(f"Ignored {background} candidates without a complete amber/blue preamble; "
+                        "not device tracks")
     observations, details = [], []
     participants = set(manifest["participantIds"])
     for track in scan.tracks:
-        if len(track.samples) < 4:
+        if fitted[track.track_id] is None:
             continue
         sampled = fitted[track.track_id]
         reason = "pilot/preamble not resolved"
@@ -109,7 +129,9 @@ def decode_tracks(scan, manifest, camera_id):
                 reason = "track phase disagrees with camera phase"
         elif sampled is not None:
             reason = "camera packet phase is ambiguous"
-        centers = np.array([(s.x, s.y) for s in track.samples])
+        packet_samples = [s for s in track.samples
+                          if sampled.phase_ms + 2*SYMBOL_MS <= s.pts_ms < sampled.phase_ms + 53*SYMBOL_MS]
+        centers = np.array([(s.x, s.y) for s in packet_samples])
         center = np.median(centers, axis=0)
         status = decoded.status if decoded else "rejected"
         reasons = sorted(track.reasons) + [reason]
@@ -121,7 +143,7 @@ def decode_tracks(scan, manifest, camera_id):
             "cameraId": camera_id, "trackId": track.track_id,
             "deviceId": decoded.device_id if decoded else None, "status": status,
             "centerPx": {"x": float(center[0]), "y": float(center[1])},
-            "firstPtsMs": track.samples[0].pts_ms, "lastPtsMs": track.samples[-1].pts_ms,
+            "firstPtsMs": packet_samples[0].pts_ms, "lastPtsMs": packet_samples[-1].pts_ms,
             "decodeScore": decoded.score if decoded else 0.0,
             "correctedBits": decoded.corrected_bits if decoded else 0,
             "erasedBits": decoded.erased_bits if decoded else 32, "reasons": reasons,
@@ -131,7 +153,7 @@ def decode_tracks(scan, manifest, camera_id):
             "symbols": sampled.symbols if sampled else None,
             "interiorSampleCounts": sampled.counts if sampled else None,
             "normalizedPilots": sampled.pilots if sampled else None,
-            "trajectory": [[s.pts_ms, s.x, s.y] for s in track.samples],
+            "trajectory": [[s.pts_ms, s.x, s.y] for s in packet_samples],
             "reasons": reasons,
         })
     return observations, details, phase, messages

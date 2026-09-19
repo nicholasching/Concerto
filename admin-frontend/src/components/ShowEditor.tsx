@@ -1,10 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { AdminSnapshotData, ShowData } from "@orchestra/contracts";
+import { DECODED_AUDIO_BUDGET_BYTES, DEFAULT_SHOW_CHANNELS, type AdminSnapshotData, type ShowData } from "@orchestra/contracts";
 import { useAdapter } from "../lib/useSnapshot";
 
-const names = ["Percussion", "Bass", "Harmony", "Melody"];
-const colors = ["#f59e0b", "#34d399", "#a78bfa", "#38bdf8"];
 export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData; refresh: () => void }) {
   const adapter = useAdapter();
   const [draft, setDraft] = useState<ShowData>(structuredClone(snapshot.show));
@@ -30,6 +28,7 @@ export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData;
     finally { await context.close(); setBusy(false); }
   }
   const decodedMb = draft.tracks.reduce((sum, track) => sum + track.durationMs / 1000 * track.sampleRateHz * track.channels * 4, 0) / 1024 / 1024;
+  const budgetMb = DECODED_AUDIO_BUDGET_BYTES / 1024 / 1024;
   return <details open={snapshot.show.clips.length === 0}><summary>Prepare show and stems</summary>
     <p>Align stems to the same musical origin. Add audio per channel, then save while stopped. Phones preload the saved show.</p>
     {!editable && <p>Stop transport and wait for pending changes before editing.</p>}
@@ -37,7 +36,7 @@ export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData;
     <fieldset disabled={!editable || busy}>
       <label>Show name <input value={draft.label} onChange={e => edit({ ...draft, label: e.target.value })} /></label>
       {draft.clips.length === 0 && <button onClick={() => edit({ showId: crypto.randomUUID(), showRevision: snapshot.show.showRevision, label: "Audience Orchestra", tracks: [], clips: [],
-        channels: names.map((label, index) => ({ channelId: `channel-${index}`, label, color: colors[index], gain: 0.5, mute: false, solo: false })) })}>Set up four channels</button>}
+        channels: DEFAULT_SHOW_CHANNELS.map(channel => ({ ...channel, gain: 0.5, mute: false, solo: false })) })}>Set up three channels</button>}
       {draft.channels.map(channel => <div key={channel.channelId}><h3 style={{ color: channel.color }}>{channel.label}</h3>
         <label>Add prepared audio <input type="file" accept="audio/*" aria-label={`Upload ${channel.label} audio`} onChange={e => void upload(e.target.files?.[0], channel.channelId)} /></label>
         {draft.clips.filter(clip => clip.channelId === channel.channelId).map(clip => <div key={clip.clipId} className="clip-editor">
@@ -48,7 +47,7 @@ export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData;
           <button onClick={() => { const clips = draft.clips.filter(item => item.clipId !== clip.clipId); edit({ ...draft, clips, tracks: draft.tracks.filter(track => clips.some(item => item.trackId === track.trackId)) }); }}>Remove clip</button>
         </div>)}
       </div>)}
-      <p>Decoded audio per phone: approximately {decodedMb.toFixed(1)} MiB / 64 MiB budget.</p>
+      <p>Decoded audio per phone: approximately {decodedMb.toFixed(1)} MiB / {budgetMb} MiB budget.</p>
       <h3>Cue markers</h3>
       {(draft.cueMarkers ?? []).map(cue => <div key={cue.cueId}>
         <label>Cue label <input value={cue.label} onChange={e => edit({ ...draft, cueMarkers: draft.cueMarkers?.map(item => item.cueId === cue.cueId ? { ...item, label: e.target.value } : item) })} /></label>
@@ -56,7 +55,7 @@ export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData;
         <button onClick={() => edit({ ...draft, cueMarkers: draft.cueMarkers?.filter(item => item.cueId !== cue.cueId) })}>Remove cue</button>
       </div>)}
       <button onClick={() => edit({ ...draft, cueMarkers: [...(draft.cueMarkers ?? []), { cueId: crypto.randomUUID(), label: "New cue", positionMs: 0 }] })}>Add cue marker</button>
-      <button disabled={!dirty || decodedMb > 64} onClick={() => { setBusy(true); setError(null); void adapter.saveShow(draft).then(() => { setDirty(false); refresh(); }, cause => setError(String(cause))).finally(() => setBusy(false)); }}>Save prepared show</button>
+      <button disabled={!dirty || decodedMb > budgetMb} onClick={() => { setBusy(true); setError(null); void adapter.saveShow(draft).then(() => { setDirty(false); refresh(); }, cause => setError(String(cause))).finally(() => setBusy(false)); }}>Save prepared show</button>
     </fieldset>
   </details>;
 }

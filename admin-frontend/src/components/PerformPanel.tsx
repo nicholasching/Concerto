@@ -71,7 +71,7 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
     <section>
       <h2>Perform</h2>
       <ShowEditor snapshot={snapshot} refresh={refresh} />
-      <p className="muted">Four lanes, one per channel. The playhead is driven by the shared clock, not a UI timer. Scheduled changes show a pending countdown before they take effect. Panic clears everything and mutes.</p>
+      <p className="muted">One lane per channel. The playhead is driven by the shared clock, not a UI timer. Scheduled changes show a pending countdown before they take effect. Panic clears everything and mutes.</p>
       {error && <p role="alert" className="error">Error: {error}</p>}
       {status && <p className="status">{status}</p>}
       {preparation && <p>Prepared cue: {preparation.readyIds.length}/{preparation.expectedIds.length} acknowledged. {preparation.excluded.length} excluded; {preparation.expectedIds.length - preparation.readyIds.length - preparation.excluded.length} awaiting response.</p>}

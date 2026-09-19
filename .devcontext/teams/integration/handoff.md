@@ -2,6 +2,8 @@
 
 Date: 2026-09-19. Owner: captain. Current implementation: main after the four feature merges.
 
+Current user updates: shows now use **Melody, Vocals and Percussion** with a shared **512 MiB decoded-audio budget per phone**. The live show has been saved with six tracks/clips, approximately 304.1 MiB, preserving device routing and uploaded audio. All three JS gates and the real-worker E2E pass; public desktop-browser loading verifies 6/6 assets. See [three-channel handoff](journal/20260919-three-channels.md) and [budget evidence](journal/20260919-decoded-audio-budget.md). Older phone pages need refreshing for the larger budget. Historical four-channel references below describe the previous checkpoint.
+
 ## Run
 
 From the root, `bun install --frozen-lockfile`, `bun run setup:python`, then `bun run dev:all`. In a second terminal, `bun run demo:seed` only if no show exists. This uploads four original eight-second tones, not bundled third-party music. Local state/media are in ignored `runtime/local/` and are preserved across restarts.

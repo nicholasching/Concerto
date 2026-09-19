@@ -1,5 +1,5 @@
 import { epochNow, type ClockQuality, type SynchronizedClock } from "./epoch";
-import { ClockEstimator, PROBE_CONSTANTS, type ClockReply } from "./estimator";
+import { CLOCK_PROFILES, ClockEstimator, PROBE_CONSTANTS, type ClockProfile, type ClockReply } from "./estimator";
 
 export interface Probe { probeGroupId: number; probeGroupIndex: 0 | 1; t0: number }
 export interface ProbeTimers { setTimeout(callback: () => void, ms: number): unknown; clearTimeout(handle: unknown): void }
@@ -16,10 +16,10 @@ export class ClockSync implements SynchronizedClock {
 
   constructor(private readonly options: {
     send: (probe: Probe) => void; timers?: ProbeTimers; now?: () => number;
-    random?: () => number; estimator?: ClockEstimator;
+    random?: () => number; estimator?: ClockEstimator; profile?: ClockProfile;
   }) {
     this.now = options.now ?? epochNow;
-    this.estimator = options.estimator ?? new ClockEstimator({ now: this.now });
+    this.estimator = options.estimator ?? new ClockEstimator({ ...CLOCK_PROFILES[options.profile ?? "strict"], now: this.now });
     this.timers = options.timers ?? { setTimeout: (callback, ms) => setTimeout(callback, ms), clearTimeout: handle => clearTimeout(handle as ReturnType<typeof setTimeout>) };
   }
 

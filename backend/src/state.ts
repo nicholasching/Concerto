@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   AdminSnapshot, Assignment, AudienceMap, Channel, DeviceReadiness, Location, ParticipantSnapshot, PendingAction,
-  PROTOCOL_VERSION, Show, Transport,
+  DEFAULT_SHOW_CHANNELS, PROTOCOL_VERSION, Show, Transport,
   type AdminSnapshotData, type ParticipantSnapshotData, type ShowData,
 } from "@orchestra/contracts";
 import type { ServerClock } from "./clock";
@@ -25,7 +25,7 @@ interface PendingAssignment {
 export const PLACEHOLDER_SHOW = Show.parse({
   showId: "placeholder", showRevision: 0, label: "Placeholder: no show saved yet",
   tracks: [], clips: [],
-  channels: [{ channelId: "placeholder", label: "Unassigned", color: "#6b7280", gain: 1, mute: false, solo: false }],
+  channels: DEFAULT_SHOW_CHANNELS.map(channel => ({ ...channel, gain: 1, mute: false, solo: false })),
 });
 
 const stoppedTransport = (transportRevision: number, showRevision: number) =>

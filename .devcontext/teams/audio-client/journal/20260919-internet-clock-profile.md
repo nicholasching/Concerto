@@ -1,0 +1,5 @@
+# Participant internet timing profile — captain integration, 2026-09-19
+
+The user explicitly requested a higher latency allowance for hotspot/mobile-data testing. The audience now constructs the shared ClockSync with profile `internet` by default (best RTT <=300 ms, accepted-sample age <=10 seconds); `NEXT_PUBLIC_CLOCK_PROFILE=strict` restores the prior policy after Next restart/rebuild. Actual uncertainty is displayed even while unready; readiness above the strict ceiling is labeled as relaxed timing. Existing connection watchdog and audio lease still apply independently.
+
+Shared producer tests, results, evidence and physical limitations are maintained in the [sync journal](../../sync-control/journal/20260919-internet-clock-profile.md) and [accepted decision](../../../decisions/20260919-internet-clock-readiness.md). No protocol or calibration packet changed. Reload audience pages before testing, then record physical calibration/audio results; broader readiness is not a physical synchronization measurement.

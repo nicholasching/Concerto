@@ -3,6 +3,7 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 import math
+from statistics import median
 
 import cv2
 import numpy as np
@@ -79,21 +80,42 @@ def detect_screens(rgb, pts_ms, excluded):
     preferred = np.zeros(rgb.shape[:2], np.int32)
     core_areas = []
     screens = []
+    absorbed = set()
     # Bright emissive cores survive washed-out amber pilots and separate blue
     # screens from dim clothing/glare. Keep the original dim-screen path too.
     # Color values here locate candidates; identity still uses measured pilots.
-    for bright, lower in ((True, (0, 25, 190)), (False, (0, 55, 50))):
-        mask = cv2.inRange(hsv, lower, (179, 255, 255))
+    # A saturated blue core can remain compact while reflected blue light joins
+    # the screen to a hand. Broader bright components may restore its footprint
+    # only when they are solid; irregular halos never replace that core.
+    for stage, lower, upper in (("blue-core", (85, 140, 190), (135, 255, 255)),
+                                ("bright", (0, 25, 190), (179, 255, 255)),
+                                ("dim", (0, 55, 50), (179, 255, 255))):
+        mask = cv2.inRange(hsv, lower, upper)
         mask[excluded != 0] = 0
         # Remove thin glow bridges without enlarging or joining nearby screens.
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         for sample, (x, y, width, height), component in _screen_components(rgb, pts_ms, mask):
             claimed = preferred[y:y+height, x:x+width]
             inside = component != 0
-            if not bright:
+            if stage != "blue-core":
                 labels, counts = np.unique(claimed[inside], return_counts=True)
                 overlaps = [(int(label)-1, count) for label, count in zip(labels, counts) if label]
                 if overlaps:
+                    if stage == "bright":
+                        # An exposure band can split one blue screen into several
+                        # saturated islands. Preserve a solid bright footprint,
+                        # including all contained islands, rather than making
+                        # them compete with the original phone track. If this is
+                        # a real two-phone merge, association still rejects it.
+                        area = np.count_nonzero(inside)
+                        if (area >= width * height * 0.75 and
+                                all(overlap >= core_areas[index] * 0.8 for index, overlap in overlaps)):
+                            index = max(overlaps, key=lambda item: item[1])[0]
+                            screens[index] = sample
+                            core_areas[index] = area
+                            claimed[inside] = index + 1
+                            absorbed.update(other for other, _ in overlaps if other != index)
+                        continue
                     # A compressed/dim screen can have only a small bright seed.
                     # Recover its full footprint only near the brightness cutoff,
                     # when one core is almost entirely contained and the
@@ -107,12 +129,12 @@ def detect_screens(rgb, pts_ms, excluded):
                             screens[index] = sample
                     continue  # A core must not compete with its own dim halo.
             screens.append(sample)
-            if bright:
+            if stage != "dim":
                 claimed[inside] = len(screens)
                 core_areas.append(np.count_nonzero(inside))
             if len(screens) > 4096:
                 raise ValueError("Too many screen candidates; add stage/light exclusion ROIs")
-    return screens
+    return [sample for index, sample in enumerate(screens) if index not in absorbed]
 
 
 def associate(tracks, active, detections, pts_ms, track_id_offset=0):
@@ -126,15 +148,21 @@ def associate(tracks, active, detections, pts_ms, track_id_offset=0):
             continue
         x, y = last.x, last.y
         if len(samples) >= 2:
-            previous = samples[-2]
-            ratio = min(3.0, (pts_ms - last.pts_ms) / (last.pts_ms - previous.pts_ms))
-            x += (last.x - previous.x) * ratio
-            y += (last.y - previous.y) * ratio
+            # A colour transition can distort one component's centroid. A
+            # single-frame velocity then extrapolates away from a stationary
+            # phone for the entire association window. Use recent median motion.
+            recent = samples[-6:]
+            steps = [(b.pts_ms-a.pts_ms, b.x-a.x, b.y-a.y)
+                     for a, b in zip(recent, recent[1:])]
+            elapsed = min(pts_ms-last.pts_ms, 3*median(step[0] for step in steps))
+            x += median(dx/dt for dt, dx, _ in steps) * elapsed
+            y += median(dy/dt for dt, _, dy in steps) * elapsed
         radius = min(40.0, max(8.0, max(last.width, last.height) * 0.8))
         predictions[index] = (x, y, radius)
         grid[(math.floor(x / 40), math.floor(y / 40))].append(index)
     matches = defaultdict(list)
     reverse = defaultdict(list)
+    affinities = {}
     for detection_index, detection in enumerate(detections):
         gx, gy = math.floor(detection.x / 40), math.floor(detection.y / 40)
         for dx in (-1, 0, 1):
@@ -158,6 +186,38 @@ def associate(tracks, active, detections, pts_ms, track_id_offset=0):
                             overlap_width * overlap_height >= smaller_area * 0.2):
                         matches[detection_index].append(index)
                         reverse[index].append(detection_index)
+                        overlap = overlap_width * overlap_height
+                        union = last.width * last.height + detection.width * detection.height - overlap
+                        affinities[index, detection_index] = overlap / union
+    # A full screen can coexist with smaller reflected fragments in the gate.
+    # Prefer a distinctly better footprint match, but never resolve near ties or
+    # an expanded two-phone merge by distance alone.
+    preferred = {}
+    for index, choices in reverse.items():
+        ranked = sorted(choices, key=lambda choice: affinities[index, choice], reverse=True)
+        if len(ranked) < 2:
+            continue
+        best, second = ranked[:2]
+        last, detection = tracks[index].samples[-1], detections[best]
+        if (affinities[index, best] >= 0.65 and
+                affinities[index, best] - affinities[index, second] >= 0.25 and
+                detection.width * detection.height <= last.width * last.height * 1.25):
+            preferred[index] = best
+    reverse.clear()
+    for detection_index, choices in matches.items():
+        choices = [index for index in choices
+                   if index not in preferred or preferred[index] == detection_index]
+        if len(choices) > 1:
+            ranked = sorted(choices, key=lambda index: affinities[index, detection_index], reverse=True)
+            best, second = ranked[:2]
+            last, detection = tracks[best].samples[-1], detections[detection_index]
+            if (affinities[best, detection_index] >= 0.65 and
+                    affinities[best, detection_index] - affinities[second, detection_index] >= 0.25 and
+                    detection.width * detection.height <= last.width * last.height * 1.25):
+                choices = [best]
+        matches[detection_index] = choices
+        for index in choices:
+            reverse[index].append(detection_index)
     next_active = set(predictions)
     for detection_index, detection in enumerate(detections):
         candidates = matches[detection_index]

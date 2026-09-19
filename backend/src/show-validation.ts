@@ -1,9 +1,9 @@
-import type { ShowData } from "@orchestra/contracts";
+import { DECODED_AUDIO_BUDGET_BYTES, type ShowData } from "@orchestra/contracts";
 
 export function validateShow(show: ShowData): string | null {
   const unique = (values: string[]) => new Set(values).size === values.length;
   if (!unique((show.cueMarkers ?? []).map(item => item.cueId))) return "Cue marker IDs must be unique.";
-  if (show.tracks.reduce((bytes, track) => bytes + track.durationMs / 1000 * track.sampleRateHz * track.channels * 4, 0) > 64 * 1024 * 1024) return "Prepared audio exceeds the 64 MiB decoded budget per phone.";
+  if (show.tracks.reduce((bytes, track) => bytes + track.durationMs / 1000 * track.sampleRateHz * track.channels * 4, 0) > DECODED_AUDIO_BUDGET_BYTES) return `Prepared audio exceeds the ${DECODED_AUDIO_BUDGET_BYTES / 1024 / 1024} MiB decoded budget per phone.`;
   if (!unique(show.tracks.map(item => item.trackId)) || !unique(show.channels.map(item => item.channelId)) || !unique(show.clips.map(item => item.clipId))) return "Track, channel and clip IDs must be unique.";
   for (const clip of show.clips) {
     const track = show.tracks.find(item => item.trackId === clip.trackId);

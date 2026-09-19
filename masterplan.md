@@ -6,6 +6,8 @@ Integration update (2026-09-19): all four development branches are merged into m
 
 ## Team handoff: start here
 
+Current concert scope (user update, 2026-09-19): exactly three musical channels, **Melody, Vocals and Percussion**. The four development teams/branches remain unchanged. See the [three-channel decision](.devcontext/decisions/20260919-three-show-channels.md).
+
 Give each teammate this file, [rules.md](rules.md), and their stage brief from the table below. Work on the assigned branch in a separate clone/worktree; continue from the shared foundation.
 
 1. Read [README.md](README.md) for setup, then `AGENTS.md`, `rules.md`, `.devcontext/README.md`, and your stage/status/handoff files.
@@ -28,7 +30,7 @@ The baseline and four branches are created locally. Remote publication is a sepa
 
 Build a browser-based concert in which audience phones play different, synchronized musical parts according to their position in the auditorium. An operator calibrates the audience from three uploaded camera recordings, reviews a device map, selects regions, assigns channels, and conducts a prepared set from a multitrack timeline.
 
-The first complete demonstration must work with 12-30 real phones, three camera views, and four prepared stems. The system must also be exercised with 1,500 simulated connections. A simulated load test does **not** establish that the venue Wi-Fi, optical coverage, or 1,000 physical phone speakers will work; those need a venue rehearsal.
+The first complete demonstration must work with 12-30 real phones, three camera views, and three prepared stems (Melody, Vocals and Percussion). The system must also be exercised with 1,500 simulated connections. A simulated load test does **not** establish that the venue Wi-Fi, optical coverage, or 1,000 physical phone speakers will work; those need a venue rehearsal.
 
 The four workstreams are:
 
@@ -50,7 +52,7 @@ The four workstreams are:
 | --- | --- | --- |
 | Position | An approximate 2D audience map relative to the stage; no GPS or metric 3D reconstruction | Check ordering against known seats in the venue |
 | Audio | Preloaded assets, a common show timeline, and scheduled Web Audio playback | Physical iOS/Android rehearsal |
-| Routing | One active logical channel per phone; many simultaneous channels across the crowd | Four channels are sufficient for the first demo |
+| Routing | One active logical channel per phone; many simultaneous channels across the crowd | Three channels: Melody, Vocals and Percussion |
 | Music | Prepared, compatible stems with explicit timeline offsets | Musical rehearsal; no automatic separation or beat matching |
 | Calibration | An error-checked temporal packet lasting about 11 seconds initially | Shorten only after camera, decoding, and flash-pattern validation |
 | Cameras | Three fixed 4K phones, one primarily covering each audience column, with overlap | Back-row visibility and actual codec/frame timing tests |
@@ -62,7 +64,7 @@ Do not promise one-second calibration or perfect acoustic alignment across the h
 
 ### MVP boundary
 
-Include QR join, resume after reconnect, audio unlock, reusable clock synchronization, four channels, calibration capture/upload, device localization with explicit unknowns, manual column fallback, rectangle/lasso selection, scheduled reassignment, prepared multitrack playback, readiness counts, and an emergency mute.
+Include QR join, resume after reconnect, audio unlock, reusable clock synchronization, three channels (Melody, Vocals and Percussion), calibration capture/upload, device localization with explicit unknowns, manual column fallback, rectangle/lasso selection, scheduled reassignment, prepared multitrack playback, readiness counts, and an emergency mute.
 
 Defer automatic stem separation, live audio streaming, full DAW editing, time stretching, arbitrary audio effects, metric 3D seating reconstruction, continuous camera tracking during music, native apps, and distributed server infrastructure. A DaVinci-style timeline is the interaction reference, not a request to recreate DaVinci Resolve.
 
@@ -136,7 +138,7 @@ Source-specific findings that affect the work:
 - `epochNow()` already uses a monotonic clock with an epoch-shaped origin. It does not need replacement with `Date.now()`. Some heartbeat/liveness timers separately use wall-clock time; keep scheduling domains explicit.
 - `global.tsx` combines clock offset with manual audio nudge and subtracts filtered output latency. **Only pure clock offset belongs in optical timing.** Audio compensation and manual nudge must never move a calibration symbol.
 - `audioContextManager.ts` contains `perfTimeToAudioTime()`, but the inspected store playback path also schedules via `AudioContext.currentTime + delay`. Select one characterized output-timing method; do not combine both and compensate latency twice.
-- Playback has a single selected source and stops the previous source when creating a new one. The cache is limited to three buffers. Both behaviors need deliberate adjustment for prepared channel switches and four preloaded stems.
+- Playback has a single selected source and stops the previous source when creating a new one. The cache is limited to three buffers. Both behaviors need deliberate adjustment for prepared channel switches and three preloaded stems.
 - The existing source can have multiple queued tracks; its limitation here is one room-wide playing source, not an inability to list multiple files.
 - Its NTP fast path bypasses the general Zod parser. Preserve early timestamps while validating finite timestamps, pair indices, membership, and size before replying.
 - The reference root package pins `bun@1.3.8`, while its `mise.toml` specifies Bun `1.3.14`. The new workspace consistently pins and has been tested with Bun `1.3.14`.
@@ -209,6 +211,8 @@ networkDelay = (c3 - c0) - (s2 - s1)
 ```
 
 Start from the inspected coded-pair/minimum-RTT estimator and preserve its focused tests. Add sample age and measured quality; add drift fitting only if measured drift warrants it. Estimated uncertainty is a quality signal, not proof of true clock error under asymmetric networks. Reprobe periodically with jitter, and immediately after reconnect or returning to the foreground. With BeatSync's epoch-shaped client clock, `toLocalPerformanceMs(S) = S - offsetEstimate - performance.timeOrigin`; do not subtract an audio nudge here. Inject clock and transport for deterministic tests.
+
+For the user's cellular/hotspot testing, participant readiness now defaults to an explicit `internet` policy: best observed RTT <=300 ms (estimated uncertainty <=150 ms) and an accepted sample age <=10 seconds. `NEXT_PUBLIC_CLOCK_PROFILE=strict` restores the original <=40 ms RTT / <=3.75-second freshness policy; shared estimator/operator defaults stay strict. The 16-pair warmup, 5 ms pair-gap filter, actual uncertainty reporting and epoch invalidation remain. This broadens eligibility, not the physical timing acceptance targets below. See the [readiness decision](.devcontext/decisions/20260919-internet-clock-readiness.md).
 
 ### Minimum HTTP and WebSocket surface
 
@@ -400,9 +404,10 @@ Schedule lease expiry through an audio-clock output gate, renewing that gate on 
 
 ### Media, memory, and network budgets
 
-- Prefer a prepared 60-90 second demonstration with four mono stems and hashes. Confirm decoded start alignment; encoder padding or silence can offset an otherwise synchronized track.
-- At 48 kHz, mono, float32, one 60-second decoded stem occupies about 11.52 MB; four occupy 46.08 MB before browser/temporary buffers. Budget by decoded bytes, pin active/prepared assets, and do not blindly retain BeatSync's three-buffer limit or decode an unlimited library.
-- At 128 kbit/s, four 60-second stems total about 3.84 MB per phone, or 3.84 GB for 1,000 phones. Preload well before the performance. A CDN helps server egress but does not create venue Wi-Fi capacity. Measure local versus public hosting and actual audience reachability.
+- Prefer a prepared 60-90 second demonstration with three mono stems and hashes. Confirm decoded start alignment; encoder padding or silence can offset an otherwise synchronized track.
+- At 48 kHz, mono, float32, one 60-second decoded stem occupies about 11.52 MB; three occupy 34.56 MB before browser/temporary buffers. Budget by decoded bytes, pin active/prepared assets, and do not blindly retain BeatSync's three-buffer limit or decode an unlimited library.
+- Local integration uses a shared 512 MiB decoded-buffer ceiling in the editor, server and phone client, increased at the user's request to admit a 405.5 MiB show. This is an application limit, not a guarantee of phone memory availability; temporary decoding/browser memory is additional. Rehearse long shows on the intended phones. See the [budget decision](.devcontext/decisions/20260919-decoded-audio-budget.md).
+- At 128 kbit/s, three 60-second stems total about 2.88 MB per phone, or 2.88 GB for 1,000 phones. Preload well before the performance. A CDN helps server egress but does not create venue Wi-Fi capacity. Measure local versus public hosting and actual audience reachability.
 - Serve immutable assets with hashes and cache headers; verify CORS, HTTPS/WSS, and phone reachability on the chosen network. Upload camera videos outside the time-critical cue path. Limit worker CPU and upload concurrency while synchronizing clients.
 - Use built-in phone speakers for the rehearsed path. Bluetooth, locked screens, hardware mute/volume, and OS interruptions require real device checks; a browser cannot force system volume or brightness.
 - Sound propagation is approximately 2.9 ms per metre, so a 30 m path difference is roughly 87 ms. This is a physical planning estimate, not a measured venue delay. Arrange spatial call-and-response or nearby instrument groups and rehearse from several seats. No single per-device delay makes all speakers arrive simultaneously at every listener.
@@ -421,7 +426,7 @@ Build against a deterministic mock immediately, then replace the adapter with th
 
 Implement selected-ID geometry as pure functions in `packages/selection/`. Render 1,500 device records with canvas/SVG or an equivalently measured approach; avoid making every telemetry message rerender the entire interface. Display server-confirmed versus pending actions distinctly. On stale revisions or lost connection, show the conflict and refresh authoritative state rather than presenting a successful local change.
 
-First milestone: a mock-driven walkthrough from three uploads to a colored map, selection, assignment, and a moving four-lane playhead. Final milestone: the same walkthrough drives real phones and shows an explicit fallback when localization is incomplete.
+First milestone: a mock-driven walkthrough from three uploads to a colored map, selection, assignment, and a moving three-lane playhead. Final milestone: the same walkthrough drives real phones and shows an explicit fallback when localization is incomplete.
 
 ## 8. Independent development and verification
 
@@ -488,7 +493,7 @@ Merge small vertical slices during development; do not wait for four finished br
 1. **Foundation (complete):** `foundation-v1` supplies schemas, generated artifacts, fixtures, executable gates, and mock interfaces. All four branches start here.
 2. **Clock-to-client:** merge Team 1's extracted sync and Team 2's join/unlock/click path. Verify against two phones. This proves the reusable sync seam before any optical dependency.
 3. **First optical round trip:** merge Team 2's packet renderer and Team 3's codebook/clean-clip decoder. Team 4 already accepts fixture results. Film a small real group and decode actual IDs.
-4. **First spatial concert:** connect Team 1's assignments to Team 2's four-channel audio and Team 4's selections using a fixture map. This provides an independently demonstrable fallback while OTC improves.
+4. **First spatial concert:** connect Team 1's assignments to Team 2's three-channel audio and Team 4's selections using a fixture map. This provides an independently demonstrable fallback while OTC improves.
 5. **Real map:** integrate uploads, worker progress/results, manual geometry, map review/commit, and then overlap registration. Verify one decoded ID reaches exactly the intended phone/channel.
 6. **Show and scale:** connect the complete transport/mix workflow, then run load plus worker/upload contention and real-device rehearsals. Freeze a tagged demonstration build.
 
@@ -503,7 +508,7 @@ Illustrative 36-hour schedule; preserve the sequence and reserve the final porti
 | Window | All-team checkpoint | Required decision |
 | --- | --- | --- |
 | Hours 0-2 | Foundation, source characterization, first screen visibility and two-phone sound experiments | Is the intended venue/camera geometry plausible? Fix framing early |
-| Hours 2-6 | Each branch runs independently; Team 3 decodes a clean real-phone recording; four-lane console works with mocks | Keep or adjust packet/palette and media arrangement |
+| Hours 2-6 | Each branch runs independently; Team 3 decodes a clean real-phone recording; three-lane console works with mocks | Keep or adjust packet/palette and media arrangement |
 | Hours 6-12 | Integrated join -> sync -> flash -> decode -> map -> assign -> play on 12-30 phones | If optics lag, preserve manual columns as the working demo while improving recall |
 | Hours 12-22 | Motion/occlusion handling, three cameras, registration fallback, mobile edge cases, first 1,500-socket run | Resolve measured failures; defer cosmetic or speculative features |
 | Hours 22-28 | Venue/representative-distance rehearsal, original camera files, upload timing, media preload, acoustic listening from several seats | Decide full crowd versus a reliable smaller participating area |
@@ -516,12 +521,12 @@ Illustrative 36-hour schedule; preserve the sequence and reserve the final porti
 
 Assign one teammate to the console/show and the other three to the camera columns during capture. Once files are transferred, the camera operators can help resolve participant issues and inspect results. Arrange the joining/preloading window with the event team before the presentation if possible; audience onboarding plus video upload/processing may exceed the on-stage slot.
 
-1. Start the frozen build, create/load the prepared show, test HTTPS/WSS/media access from the audience network, and verify the server machine stays awake. Load four stems and confirm their aligned source origins.
+1. Start the frozen build, create/load the prepared show, test HTTPS/WSS/media access from the audience network, and verify the server machine stays awake. Load three stems and confirm their aligned source origins.
 2. Position and secure cameras, mark primary columns/anchors, take back-row test crops, and verify recording codec/free storage. Keep the server clock process stable after devices synchronize.
 3. Put the join QR on screen early. Participants tap to enable sound, allow enough time for media download, and keep the page open. Display accurate readiness counts before proceeding.
 4. Record all cameras, prepare/arm one calibration, run the roughly 11-second packet, and stop recordings after the trailing margin. Transfer originals through the tested upload path or a tested wired transfer into the same manifest workflow.
 5. Process, inspect annotated matches, confirm map orientation with known volunteers, and commit the result. Use manual column mapping or declared manual participant choices for unresolved sections. Do not wait indefinitely for a perfect map.
-6. Select three/four regions, assign instruments, verify ready counts, then schedule a short musical cue. Confirm expected phones play and others remain silent. Begin the prepared performance.
+6. Select three regions, assign instruments, verify ready counts, then schedule a short musical cue. Confirm expected phones play and others remain silent. Begin the prepared performance.
 7. Keep mute/panic visible. End with a scheduled stop, confirm clients are silent, and retain only the recordings needed for agreed debugging. Keep raw audience recordings out of the repository.
 
 | Failure | Prepared fallback |

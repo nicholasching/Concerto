@@ -67,13 +67,13 @@ test("transport.prepare checks audio, clock, show revision and decoded tracks", 
 });
 
 test("assignment.prepare answers only for this device and checks the target channel's tracks", () => {
-  facts.verified = trackId => trackId !== "tone-3";
+  facts.verified = trackId => trackId !== "tone-2";
   const prepare = (channelId: string, deviceId = me.deviceId): ServerMessageData => ({ ...envelope, type: "assignment.prepare", payload: { preparationId: "p", assignment: { deviceId, channelId, assignmentRevision: 4, mapRevision: 1 } } });
   control.handle(prepare("channel-1", me.deviceId + 1));
   expect(sent).toHaveLength(0);
   control.handle(prepare("channel-1"));
   expect(lastReply()).toMatchObject({ type: "assignment.ready", payload: { ready: true, assignmentRevision: 4 } });
-  control.handle(prepare("channel-3"));
+  control.handle(prepare("channel-2"));
   expect(lastReply().payload).toMatchObject({ ready: false, reason: "assets-missing" });
 });
 
@@ -91,7 +91,7 @@ test("commits apply once, in revision order; older or repeated revisions are ign
   control.handle(transportCommit(playing(1, T0 + 500), T0 + 500));
   control.handle(assignmentCommit("channel-1", 3, T0 + 2000));
   control.handle(assignmentCommit("channel-2", 2, T0 + 2500));
-  control.handle(assignmentCommit("channel-3", 9, T0 + 2500, me.deviceId + 1));
+  control.handle(assignmentCommit("channel-2", 9, T0 + 2500, me.deviceId + 1));
   expect(calls).toEqual([["transport", 2, T0 + 1000], ["channel", "channel-1", T0 + 2000]]);
 });
 

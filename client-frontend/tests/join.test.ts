@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test";
-import { joinSession, tokenKey, type KeyValueStore } from "../src/lib/join";
+import { expect, spyOn, test } from "bun:test";
+import { JOIN_TIMEOUT_MS, joinSession, tokenKey, type KeyValueStore } from "../src/lib/join";
 
 const TOKEN_A = "a".repeat(32);
 const TOKEN_B = "b".repeat(32);
@@ -82,4 +82,26 @@ test("storage that throws does not break joining", async () => {
   const broken: KeyValueStore = { getItem: () => { throw new Error("denied"); }, setItem: () => { throw new Error("denied"); }, removeItem: () => { throw new Error("denied"); } };
   const result = await joinSession({ api: "http://mock", sessionId: "demo", storage: broken, fetch: async () => joined(2, TOKEN_A) });
   expect(result).toMatchObject({ status: "joined", join: { deviceId: 2 } });
+});
+
+test("a hanging join times out, preserves identity and releases the next retry", async () => {
+  let expire: (() => void) | undefined;
+  const timer = spyOn(globalThis, "setTimeout").mockImplementation(((callback: () => void, delay: number) => {
+    expect(delay).toBe(JOIN_TIMEOUT_MS);
+    expire = callback;
+    return 123;
+  }) as typeof setTimeout);
+  const clear = spyOn(globalThis, "clearTimeout").mockImplementation(() => {});
+  const storage = memory({ [tokenKey("demo")]: TOKEN_A });
+  try {
+    const pending = joinSession({ api: "http://mock", sessionId: "demo", storage, fetch: (_url, init) => new Promise((_resolve, reject) => {
+      init.signal!.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+    }) });
+    expire!();
+    expect(await pending).toEqual({ status: "error", message: "Join timed out; retrying the connection." });
+    expect(storage.data.get(tokenKey("demo"))).toBe(TOKEN_A);
+    const result = await joinSession({ api: "http://mock", sessionId: "demo", storage, fetch: async () => joined(7, TOKEN_A) });
+    expect(result).toMatchObject({ status: "joined", join: { deviceId: 7 } });
+    expect(clear).toHaveBeenCalledTimes(2);
+  } finally { timer.mockRestore(); clear.mockRestore(); }
 });

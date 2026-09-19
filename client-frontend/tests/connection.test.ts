@@ -68,7 +68,7 @@ test("joins, opens a token-bound socket and connects on its own snapshot", async
   sockets[0].receive(snapshotMessage(snapshotFor()));
   expect(last().status).toEqual({ kind: "connected" });
   expect(last().snapshot?.deviceId).toBe(base.deviceId);
-  expect(timers.pending.size).toBe(0);
+  expect(timers.delays()).toEqual([BACKOFF.receiveTimeoutMs]);
 });
 
 test("drops invalid messages and snapshots for another device", async () => {
@@ -143,6 +143,43 @@ test("a socket that never delivers a snapshot is abandoned after the connect tim
   expect(sockets[0].closed).toBe(true);
   expect(last().status).toEqual({ kind: "reconnecting", attempt: 1 });
   expect(timers.delays()).toEqual([BACKOFF.initialMs]);
+});
+
+test("a connected socket that goes silent without a close event is resumed", async () => {
+  const connection = create();
+  connection.start();
+  await settle();
+  sockets[0].receive(snapshotMessage(snapshotFor()));
+  // A network change can leave the browser believing a dead socket is still OPEN.
+  timers.runAll();
+  expect(sockets[0].closed).toBe(true);
+  expect(last().status).toEqual({ kind: "reconnecting", attempt: 1 });
+  timers.runAll();
+  await settle();
+  expect(sockets).toHaveLength(2);
+  sockets[1].receive(snapshotMessage(snapshotFor({ revision: 3 })));
+  expect(last()).toMatchObject({ status: { kind: "connected" }, identity: { deviceId: base.deviceId }, snapshot: { revision: 3 } });
+  connection.stop();
+});
+
+test("validated traffic renews liveness even when clock quality may be poor", async () => {
+  const connection = create();
+  connection.start();
+  await settle();
+  sockets[0].receive(snapshotMessage(snapshotFor()));
+  const firstTimer = [...timers.pending.keys()][0];
+  const lease = { protocolVersion: 1, sessionId: base.sessionId, serverEpoch: base.serverEpoch,
+    messageId: "lease", type: "lease.renew", payload: { expiresServerMs: 10000 } };
+  sockets[0].receive(JSON.stringify(lease));
+  expect(timers.pending.has(firstTimer)).toBe(false);
+  expect(timers.delays()).toEqual([BACKOFF.receiveTimeoutMs]);
+  const liveTimer = [...timers.pending.keys()][0];
+  sockets[0].receive("invalid JSON");
+  sockets[0].receive(JSON.stringify({ ...lease, serverEpoch: "stale-epoch" }));
+  expect([...timers.pending.keys()]).toEqual([liveTimer]);
+  expect(last().status.kind).toBe("connected");
+  connection.stop();
+  expect(timers.pending.size).toBe(0);
 });
 
 test("waking reconnects immediately while disconnected, not while connected", async () => {

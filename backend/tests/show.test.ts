@@ -62,7 +62,7 @@ const show = (label: string): ShowData => ({
 });
 
 const save = (app: ReturnType<typeof createApp>, options: {
-  commandId: string; expectedRevision: number; label?: string; secret?: string;
+  commandId: string; expectedRevision: number; label?: string; secret?: string; preparedShow?: ShowData;
 }) =>
   app.request("/api/show", {
     method: "PUT",
@@ -70,11 +70,37 @@ const save = (app: ReturnType<typeof createApp>, options: {
     body: JSON.stringify({
       protocolVersion: PROTOCOL_VERSION, sessionId: SESSION, serverEpoch: "epoch-a",
       commandId: options.commandId, expectedRevision: options.expectedRevision,
-      show: show(options.label ?? "First show"),
+      show: options.preparedShow ?? show(options.label ?? "First show"),
     }),
   });
 
 describe("saving a show", () => {
+  test("saves four long stereo tracks within the expanded decoded budget", async () => {
+    const { app, state } = harness();
+    const preparedShow = show("Long prepared show");
+    preparedShow.tracks = Array.from({ length: 4 }, (_, index) => ({
+      ...preparedShow.tracks[0], trackId: `track-${index + 1}`, durationMs: 276_800,
+    }));
+    // 405.47 MiB of decoded float32 audio; encoded file size is not the memory cost.
+    const response = await save(app, { commandId: "long-show", expectedRevision: 0, preparedShow });
+    expect(response.status).toBe(200);
+    expect(state.show.tracks).toHaveLength(4);
+    expect(state.show.showRevision).toBe(1);
+  });
+
+  test("accepts the 512 MiB boundary and rejects one decoded sample beyond it", async () => {
+    const { app, state } = harness();
+    const preparedShow = show("At the limit");
+    preparedShow.tracks[0].durationMs = 512 * 1024 * 1024 / (48_000 * 2 * 4) * 1000;
+    const accepted = await save(app, { commandId: "at-limit", expectedRevision: 0, preparedShow });
+    expect(accepted.status).toBe(200);
+    preparedShow.tracks[0].durationMs += 1000 / 48_000;
+    const rejected = await save(app, { commandId: "over-limit", expectedRevision: 1, preparedShow });
+    expect(rejected.status).toBe(400);
+    expect(ApiError.parse(await rejected.json()).error.message).toContain("512 MiB");
+    expect(state.show.showRevision).toBe(1);
+  });
+
   test("replaces the placeholder and takes a server-assigned revision", async () => {
     const { app, state } = harness();
     expect(state.show.showId).toBe("placeholder");

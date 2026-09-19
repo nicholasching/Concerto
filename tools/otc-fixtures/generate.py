@@ -14,7 +14,7 @@ import numpy as np
 from otc.validation import ROOT, validate_manifest
 
 CASES = ("clean", "degraded", "wrong-tag", "duplicates", "crossing", "rotated", "vfr", "empty",
-         "perspective", "perspective-undersized", "emissive-background")
+         "perspective", "perspective-undersized", "emissive-background", "reflected-motion")
 
 
 def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, height=360, seed=7, manifest_path=None):
@@ -86,6 +86,8 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
         screen_sizes = {}
         for phone in phones:
             screen_width, screen_height = 10, 16
+            if case == "reflected-motion":
+                screen_width, screen_height = 24, 42
             if perspective:
                 scale = (height / 360) / (1 + 3*phone["depth"])
                 screen_width, screen_height = round(22*scale), round(35*scale)
@@ -128,7 +130,7 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
                         other_x, _ = project(phones[3 if index == 0 else 0]["x"], phone["y"])
                         fraction = min(1, max(0, ((pts_ms-phases[camera_index])/200-22)/6))
                         x += (other_x-x) * fraction
-                    if case in ("degraded", "vfr"):
+                    if case in ("degraded", "vfr", "reflected-motion"):
                         x += 1.6 * math.sin(pts_ms / 700 + phone["motionPhase"])
                         y += 1.1 * math.cos(pts_ms / 600 + phone["motionPhase"])
                     bit = packets[device_id][slot] if 0 <= slot < 55 else None
@@ -148,12 +150,18 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
                         if index == 2 and slot == 25:
                             continue  # One full data-slot erasure.
                     screen_width, screen_height = screen_sizes[device_id]
-                    if perspective:
+                    if perspective or case == "reflected-motion":
                         x0 = round(x-(screen_width-1)/2)
                         y0 = round(y-(screen_height-1)/2)
                     else:
                         x0, y0 = round(x-5), round(y-8)
                     if 0 <= x0 < width-screen_width and 0 <= y0 < height-screen_height:
+                        if case == "reflected-motion" and bit == 1 and index % 2 == 0:
+                            # A blue screen illuminates a nearby hand/arm. Its
+                            # low-saturation connected glow changes the naive
+                            # blob's footprint and centroid as the phone moves.
+                            rgb[max(0, y0-50):y0+10, x0+screen_width:x0+screen_width+10] = (150, 140, 245)
+                            rgb[y0:y0+10, x0+screen_width-3:x0+screen_width+10] = (150, 140, 245)
                         if case == "emissive-background" and index % 3 == 0:
                             rgb[max(0, y0-8):y0+screen_height+12,
                                 max(0, x0-10):x0+screen_width+14] = (25, 60, 95)
@@ -163,6 +171,16 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
                             if bit == 1:
                                 rgb[y0+3:y0+4, x0+screen_width:x0+screen_width+6] = (15, 220, 255)
                         rgb[y0:y0+screen_height, x0:x0+screen_width] = color.clip(0, 255).astype(np.uint8)
+                        if (case == "reflected-motion" and slot in (24, 32, 44) and
+                                (pts_ms-phases[camera_index]) % 200 < 1000/fps):
+                            # A short glare/rolling-exposure band removes part
+                            # of the detected screen for one transition frame.
+                            rgb[y0:y0+screen_height//3, x0:x0+screen_width] = 245
+                        if (case == "reflected-motion" and index % 2 == 1 and slot == 6 and
+                                70 <= (pts_ms-phases[camera_index]) % 200 < 70+1000/fps):
+                            # A pale exposure band divides the saturated blue
+                            # regions while leaving the lit screen contiguous.
+                            rgb[y0+10:y0+14, x0:x0+screen_width] = (180, 200, 250)
                         if case == "degraded" and index == 5 and 23 <= slot <= 28:
                             rgb[y0:y0+16, x0:x0+5] = 9  # Half-covered phone, then uncovered.
                 if case == "duplicates" and camera_index == 0:

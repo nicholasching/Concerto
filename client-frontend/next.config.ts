@@ -1,11 +1,21 @@
 import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 const backend = (process.env.BACKEND_INTERNAL_URL ?? "http://127.0.0.1:8080").replace(/\/$/, "");
+const development = process.env.NODE_ENV === "development";
 const config: NextConfig = {
   transpilePackages: ["@orchestra/audio", "@orchestra/contracts", "@orchestra/sync"],
   devIndicators: false,
-  allowedDevOrigins: ["*.trycloudflare.com", ...(process.env.DEV_ALLOWED_ORIGINS ?? "").split(",").map(value => value.trim()).filter(Boolean)],
+  allowedDevOrigins: ["*.trycloudflare.com", "htn.nicholasching.ca", ...(process.env.DEV_ALLOWED_ORIGINS ?? "").split(",").map(value => value.trim()).filter(Boolean)],
   outputFileTracingRoot: fileURLToPath(new URL("..", import.meta.url)),
+  // A tunnel/browser can retain dev chunks under their unhashed filenames. Version them
+  // per dev server and prevent shared caches from retaining subsequent hot updates.
+  deploymentId: development ? (process.env.NEXT_DEPLOYMENT_ID ??= `local-${Date.now().toString(36)}`) : undefined,
+  async headers() {
+    return development ? [{ source: "/_next/:path*", headers: [
+      { key: "CDN-Cache-Control", value: "no-store" },
+      { key: "Cloudflare-CDN-Cache-Control", value: "no-store" },
+    ] }] : [];
+  },
   async rewrites() {
     // Expose audience operations only. Operator APIs and camera uploads use the local console.
     return [

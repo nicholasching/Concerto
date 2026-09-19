@@ -13,13 +13,13 @@ bun run dev:all
 bun run demo:seed
 ```
 
-Open [the operator console](http://localhost:3001) and enter `local-demo-only`, the development default. Open [the audience client](http://localhost:3000/?session=dev-session), tap **Enable sound**, and wait for clock and all four asset checks to pass. `demo:seed` uploads four original eight-second tones to the real backend and refuses to overwrite an existing show.
+Open [the operator console](http://localhost:3001) and enter `local-demo-only`, the development default. Open [the audience client](http://localhost:3000/?session=dev-session), tap **Enable sound**, and wait for clock and all asset checks to pass. Shows default to **Melody, Vocals and Percussion**. `demo:seed` uploads three original eight-second tones to the real backend and refuses to overwrite an existing show.
 
 1. Choose a manual column on the audience page. In **Assign**, select that column and assign a channel. The location remains explicitly coarse with no invented coordinates.
 2. In **Perform**, select **Prepare cue**, inspect ready/excluded counts, then **Play ready phones**. Stop, pause, seek, gain, mute/solo and panic use the real server. Live reassignment verifies readiness for the new channel before scheduling it.
 3. For optical localization, keep participating pages visible; open **Calibration**, prepare, start three camera recordings, then arm. Leave recording margin around the eleven-second pattern. Upload each original clip, specify column/rotation and four ordered seating anchors (or accept a coarse result), process, review annotated stills and unresolved IDs, then commit the map. For a one-camera test, select only that upload with **Include Camera**; use each original recording once. The review distinguishes decoded devices, seat coordinates and column-only results.
 4. Use rectangle/lasso selection for localized phones, or explicit IDs/manual columns for unresolved phones. Geometry corrections require processing and review again. A generated video must be labeled **synthetic**.
-5. Replace the tones through **Perform → Prepare show and stems**. Edit clip start/source offset/duration/gain while stopped; save the show before preparing playback. The 64 MiB decoded budget is per phone. Cue markers persist with the show; waveforms are computed only in the console.
+5. Replace the tones through **Perform → Prepare show and stems**. Edit clip start/source offset/duration/gain while stopped; save the show before preparing playback. The shared 512 MiB decoded budget is per phone; browser and temporary decoding memory are additional, so rehearse large shows on the intended phones. Cue markers persist with the show; waveforms are computed only in the console.
 
 Local state and media live under ignored `runtime/local/`. Restart restores identities, show, map, run-tag allocation and routing, starts a fresh clock epoch, and stays stopped. An unfinished calibration must be repeated after restart. To start a separate concert, set a new `SESSION_ID` and separate `CHECKPOINT_PATH` rather than deleting the existing concert.
 

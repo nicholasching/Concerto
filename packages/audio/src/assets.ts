@@ -1,7 +1,7 @@
-import type { ShowData } from "@orchestra/contracts";
+import { DECODED_AUDIO_BUDGET_BYTES, type ShowData } from "@orchestra/contracts";
 
 export type TrackData = ShowData["tracks"][number];
-export const DEFAULT_DECODED_BUDGET_BYTES = 64 * 1024 * 1024;
+export const DEFAULT_DECODED_BUDGET_BYTES = DECODED_AUDIO_BUDGET_BYTES;
 
 export class AssetError extends Error {
   constructor(readonly code: "http" | "size" | "hash" | "budget", message: string) {
