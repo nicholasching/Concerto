@@ -1,20 +1,21 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAdapter } from "../lib/useSnapshot";
 import type { Column } from "../lib/adapter";
 
-interface Slot { index: number; cameraId: string; column: Column; status: "idle" | "uploading" | "done" | "error"; uploadId: string | null; error?: string; }
+interface Slot { index: number; cameraId: string; column: Column; status: "idle" | "uploading" | "done" | "error"; uploadId: string | null; file: File | null; error?: string; }
 
 const COLUMNS: Column[] = ["left", "center", "right"];
 
 export function CalibrationPanel({ refresh, mapRevision }: { refresh: () => void; mapRevision: number }) {
   const adapter = useAdapter();
+  const fileRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [runId, setRunId] = useState<string | null>(null);
   const [runTag, setRunTag] = useState<number | null>(null);
   const [slots, setSlots] = useState<Slot[]>([
-    { index: 0, cameraId: "cam-left", column: "left", status: "idle", uploadId: null },
-    { index: 1, cameraId: "cam-center", column: "center", status: "idle", uploadId: null },
-    { index: 2, cameraId: "cam-right", column: "right", status: "idle", uploadId: null },
+    { index: 0, cameraId: "cam-left", column: "left", status: "idle", uploadId: null, file: null },
+    { index: 1, cameraId: "cam-center", column: "center", status: "idle", uploadId: null, file: null },
+    { index: 2, cameraId: "cam-right", column: "right", status: "idle", uploadId: null, file: null },
   ]);
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ stage: string; progress: number; message: string } | null>(null);
@@ -35,9 +36,10 @@ export function CalibrationPanel({ refresh, mapRevision }: { refresh: () => void
     setError(null);
     setSlots(prev => prev.map(s => s.index === slotIndex ? { ...s, status: "uploading" } : s));
     try {
-      // No real file needed; the harness accepts a synthetic upload. Pass null.
       const slot = slots[slotIndex];
-      const result = await adapter.uploadCamera(runId, slot.cameraId, slot.column, null);
+      // Sends the chosen video file to the real server. If no file is chosen, it still attempts the
+      // real call; if the server isn't running, the catch below shows "Real server not detected".
+      const result = await adapter.uploadCamera(runId, slot.cameraId, slot.column, slot.file);
       setSlots(prev => prev.map(s => s.index === slotIndex ? { ...s, status: "done", uploadId: result.uploadId } : s));
     } catch (e) {
       // A failed upload marks only this slot; the other two keep their state.
@@ -75,7 +77,7 @@ export function CalibrationPanel({ refresh, mapRevision }: { refresh: () => void
       await adapter.commitMap(runId, jobId, mapRevision);
       refresh();
       setRunId(null); setRunTag(null); setJobId(null); setProgress(null);
-      setSlots(prev => prev.map(s => ({ ...s, status: "idle", uploadId: null, error: undefined })));
+      setSlots(prev => prev.map(s => ({ ...s, status: "idle", uploadId: null, file: null, error: undefined })));
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
@@ -86,7 +88,7 @@ export function CalibrationPanel({ refresh, mapRevision }: { refresh: () => void
   return (
     <section>
       <h2>Calibration</h2>
-      <p className="muted">A short flashing test figures out where each phone is. No real camera files are needed — the harness accepts synthetic uploads. One failed upload does not discard the others.</p>
+      <p className="muted">A short flashing test figures out where each phone is. Each camera slot takes a video recording of the phones flashing. If the real server isn't running, every action below retries it and shows "Real server not detected". One failed upload does not discard the others.</p>
       {error && <p role="alert" className="error">Error: {error}</p>}
       {!runId && <button onClick={startRun}>Start calibration run</button>}
       {runId && <>
@@ -100,10 +102,15 @@ export function CalibrationPanel({ refresh, mapRevision }: { refresh: () => void
                   {COLUMNS.map(col => <option key={col} value={col}>{col}</option>)}
                 </select>
               </label>
+              <input
+                ref={el => { fileRefs.current[slot.index] = el; }}
+                type="file" accept="video/*" aria-label={`Camera ${slot.index + 1} video`}
+                onChange={e => setSlots(prev => prev.map(s => s.index === slot.index ? { ...s, file: e.target.files?.[0] ?? null } : s))}
+              />
               <button disabled={slot.status === "uploading"} onClick={() => upload(slot.index)}>
-                {slot.status === "uploading" ? "Uploading..." : slot.status === "done" ? "Re-upload fake camera" : "Add fake camera"}
+                {slot.status === "uploading" ? "Uploading..." : slot.status === "done" ? "Re-upload" : "Upload camera video"}
               </button>
-              <p className="muted">Status: {slot.status}{slot.error ? ` — ${slot.error}` : ""}</p>
+              <p className="muted">Status: {slot.status}{slot.file ? ` — ${slot.file.name}` : ""}{slot.error ? ` — ${slot.error}` : ""}</p>
             </div>
           ))}
         </div>

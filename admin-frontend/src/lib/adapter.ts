@@ -38,6 +38,14 @@ export function createAdapter(baseUrl: string) {
 
   function newCommandId() { return `cmd-${Math.random().toString(36).slice(2, 12)}`; }
 
+  // Every network call goes through safeFetch so a missing/unreachable server becomes one clean
+  // error instead of a raw TypeError. This is the "not detected" path: the console tries the real
+  // server, and if nothing is listening it reports that honestly rather than faking success.
+  async function safeFetch(url: string, init?: RequestInit): Promise<Response> {
+    try { return await fetch(url, init); }
+    catch { throw new AdapterError("SERVER_UNREACHABLE", `Real server not detected at ${baseUrl}`, false, 0); }
+  }
+
   async function parseError(response: Response): Promise<never> {
     let code = "HTTP_ERROR", message = `HTTP ${response.status}`, retryable = false;
     try {
@@ -48,15 +56,15 @@ export function createAdapter(baseUrl: string) {
   }
 
   async function getSnapshot(): Promise<AdminSnapshotData> {
-    const response = await fetch(`${baseUrl}/api/sessions/demo/snapshot`);
+    const response = await safeFetch(`${baseUrl}/api/sessions/demo/snapshot`);
     if (!response.ok) await parseError(response);
     const data = AdminSnapshot.parse(await response.json());
     session = { sessionId: data.sessionId, serverEpoch: data.serverEpoch, revision: data.revision };
     // Any pending commands whose effect is now reflected in the confirmed snapshot are confirmed.
     for (const [, cmd] of pending) {
       if (cmd.status === "pending") {
-        // Simple heuristic: a command is confirmed once the server revision advances past the
-        // revision we sent it against. The harness bumps revision on accept and again on apply.
+        // A command is confirmed once the server revision advances past the revision we sent it
+        // against. The server bumps revision on accept and again on apply.
         if (data.revision > cmd.sentRevision) { cmd.status = "confirmed"; }
       }
     }
@@ -66,7 +74,7 @@ export function createAdapter(baseUrl: string) {
   async function sendJson<T>(path: string, body: Record<string, unknown>, commandId: string, domain: PendingCommand["domain"], sentRevision: number): Promise<T> {
     const cmd: PendingCommand = { commandId, domain, status: "pending", sentAt: Date.now(), sentRevision };
     pending.set(commandId, cmd);
-    const response = await fetch(`${baseUrl}${path}`, {
+    const response = await safeFetch(`${baseUrl}${path}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     });
     if (!response.ok) {
@@ -100,7 +108,7 @@ export function createAdapter(baseUrl: string) {
       form.set("cameraId", cameraId);
       form.set("primaryColumn", primaryColumn);
       if (file) form.set("file", file);
-      const response = await fetch(`${baseUrl}/api/calibrations/${runId}/uploads`, { method: "POST", body: form });
+      const response = await safeFetch(`${baseUrl}/api/calibrations/${runId}/uploads`, { method: "POST", body: form });
       if (!response.ok) await parseError(response);
       return response.json() as Promise<{ uploadId: string; cameraId: string; revision: number }>;
     },
@@ -109,7 +117,7 @@ export function createAdapter(baseUrl: string) {
       return sendJson<{ jobId: string; revision: number }>(`/api/calibrations/${runId}/jobs`, { ...context(commandId), runId, uploadIds }, commandId, "calibration", session.revision);
     },
     async getJobProgress(jobId: string) {
-      const response = await fetch(`${baseUrl}/api/jobs/${jobId}`);
+      const response = await safeFetch(`${baseUrl}/api/jobs/${jobId}`);
       if (!response.ok) await parseError(response);
       return response.json() as Promise<{ protocolVersion: 1; jobId: string; runId: string; stage: string; progress: number; message: string }>;
     },

@@ -1,26 +1,21 @@
-# Operator harness - Team 4
+# Operator demo helper - Team 4
 
-`bun run dev:admin-demo` starts this fake-input harness on port `18084` and the admin console
-(Next.js) on port `3001`. The console talks to the harness through the typed adapter in
-`admin-frontend/src/lib/adapter.ts`; it never knows this is fake.
+`bun run dev:admin-demo` starts the admin console (Next.js) on port `3001`, pointed at the real
+control server (default `http://localhost:8080`, Team 1).
 
-## What the harness simulates (all synthetic, no real files)
+## No fake harness
 
-- **Snapshot** — `GET /api/sessions/demo/snapshot` returns a 1,500-device admin snapshot built
-  from the shared fixture. Map evidence is labeled `synthetic`.
-- **Calibration** — `POST /api/calibrations`, `.../arm`, `.../uploads`, `.../jobs`. Uploads accept
-  a fake file or none; jobs stream fake `JobProgress` (queued → validate → decode → track →
-  register → complete over ~2s) and produce a synthetic candidate map.
-- **Commit map** — `POST /api/calibrations/:runId/commit-map` commits the candidate and bumps
-  `mapRevision`. A stale `expectedMapRevision` returns `409 STALE_MAP`.
-- **Assignments / transport / mix** — accepted as pending actions with a future `effectiveServerMs`.
-  They apply when the shared clock reaches that time, so the console can show pending vs
-  confirmed distinctly. A stale map revision on assignment returns `409 STALE_MAP`.
-- **Panic** — clears pending actions, stops transport, mutes all channels.
-- **Job progress** — `GET /api/jobs/:jobId`.
+The fake-input harness has been removed. The console now talks to the real server only. When the
+real server is not running, every action attempts the real call and shows a clean
+"Real server not detected at http://localhost:8080" error in its catch block — nothing is faked.
+The console is still runnable and clickable; it just has no live data until the real server is up.
+
+`tools/admin-demo/index.ts` is a standalone status checker: run it to ping the real server and
+report whether the console will see live data or "not detected" messages.
 
 ## Notes
 
-- `server.ts` exports `startAdminHarness(port, count)` so adapter tests can start a small instance.
-- Dot count is not load evidence; this is a loopback single-process harness, not 1,500 sockets.
-- Production UI ignores the mock flag; this harness is for building and testing only.
+- The console's server interface is `admin-frontend/src/lib/adapter.ts`; it wraps every fetch so a
+  missing server becomes `AdapterError(SERVER_UNREACHABLE)`.
+- This is not load evidence and not a substitute for the real server (Team 1) or the OTC decoder
+  (Team 3). Calibration uploads a real video to the real server, which hands it to the OTC worker.

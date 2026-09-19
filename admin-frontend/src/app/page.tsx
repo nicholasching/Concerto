@@ -13,18 +13,23 @@ export default function Page() {
   const { snapshot, error, loading, refresh } = useSnapshot(1000);
   const adapter = useAdapter();
   const [tab, setTab] = useState<Tab>("session");
-  const mock = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCKS === "1";
 
   const summary = snapshot ? audienceSummary(snapshot) : null;
   const pending = adapter.pending();
   const pendingCount = pending.filter(p => p.status === "pending").length;
+  const notDetected = !snapshot && !loading && !!error;
 
   return (
     <main>
       <p className="eyebrow">AUDIENCE ORCHESTRA / TEAM 4</p>
       <h1>Admin console</h1>
-      <p className="notice">{mock ? "SYNTHETIC FAKE-INPUT HARNESS" : "FOUNDATION SHELL"}</p>
-      {error && <p role="alert" className="error">Server error: {error}. The console never shows fake success — this is a real error from the harness/server.</p>}
+      {notDetected && (
+        <p role="alert" className="error">
+          Real server not detected at {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}.
+          The console is ready; start the real control server (Team 1, port 8080) to use these
+          features. Any action you take will retry the real server and show this until it is running.
+        </p>
+      )}
 
       <nav className="tabs">
         {(["session", "calibration", "review", "assign", "perform"] as Tab[]).map(t => (
@@ -32,56 +37,60 @@ export default function Page() {
         ))}
       </nav>
 
-      {loading && !snapshot && <p>Loading snapshot…</p>}
+      {loading && !snapshot && <p>Trying the real server…</p>}
 
-      {snapshot && summary && tab === "session" && (
-        <section>
-          <h2>Session</h2>
-          <p className="muted">The audience scans the QR code to join. Watch the counts; keep the panic control visible.</p>
-          <div className="stats">
-            <p><strong>{summary.connected}</strong><br />connected</p>
-            <p><strong>{summary.clockReady}</strong><br />clock synced</p>
-            <p><strong>{summary.audioUnlocked}</strong><br />audio unlocked</p>
-            <p><strong>{summary.localized}</strong><br />localized</p>
-            <p><strong>{summary.unresolved}</strong><br />unresolved</p>
-          </div>
-          <div className="qr-box">
-            <pre>{`  █▀▀▀▀█  █▀▀▀▀█
+      {tab === "session" && (
+        snapshot && summary ? (
+          <section>
+            <h2>Session</h2>
+            <p className="muted">The audience scans the QR code to join. Watch the counts; keep the panic control visible.</p>
+            <div className="stats">
+              <p><strong>{summary.connected}</strong><br />connected</p>
+              <p><strong>{summary.clockReady}</strong><br />clock synced</p>
+              <p><strong>{summary.audioUnlocked}</strong><br />audio unlocked</p>
+              <p><strong>{summary.localized}</strong><br />localized</p>
+              <p><strong>{summary.unresolved}</strong><br />unresolved</p>
+            </div>
+            <div className="qr-box">
+              <pre>{`  █▀▀▀▀█  █▀▀▀▀█
   █ ███ █  █ ███ █
   █ ▀▀▀ █  █ ▀▀▀ █
   ▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀`}</pre>
-            <p className="muted">QR placeholder — phones scan this to join (Team 2 client).</p>
-          </div>
-          <p className="muted">Revision {snapshot.revision}. Pending commands: {pendingCount}. {pendingCount > 0 && "Shown as pending until the server confirms."}</p>
-          <button className="panic" onClick={() => { void adapter.panic(); refresh(); }}>PANIC</button>
-        </section>
+              <p className="muted">QR placeholder — phones scan this to join (Team 2 client).</p>
+            </div>
+            <p className="muted">Revision {snapshot.revision}. Pending commands: {pendingCount}. {pendingCount > 0 && "Shown as pending until the server confirms."}</p>
+            <button className="panic" onClick={() => { void adapter.panic(); refresh(); }}>PANIC</button>
+          </section>
+        ) : <NotDetectedSection label="Session" />
       )}
 
-      {snapshot && tab === "calibration" && (
-        <CalibrationPanel refresh={refresh} mapRevision={snapshot.audienceMap.mapRevision} />
+      {tab === "calibration" && (
+        <CalibrationPanel refresh={refresh} mapRevision={snapshot?.audienceMap.mapRevision ?? 0} />
       )}
 
-      {snapshot && tab === "review" && (
-        <section>
-          <h2>Review</h2>
-          <p className="muted">The audience map after calibration. One dot per phone, colored by status or assignment. Switch to Assign to draw selections.</p>
-          <MapPanel map={snapshot.audienceMap} assignments={snapshot.assignments} channels={snapshot.show.channels} drawable={false} />
-          <div className="legend">
-            <span><i style={{ background: "#71d0b0" }} /> localized</span>
-            <span><i style={{ background: "#f2c76d" }} /> coarse</span>
-            <span><i style={{ background: "#e08a8a" }} /> ambiguous</span>
-            <span><i style={{ background: "#5a6b86" }} /> unseen</span>
-          </div>
-          <p className="muted">Evidence: {snapshot.audienceMap.evidence} (synthetic = from the harness, not real cameras). Run: {snapshot.audienceMap.runId ?? "none"}.</p>
-        </section>
+      {tab === "review" && (
+        snapshot ? (
+          <section>
+            <h2>Review</h2>
+            <p className="muted">The audience map after calibration. One dot per phone, colored by status or assignment. Switch to Assign to draw selections.</p>
+            <MapPanel map={snapshot.audienceMap} assignments={snapshot.assignments} channels={snapshot.show.channels} drawable={false} />
+            <div className="legend">
+              <span><i style={{ background: "#71d0b0" }} /> localized</span>
+              <span><i style={{ background: "#f2c76d" }} /> coarse</span>
+              <span><i style={{ background: "#e08a8a" }} /> ambiguous</span>
+              <span><i style={{ background: "#5a6b86" }} /> unseen</span>
+            </div>
+            <p className="muted">Evidence: {snapshot.audienceMap.evidence}. Run: {snapshot.audienceMap.runId ?? "none"}.</p>
+          </section>
+        ) : <NotDetectedSection label="Review" />
       )}
 
-      {snapshot && tab === "assign" && (
-        <AssignPanel snapshot={snapshot} refresh={refresh} />
+      {tab === "assign" && (
+        snapshot ? <AssignPanel snapshot={snapshot} refresh={refresh} /> : <NotDetectedSection label="Assign" />
       )}
 
-      {snapshot && tab === "perform" && (
-        <PerformPanel snapshot={snapshot} refresh={refresh} />
+      {tab === "perform" && (
+        snapshot ? <PerformPanel snapshot={snapshot} refresh={refresh} /> : <NotDetectedSection label="Perform" />
       )}
 
       {pending.length > 0 && (
@@ -94,5 +103,14 @@ export default function Page() {
         </section>
       )}
     </main>
+  );
+}
+
+function NotDetectedSection({ label }: { label: string }) {
+  return (
+    <section>
+      <h2>{label}</h2>
+      <p className="error">Real server not detected. Start the real control server (Team 1, port 8080) to use {label}.</p>
+    </section>
   );
 }

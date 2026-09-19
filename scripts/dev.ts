@@ -16,7 +16,7 @@ function frontend(app: string, port: number, mockPort?: number) {
 }
 if (mode === "sync-demo" || mode === "all") spawn([resolve(ROOT, "backend/src/index.ts")]);
 if (mode === "client-demo") { spawn([resolve(ROOT, "tools/client-demo/index.ts")]); frontend("client-frontend", 3000, 18081); }
-else if (mode === "admin-demo") { spawn([resolve(ROOT, "tools/admin-demo/index.ts")]); frontend("admin-frontend", 3001, 18084); }
+else if (mode === "admin-demo") { frontend("admin-frontend", 3001); }
 else if (mode === "all") { frontend("client-frontend", 3000); frontend("admin-frontend", 3001); }
 else if (mode !== "sync-demo") throw new Error(`Unknown mode: ${mode}`);
 function stop() { for (const child of children) child.kill(); }
