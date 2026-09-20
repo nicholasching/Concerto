@@ -97,6 +97,15 @@ def test_pending_flash_sequence_does_not_cross_a_long_gap_or_fragment():
     assert qualified_ids == {qualified.track_id}
 
 
+def test_flash_sequence_tolerates_a_short_same_track_gap():
+    sequence = FlashSequence()
+
+    assert not _observe_phase(sequence, "red", 0)
+    assert not _observe_phase(sequence, "blue", 330)  # 170 ms after the red sample.
+    assert not _observe_phase(sequence, "red", 660)
+    assert _observe_phase(sequence, "blue", 990)
+
+
 def test_palette_evidence_is_exclusive_and_rejects_an_enclosing_ghost_track():
     rgb = np.zeros((120, 120, 3), dtype=np.uint8)
     rgb[40:60, 50:65] = (255, 0, 0)

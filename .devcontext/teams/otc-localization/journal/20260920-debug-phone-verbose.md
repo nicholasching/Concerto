@@ -64,3 +64,12 @@ following blue phase therefore had no valid red-blue-red history to complete.
 The current rule requires consecutive evidence from one raw screen track with
 gaps no greater than 100 ms. No detector behavior was changed from this
 diagnosis alone.
+
+## Follow-up implementation: same-track phase grace
+
+Approved change: increase only the per-phase gap allowance from 100 ms to 200
+ms. This is below the 350 ms raw-track expiry and does not transfer pending
+qualification between tracks. A focused sequence test covers a 170 ms gap;
+the existing 300 ms gap rejection remains the upper-bound regression check.
+Focused automated verification was intentionally deferred at the user's
+request; the next action is a front-end rerun of the representative clip.

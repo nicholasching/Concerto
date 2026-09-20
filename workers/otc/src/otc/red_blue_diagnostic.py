@@ -32,7 +32,9 @@ DEFAULT_FLASH_SETTINGS = FlashSettings()
 SELECTED_TRACK_MAX_AGE_MS = 350
 PHASE_MIN_SAMPLES = 2
 PHASE_MIN_DURATION_MS = 50
-PHASE_MAX_GAP_MS = 100
+# A frame-level screen association can briefly disappear while the same raw
+# track remains eligible. Allow that short loss without joining separate tracks.
+PHASE_MAX_GAP_MS = 200
 REQUIRED_FLASH_SEQUENCE = ("red", "blue", "red", "blue")
 FRAGMENT_HANDOFF_MIN_AREA_RATIO = .5
 FRAGMENT_HANDOFF_MAX_AREA_RATIO = 2.0
