@@ -14,7 +14,8 @@ import numpy as np
 from otc.validation import ROOT, validate_manifest
 
 CASES = ("clean", "degraded", "wrong-tag", "duplicates", "crossing", "rotated", "vfr", "empty",
-         "perspective", "perspective-undersized", "emissive-background", "reflected-motion")
+         "perspective", "perspective-undersized", "emissive-background", "reflected-motion",
+         "missing-pilots", "repeat-erasures", "red-glow", "faint-colors")
 
 
 def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, height=360, seed=7, manifest_path=None):
@@ -48,12 +49,18 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
             phones[-1].update(depth=phones[-1]["y"], cameraScreens=[],
                               expectedUnresolvable=(case == "perspective-undersized" and
                                                     local // columns == rows - 1))
+    version = manifest["packetVersion"]
+    symbol_ms = manifest["symbolMs"]
+    packet_symbols = 47 if version == "otc-v2" else 55
+    body_start = 13 if version == "otc-v2" else 21
+    if case == "wrong-tag" and version == "otc-v2":
+        raise ValueError("OTC v2 does not transmit a run tag")
     tag = manifest["runTag"] + (case == "wrong-tag")
     packets = {}
     for device_id in ids:
         word = [int(bit) for bit in words["codewords"][device_id]]
         packets[device_id] = ([None, None, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0]
-                             + [int(bit) for bit in f"{tag:08b}"] + word
+                             + ([int(bit) for bit in f"{tag:08b}"] if version == "otc-v1" else []) + word
                              + [1-bit for bit in word] + [None, None])
     colors = {bit: np.array([int(manifest["palette"][key][i:i+2], 16) for i in (1, 3, 5)],
                             dtype=np.float64)
@@ -118,7 +125,7 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
                     continue
                 rgb = np.full((height, width, 3), 9, np.uint8)
                 rgb[6:18, 6:38] = [180, 20, 180]  # Non-packet stage-light distractor.
-                slot = math.floor((pts_ms - phases[camera_index]) / 200)
+                slot = math.floor((pts_ms - phases[camera_index]) / symbol_ms)
                 for index, phone in enumerate(phones):
                     device_id = phone["deviceId"]
                     if case == "empty" or (case == "degraded" and device_id == ids[-1]):
@@ -126,13 +133,22 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
                     x, y = project(phone["x"], phone["y"])
                     if case == "crossing" and len(phones) > 3 and index in (0, 3):
                         other_x, _ = project(phones[3 if index == 0 else 0]["x"], phone["y"])
-                        fraction = min(1, max(0, ((pts_ms-phases[camera_index])/200-22)/6))
+                        fraction = min(1, max(0, ((pts_ms-phases[camera_index])/symbol_ms-22)/6))
                         x += (other_x-x) * fraction
                     if case in ("degraded", "vfr", "reflected-motion"):
                         x += 1.6 * math.sin(pts_ms / 700 + phone["motionPhase"])
                         y += 1.1 * math.cos(pts_ms / 600 + phone["motionPhase"])
-                    bit = packets[device_id][slot] if 0 <= slot < 55 else None
+                    bit = packets[device_id][slot] if 0 <= slot < packet_symbols else None
+                    if case == "missing-pilots" and 2 <= slot < 6:
+                        continue
+                    if case == "repeat-erasures" and slot-body_start in (0, 2, 4, 6, 17, 19, 21, 23):
+                        continue
                     color = colors[bit]
+                    if case == "faint-colors" and bit is not None:
+                        palettes = (((247, 41, 59), (32, 40, 85)),
+                                    ((90, 50, 40), (57, 75, 163)),
+                                    ((100, 35, 60), (60, 90, 110)))
+                        color = np.array(palettes[index % 3][bit], dtype=np.float64)
                     if case == "emissive-background" and bit is not None:
                         # Three independent exposure conditions, unrelated to
                         # detector thresholds: washed zero/cyan over clothing,
@@ -160,6 +176,13 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
                     else:
                         x0, y0 = round(x-5), round(y-8)
                     if 0 <= x0 < width-screen_width and 0 <= y0 < height-screen_height:
+                        if case == "faint-colors":
+                            rgb[max(0,y0-10):y0+screen_height+10,
+                                max(0,x0-10):x0+screen_width+10] = (200,150,120)
+                        if case == "red-glow" and bit == 0:
+                            # Warm skin/clothing joins the broad brightness mask.
+                            rgb[max(0,y0-20):y0+2, x0+screen_width:x0+screen_width+5] = (220,170,140)
+                            rgb[y0:y0+4, x0+screen_width-2:x0+screen_width+5] = (220,170,140)
                         if case == "reflected-motion" and bit == 1 and index % 2 == 0:
                             # A blue screen illuminates a nearby hand/arm. Its
                             # low-saturation connected glow changes the naive
@@ -176,19 +199,19 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
                                 rgb[y0+3:y0+4, x0+screen_width:x0+screen_width+6] = (15, 220, 255)
                         rgb[y0:y0+screen_height, x0:x0+screen_width] = color.clip(0, 255).astype(np.uint8)
                         if (case == "reflected-motion" and slot in (24, 32, 44) and
-                                (pts_ms-phases[camera_index]) % 200 < 1000/fps):
+                                (pts_ms-phases[camera_index]) % symbol_ms < 1000/fps):
                             # A short glare/rolling-exposure band removes part
                             # of the detected screen for one transition frame.
                             rgb[y0:y0+screen_height//3, x0:x0+screen_width] = 245
                         if (case == "reflected-motion" and index % 2 == 1 and slot == 6 and
-                                70 <= (pts_ms-phases[camera_index]) % 200 < 70+1000/fps):
+                                70 <= (pts_ms-phases[camera_index]) % symbol_ms < 70+1000/fps):
                             # A pale exposure band divides the saturated blue
                             # regions while leaving the lit screen contiguous.
                             rgb[y0+10:y0+14, x0:x0+screen_width] = (180, 200, 250)
                         if case == "degraded" and index == 5 and 23 <= slot <= 28:
                             rgb[y0:y0+16, x0:x0+5] = 9  # Half-covered phone, then uncovered.
                 if case == "duplicates" and camera_index == 0:
-                    bit = packets[ids[0]][slot] if 0 <= slot < 55 else None
+                    bit = packets[ids[0]][slot] if 0 <= slot < packet_symbols else None
                     rgb[25:41, 60:70] = colors[bit].astype(np.uint8)
                 if camera["rotationDegrees"]:
                     rgb = np.ascontiguousarray(np.rot90(rgb))

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .protocol import HEADER, PACKET_SYMBOLS, SYMBOL_MS, decode_packet
+from .protocol import HEADER, SYMBOL_MS, decode_packet, packet_layout, v2_header_supported
 
 MIN_PHASE_SAMPLES = 40
 
@@ -15,6 +15,7 @@ class SampledPacket:
     symbols: list[int | None]
     counts: list[int]
     pilots: list[list[float]]
+    preamble_reference: bool = False
 
 
 def prepare_samples(track):
@@ -33,15 +34,28 @@ def zero_evidence(colors, zero_color):
     raise ValueError(f"Unsupported calibration zero color: {zero_color}")
 
 
-def sample_packet(track, phase_ms, prepared=None, *, zero_color="#FFB000"):
+def sample_packet(track, phase_ms, prepared=None, *, zero_color="#FFB000", packet_version="otc-v1"):
+    layout = packet_layout(packet_version)
     times, colors = prepared if prepared is not None else prepare_samples(track)
-    relative = (times - phase_ms) / SYMBOL_MS
+    relative = (times - phase_ms) / layout.symbol_ms
     slots = np.floor(relative).astype(np.int32)
     interior = ((relative - slots >= 0.25) & (relative - slots <= 0.75) &
-                (slots >= 0) & (slots < PACKET_SYMBOLS))
+                (slots >= 0) & (slots < layout.symbols))
     pilots = []
+    preamble_reference = False
     for first_slot in (2, 4):
         selected = interior & ((slots == first_slot) | (slots == first_slot + 1))
+        if packet_version == "otc-v2":
+            measured = np.median(colors[selected], axis=0) if selected.sum() >= 2 else None
+            credible_pilot = measured is not None and (
+                zero_evidence(measured, zero_color) if first_slot == 2 else measured[2]-measured[0] >= 0.05)
+        else:
+            credible_pilot = True
+        if not credible_pilot:
+            preamble_reference = True
+            bit = 0 if first_slot == 2 else 1
+            reference_slots = [slot for slot in range(6, 13) if HEADER[slot-2] == bit]
+            selected = interior & np.isin(slots, reference_slots)
         if selected.sum() < 2:
             return None
         pilots.append(np.median(colors[selected], axis=0))
@@ -58,19 +72,21 @@ def sample_packet(track, phase_ms, prepared=None, *, zero_color="#FFB000"):
     credible = (np.minimum(d0, d1) <= separation * 0.45) & (
         np.abs(d0 - d1) >= separation * 0.2
     )
-    counts = np.bincount(slots[interior], minlength=PACKET_SYMBOLS)
-    zeros = np.bincount(slots[interior & credible & (d0 < d1)], minlength=PACKET_SYMBOLS)
-    ones = np.bincount(slots[interior & credible & (d1 < d0)], minlength=PACKET_SYMBOLS)
+    counts = np.bincount(slots[interior], minlength=layout.symbols)
+    zeros = np.bincount(slots[interior & credible & (d0 < d1)], minlength=layout.symbols)
+    ones = np.bincount(slots[interior & credible & (d1 < d0)], minlength=layout.symbols)
     symbols = [
         (int(one > zero) if count >= 2 and max(zero, one) / count >= 0.8 else None)
         for count, zero, one in zip(counts, zeros, ones)
     ]
     # Guards remain neutral. None in a data slot is an erasure, never zero.
-    symbols[:2] = symbols[53:] = [None, None]
-    return SampledPacket(phase_ms, symbols, counts.tolist(), [p.tolist() for p in pilots])
+    symbols[:2] = symbols[layout.body_end:] = [None, None]
+    return SampledPacket(phase_ms, symbols, counts.tolist(), [p.tolist() for p in pilots], preamble_reference)
 
 
-def find_phase(track, *, zero_color="#FFB000"):
+def find_phase(track, *, zero_color="#FFB000", packet_version="otc-v1"):
+    if packet_version == "otc-v2":
+        return find_phase_v2(track, zero_color=zero_color)
     if len(track.samples) < MIN_PHASE_SAMPLES:
         return None
     prepared = prepare_samples(track)
@@ -102,12 +118,58 @@ def find_phase(track, *, zero_color="#FFB000"):
     return None
 
 
+def find_phase_v2(track, *, zero_color):
+    if len(track.samples) < MIN_PHASE_SAMPLES:
+        return None
+    prepared = prepare_samples(track)
+    times, colors = prepared
+    cadence = float(np.median(np.diff(times)))
+    symbol_ms = packet_layout("otc-v2").symbol_ms
+    zero = zero_evidence(colors, zero_color)
+    blue = colors[:, 2]-colors[:, 0] >= 0.05
+    estimates = []
+    for evidence, slots in ((zero, (2, 9)), (blue, (4, 6, 11))):
+        starts = np.flatnonzero(evidence & ~np.r_[False, evidence[:-1]])
+        estimates.extend(times[index]-slot*symbol_ms-cadence/2
+                         for index in starts for slot in slots)
+    # Work from the earliest plausible header. Packet starts may precede the
+    # clip when recording begins after the dedicated pilots.
+    estimates = sorted(set(round(value, 1) for value in estimates
+                           if value >= -6*symbol_ms and value+13*symbol_ms <= times[-1]+100))
+    candidates = []
+    for estimate in estimates:
+        if candidates and estimate > max(p for p, _ in candidates)+symbol_ms:
+            break
+        for offset in range(-120, 121, 10):
+            phase = estimate+offset
+            header = (times >= phase+2*symbol_ms) & (times < phase+13*symbol_ms)
+            if header.sum() < 10:
+                continue
+            sampled = sample_packet(track, phase, (times[header], colors[header]),
+                                    zero_color=zero_color, packet_version="otc-v2")
+            if sampled and v2_header_supported(sampled.symbols):
+                support = sum(bit is not None for bit in sampled.symbols[6:13])
+                candidates.append((phase, support))
+    if not candidates:
+        return None
+    best_support = max(support for _, support in candidates)
+    phases = sorted({phase for phase, support in candidates if support == best_support})
+    if (phases[-1]-phases[0] > symbol_ms or
+            any(b-a > symbol_ms/4 for a, b in zip(phases, phases[1:]))):
+        return None  # Header alone does not distinguish these timing hypotheses.
+    return sample_packet(track, float(np.median(phases)), prepared,
+                         zero_color=zero_color, packet_version="otc-v2")
+
+
 def decode_tracks(scan, manifest, camera_id):
+    version = manifest.get("packetVersion", "otc-v1")
+    layout = packet_layout(version)
     zero_color = manifest["palette"]["zero"].upper()
     if zero_color not in ("#FF0000", "#FFB000") or manifest["palette"]["one"].upper() != "#0066FF":
         raise ValueError("Unsupported calibration palette; expected red/blue or legacy amber/blue")
     palette_label = "red/blue" if zero_color == "#FF0000" else "amber/blue"
-    fitted = {track.track_id: find_phase(track, zero_color=zero_color) for track in scan.tracks}
+    fitted = {track.track_id: find_phase(track, zero_color=zero_color, packet_version=version)
+              for track in scan.tracks}
     phases = [packet.phase_ms for packet in fitted.values() if packet is not None]
     phase = None
     messages = []
@@ -115,7 +177,7 @@ def decode_tracks(scan, manifest, camera_id):
         center = max(phases, key=lambda value: sum(abs(other-value) <= 60 for other in phases))
         cluster = [value for value in phases if abs(value-center) <= 60]
         other = [value for value in phases if abs(value-center) > 150]
-        if len(other) >= max(2, len(cluster) / 2):
+        if version == "otc-v1" and len(other) >= max(2, len(cluster) / 2):
             messages.append("Multiple incompatible packet phases; re-record one calibration run")
         else:
             phase = float(np.median(cluster))
@@ -134,22 +196,27 @@ def decode_tracks(scan, manifest, camera_id):
         reason = "pilot/preamble not resolved"
         decoded = None
         if sampled is not None and phase is not None:
-            if abs(sampled.phase_ms - phase) <= 75:
-                decoded = decode_packet(sampled.symbols, manifest["runTag"], participants)
+            if version == "otc-v2" or abs(sampled.phase_ms - phase) <= 75:
+                decoded = decode_packet(sampled.symbols, manifest["runTag"], participants,
+                                        packet_version=version)
                 reason = decoded.reason
             else:
                 reason = "track phase disagrees with camera phase"
         elif sampled is not None:
             reason = "camera packet phase is ambiguous"
         packet_samples = [s for s in track.samples
-                          if sampled.phase_ms + 2*SYMBOL_MS <= s.pts_ms < sampled.phase_ms + 53*SYMBOL_MS]
+                          if sampled.phase_ms + 2*layout.symbol_ms <= s.pts_ms < sampled.phase_ms + layout.body_end*layout.symbol_ms]
         centers = np.array([(s.x, s.y) for s in packet_samples])
         center = np.median(centers, axis=0)
         status = decoded.status if decoded else "rejected"
         reasons = sorted(track.reasons) + [reason]
+        if sampled.preamble_reference:
+            reasons.append("preamble color reference; pilot unavailable")
+        if version == "otc-v2" and any(bit is None for bit in sampled.symbols[6:13]):
+            reasons.append("partial preamble; erased symbols")
         # Valid codes survive size changes and transient pieces of their own
         # screen. Block actual crossing/merging phones, not generic track warnings.
-        collision = any(sampled.phase_ms + 2*SYMBOL_MS <= pts < sampled.phase_ms + 53*SYMBOL_MS
+        collision = any(sampled.phase_ms + 2*layout.symbol_ms <= pts < sampled.phase_ms + layout.body_end*layout.symbol_ms
                         and (separate or fitted.get(peer) is not None)
                         for pts, peer, separate in track.collisions)
         if collision and decoded and decoded.device_id is not None:

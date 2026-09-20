@@ -65,7 +65,7 @@ export class CalibrationSession {
     if (!me || !this.matches(me, message) || this.state.kind !== "prepared") return;
     if (preparationId !== this.state.preparationId || !samePlan(this.state.plan, run) || message.effectiveServerMs !== run.startServerMs) return;
     if (nowServerMs >= run.startServerMs) { this.finish(me, run.runId, false, "late", 0); return; }
-    this.set({ kind: "armed", preparationId, run, packet: calibrationPacket(me.deviceId, run.runTag) });
+    this.set({ kind: "armed", preparationId, run, packet: calibrationPacket(me.deviceId, run.runTag, run.packetVersion) });
   }
 
   abort(reason: AbortReason): void {

@@ -20,7 +20,8 @@ def process_camera(index, camera, path, manifest, debug_dir, report, frame_worke
     def on_frames(frames, pts_ms):
         report("track", f"{camera_id}: {frames} frames, clip PTS {pts_ms:.1f} ms")
 
-    scan = scan_camera(path, camera, on_frames, frame_workers=frame_workers)
+    scan = scan_camera(path, camera, on_frames, frame_workers=frame_workers,
+                       zero_color=manifest["palette"]["zero"])
     seen, details, phase, messages = decode_tracks(scan, manifest, camera_id)
     diagnostic = {
         "cameraId": camera_id, "frameWidth": scan.width, "frameHeight": scan.height,

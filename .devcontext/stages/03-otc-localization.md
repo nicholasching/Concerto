@@ -1,5 +1,7 @@
 # Stage 03 - Optical localization
 
+Latest OTC v2 migration: 47 slots at 250 ms, no optical run tag, joint identity decoding and preamble fallback. Legacy physical clips are regression-tested; physical v2 acceptance still requires a new capture. See [current implementation and evidence](../teams/integration/journal/20260920-otc-v2.md).
+
 Integrated-main working-tree checkpoint, 2026-09-19: **v1.5 passes 103 Python tests** and shared OTC gate. Fresh original-file checks recover the new clip's **three completed devices (15/16/17)** and preserve the earlier **two (9/11)**, all with agreeing passes and zero corrected/erased bits. See the [preamble/tracking investigation](../teams/otc-localization/journal/20260919-preamble-tracking.md). Background objects without the complete amber/blue header are no longer published as device tracks. Live runs/maps remain untouched; these single-camera results are column-only without anchors. Broader near/far/three-camera/venue acceptance remains separate. The initial branch checkpoints below are historical.
 
 Status: in progress; software implementation audited and ready for integration. Owner: Team 3 lead. Branch: feat/otc-localization. Base: foundation-v1 (ab59c27105627977ee52dc2bcd4276b4532b9e2a).

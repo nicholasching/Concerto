@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CalibrationPlan, Column } from "@orchestra/contracts";
+import { PACKET_VERSION, SYMBOL_MS } from "@orchestra/contracts/otc";
 
 type CalibrationPlanData = z.infer<typeof CalibrationPlan>;
 
@@ -69,8 +70,8 @@ export class CalibrationRuns {
       protocolVersion: 1, sessionId: input.sessionId, serverEpoch: input.serverEpoch,
       runId: crypto.randomUUID(), runTag: this.nextRunTag++,
       participantIds: input.participantIds,
-      packetVersion: "otc-v1", codebookVersion: "hamming16-11-v1",
-      paletteVersion: input.paletteVersion, palette: input.palette, symbolMs: 200,
+      packetVersion: PACKET_VERSION, codebookVersion: "hamming16-11-v1",
+      paletteVersion: input.paletteVersion, palette: input.palette, symbolMs: SYMBOL_MS,
     });
     const run: CalibrationRunRecord = { plan, status: "created", startServerMs: null, uploads: new Map(), preparationId: "pending", reports: new Map() };
     this.runs.set(plan.runId, run);

@@ -4,6 +4,12 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### OTC v2 reliability
+
+New runs use 47 symbols at 250 ms (11.75 s), with no optical run-tag field. Joint identity decoding recovers complementary losses across both passes; preamble evidence can replace missing pilots. Red-only compact-core detection fixes observed merging with skin/clothing while preserving legacy amber behavior. See the [decision](decisions/20260920-otc-v2-redundancy.md) and [implementation/checks](teams/integration/journal/20260920-otc-v2.md). Correct clip selection is operator-managed; a fresh physical v2 rehearsal remains required.
+
+The [wider-color detection follow-up](teams/otc-localization/journal/20260920-tolerant-detection.md) recovers **6/6** phones from the latest physical v1 recording (previously 4/6) and retains the amber 5/5 regression. The local app has been restarted with v2 and its public origin verified; refresh participant/admin pages before the next calibration.
+
 ### Audience music visualizer
 
 The `feat/color-music-sync` feature is integrated with scheduled playback: ready phones display their assigned channel color, with brightness following their own audio after mix and lease gating. Calibration and recovery/manual-section controls take priority. Review fixes, tests and browser evidence are in the [integration journal](teams/integration/journal/20260920-color-music-integration.md); see the [operator guide](../docs/stage-dashboard.md). Physical phone display/audio alignment remains a rehearsal check.

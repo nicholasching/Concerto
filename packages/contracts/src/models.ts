@@ -79,13 +79,18 @@ export const AudienceMap = z.strictObject({
 });
 
 export const Palette = z.strictObject({ zero: Color, one: Color, neutral: Color });
-export const CalibrationPlan = z.strictObject({
+const calibrationBase = {
   ...SessionIdentity, runId: Id, runTag: z.number().int().min(0).max(255),
-  participantIds: ParticipantIds, packetVersion: z.literal("otc-v1"),
+  participantIds: ParticipantIds,
   codebookVersion: z.literal("hamming16-11-v1"), paletteVersion: Id,
-  palette: Palette, symbolMs: z.literal(200),
-});
-export const CalibrationRun = CalibrationPlan.extend({ startServerMs: Milliseconds });
+  palette: Palette,
+};
+const LegacyCalibrationPlan = z.strictObject({ ...calibrationBase, packetVersion: z.literal("otc-v1"), symbolMs: z.literal(200) });
+const CurrentCalibrationPlan = z.strictObject({ ...calibrationBase, packetVersion: z.literal("otc-v2"), symbolMs: z.literal(250) });
+export const CalibrationPlan = z.discriminatedUnion("packetVersion", [LegacyCalibrationPlan, CurrentCalibrationPlan]);
+const LegacyCalibrationRun = LegacyCalibrationPlan.extend({ startServerMs: Milliseconds });
+const CurrentCalibrationRun = CurrentCalibrationPlan.extend({ startServerMs: Milliseconds });
+export const CalibrationRun = z.discriminatedUnion("packetVersion", [LegacyCalibrationRun, CurrentCalibrationRun]);
 export const CameraInput = z.strictObject({
   cameraId: Id, primaryColumn: Column, videoPath: z.string().min(1), sha256: Sha256,
   rotationDegrees: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
@@ -93,7 +98,8 @@ export const CameraInput = z.strictObject({
   anchors: z.tuple([Point, Point, Point, Point]).nullable(),
   frameLayout: z.enum(["from-stage", "from-back"]).optional(),
 });
-export const CalibrationManifest = CalibrationRun.extend({ cameras: z.array(CameraInput).min(1).max(3) });
+const cameraFields = { cameras: z.array(CameraInput).min(1).max(3) };
+export const CalibrationManifest = z.discriminatedUnion("packetVersion", [LegacyCalibrationRun.extend(cameraFields), CurrentCalibrationRun.extend(cameraFields)]);
 export const Observation = z.strictObject({
   cameraId: Id, trackId: Id, deviceId: DeviceId.nullable(),
   status: z.enum(["accepted", "ambiguous", "rejected"]),
@@ -103,7 +109,7 @@ export const Observation = z.strictObject({
 });
 export const CameraDiagnostic = z.strictObject({
   cameraId: Id, frameWidth: z.number().int().positive(), frameHeight: z.number().int().positive(),
-  phasePtsMs: Milliseconds.nullable(), acceptedTracks: z.number().int().nonnegative(),
+  phasePtsMs: z.number().nullable(), acceptedTracks: z.number().int().nonnegative(),
   rejectedTracks: z.number().int().nonnegative(), messages: z.array(z.string()),
 });
 export const OtcResult = z.strictObject({

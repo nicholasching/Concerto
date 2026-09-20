@@ -1,5 +1,9 @@
 # otc-localization checkpoint
 
+Latest detection follow-up (2026-09-20): wider faint-color discovery and robust footprints recover **6/6** from the latest physical v1 clip, all identity bits clean; amber regression retains **5/5**. Final OTC gate passes **194 Python tests** with three analysis workers; v2 E2E passes. Local app restarted with v2, saved state preserved, and public-origin/served-frontend checks pass. See [detection and activation evidence](journal/20260920-tolerant-detection.md). Fresh physical v2 capture remains required.
+
+Latest OTC v2 update (2026-09-20): new runs use 47 slots at 250 ms with no optical run tag, joint repeated-identity recovery, preamble fallback and red-palette-only core isolation. Legacy v1 manifests remain supported. All consumer gates, 184 final OTC tests and synthetic MP4 E2E pass. See [implementation, verification and handoff](../integration/journal/20260920-otc-v2.md). Fresh physical v2 capture remains outstanding.
+
 Latest performance work: automatic container-aware CPU allocation and bounded shared-memory frame analysis, retaining ordered tracking and identical results. **142 Python tests and real-worker E2E pass.** Original five-phone clip: 151.0 → 36.7 s; three-camera synthetic budget 3 → 16: 69.0 → 38.5 s, all 1,500 positions correct. User targets up to 24 Railway CPUs; deployed throughput remains unmeasured. See the [current performance journal](journal/20260920-frame-parallelism.md) and [configuration](../../../docs/otc-performance.md). Detector/geometry rules stay unchanged.
 
 Latest palette follow-up: **otc-v1.7** supports new full-red/current-blue runs and legacy amber/blue recordings. Exact source/verification/runtime status: [red/blue journal](journal/20260920-red-blue-palette.md). This user-requested palette change does not change flash timing or valid-ID/collision policy. Physical red/blue camera validation remains separate.

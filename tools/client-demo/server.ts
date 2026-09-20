@@ -144,7 +144,7 @@ export function startClientDemoServer({ port = 18081, capacity = 30, log = conso
     const runTag = ++lastRunTag;
     const record: CalibrationRecord = { runId: `mock-run-${runTag}`, runTag, preparationId: `mock-prepare-${runTag}`, participantIds, ready: [], notReady: [], startServerMs: null, results: [] };
     calibrations.push(record);
-    const plan = { protocolVersion: 1 as const, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch, runId: record.runId, runTag, participantIds, packetVersion: "otc-v1" as const, codebookVersion: "hamming16-11-v1" as const, ...PALETTE, symbolMs: 200 as const };
+    const plan = { protocolVersion: 1 as const, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch, runId: record.runId, runTag, participantIds, packetVersion: "otc-v2" as const, codebookVersion: "hamming16-11-v1" as const, ...PALETTE, symbolMs: 250 as const };
     snapshot.revision += 1;
     const prepare = JSON.stringify(ServerMessage.parse({ ...envelope(), type: "calibration.prepare", revision: snapshot.revision, payload: { preparationId: record.preparationId, plan } }));
     for (const id of participantIds) sockets.get(id)?.send(prepare);

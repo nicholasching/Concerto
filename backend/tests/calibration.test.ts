@@ -157,7 +157,7 @@ describe("creating a calibration run", () => {
 
     expect(plan.participantIds).toEqual([0, 1, 2]);
     expect(plan.runTag).toBe(0);
-    expect(plan).toMatchObject({ packetVersion: "otc-v1", codebookVersion: "hamming16-11-v1", symbolMs: 200 });
+    expect(plan).toMatchObject({ packetVersion: "otc-v2", codebookVersion: "hamming16-11-v1", symbolMs: 250 });
     expect(body.preparationId).toBe(context.preparations.current("calibration")?.preparationId);
   });
 

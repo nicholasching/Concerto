@@ -1,0 +1,13 @@
+# OTC v2: no optical run tag, 250 ms symbols, joint identity decoding
+
+Date: 2026-09-20. Status: accepted by explicit user instruction. Owner: integration captain across shared contracts and the four integrated consumers.
+
+The user directs removal of the transmitted run tag, 250 ms symbols, and fuller use of parity/repeated evidence. This supersedes v1's optical stale-run protection for new runs. The operator assumes responsibility for uploading the correct recording. Server session/epoch/run IDs, monotonic run counter (existing runTag metadata), input hashes, membership and map-revision validation remain. Metadata is not evidence that a v2 clip belongs to its selected run.
+
+New packet `otc-v2`: 47 slots at 250 ms = 11,750 ms. Slots 0-1 guards; 2-3 zero pilot; 4-5 one pilot; 6-12 fixed preamble 1110010; 13-28 Hamming(16,11) identity; 29-44 complemented identity; 45-46 guards. No optical run-tag bits. Existing `otc-v1` manifests keep 55 slots/200 ms and exact header/tag checking. Packet version and timing must match in TS and generated Python schemas. Existing codebook is unchanged.
+
+V2 can use the preamble as its color/timing reference when pilots are missing. At least five of seven preamble bits must be observed, including two of each color, with no contradicting bits; distinct timing hypotheses reject. It does not require population phase agreement when each screen independently resolves its preamble. Joint identity decoding evaluates the full codebook against both measured passes, including pattern-specific erasure recovery; no participant-set fitting. Competing IDs, insufficient distinguishing evidence, collisions and duplicate identities remain rejected. Single-pass recovery remains supported with disclosed evidence. Colors and phase must not be selected to manufacture a desired ID.
+
+The confirmed red segmentation failure is included in this repair: for red palettes, saturated red receives the same compact-core treatment as blue, with tests for nearby skin/glow and separate phones. Amber palettes retain their existing segmentation. Final physical v1 replays recover 5/5 amber phones and 3/4 red phones (previously 2/4). The fourth red phone still fails its legacy optical tag. Raw physical evidence remains ignored. Existing recordings cannot validate physical v2 transmission; a fresh 250 ms recording is the next physical acceptance step.
+
+This coordinated task owns the necessary shared schemas/generation, backend/client/admin timing consumers, OTC detector/decoder and their fixtures/tests. No dependency or reference-source changes are needed. Verification: all consumer gates, independent packet vectors, adversarial decoder tests, synthetic MP4 E2E, and saved physical v1 regressions.

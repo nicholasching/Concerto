@@ -196,7 +196,6 @@
           28,
           29
         ],
-        "packetVersion": "otc-v1",
         "codebookVersion": "hamming16-11-v1",
         "paletteVersion": "amber-blue-v1",
         "palette": {
@@ -204,6 +203,7 @@
           "one": "#0066FF",
           "neutral": "#111111"
         },
+        "packetVersion": "otc-v1",
         "symbolMs": 200
       }
     }
@@ -256,7 +256,6 @@
           28,
           29
         ],
-        "packetVersion": "otc-v1",
         "codebookVersion": "hamming16-11-v1",
         "paletteVersion": "amber-blue-v1",
         "palette": {
@@ -264,6 +263,7 @@
           "one": "#0066FF",
           "neutral": "#111111"
         },
+        "packetVersion": "otc-v1",
         "symbolMs": 200,
         "startServerMs": 100000
       }

@@ -14,16 +14,18 @@ def capture(tmp_path_factory):
     spec.loader.exec_module(module)
     cached = {}
 
-    def create(case="clean", count=12, fps=30, *, width=640, height=360, red_blue=False):
-        key = (case, count, fps, width, height, red_blue)
+    def create(case="clean", count=12, fps=30, *, width=640, height=360, red_blue=False, v2=False):
+        key = (case, count, fps, width, height, red_blue, v2)
         if key not in cached:
             path = tmp_path_factory.mktemp(f"{case}-{count}-{fps}-{width}x{height}")
             manifest_path = None
-            if red_blue:
+            if red_blue or v2:
                 template = json.loads((ROOT / "fixtures/otc/clean-30/manifest.json").read_text())
                 template["palette"] = {"zero": "#FF0000", "one": "#0066FF", "neutral": "#111111"}
                 template["paletteVersion"] = "red-blue-v1"
                 template["participantIds"] = list(range(count))
+                if v2:
+                    template.update(packetVersion="otc-v2", symbolMs=250)
                 manifest_path = path / "red-blue-input.json"
                 manifest_path.write_text(json.dumps(template))
             manifest, truth = module.generate_capture(path, case=case, count=count, fps=fps,

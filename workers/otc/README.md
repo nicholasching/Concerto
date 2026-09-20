@@ -1,5 +1,9 @@
 # OTC worker - Team 3
 
+Current decoder **otc-v2.0** supports new 47-slot/250-ms/tag-free packets and legacy v1 recordings. See [migration and verification](../../.devcontext/teams/integration/journal/20260920-otc-v2.md). Joint identity recovery, preamble-based color references and red-only core isolation are implemented; fresh physical v2 capture remains required.
+
+Wider faint-color discovery and robust screen tracking now recover all six phones in the latest physical v1 recording, previously 4/6. Red hue ranges are combined before segmentation; faint candidates preserve compact screen shapes, and tracking tolerates color-dependent brightness without adopting broad transient glow. Bit decisions still use measured color references and bounded identity correction. See [verification and runtime activation](../../.devcontext/teams/otc-localization/journal/20260920-tolerant-detection.md).
+
 CPU performance: processing now shares an automatic, container-aware CPU budget across cameras and independent frame detection. `OTC_CPU_BUDGET=24` requests up to 24 analysis CPUs; `--cpu-budget` overrides it per CLI run. Tracking still consumes all native-resolution frames in PTS order. See the [configuration/benchmark guide](../../docs/otc-performance.md) and [measurements/handoff](../../.devcontext/teams/otc-localization/journal/20260920-frame-parallelism.md). Accuracy rules and protocol v1 are unchanged.
 
 An offline worker decodes actual video files into protocol-v1 observations and audience locations. Synthetic MP4s provide independent identity/geometry regressions; original camera recordings provide separate physical evidence. Venue-scale camera validation remains outstanding.

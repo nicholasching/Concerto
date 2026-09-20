@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "bun:test";
 import { ClientMessage, DEFAULT_CALIBRATION_PALETTE, type ClientMessageData } from "@orchestra/contracts";
 import { calibrationPacket } from "@orchestra/contracts/otc";
 import goldens from "../../packages/contracts/generated/otc-golden-packets.json";
+import v2Goldens from "../../packages/contracts/generated/otc-v2-golden-packets.json";
 import { CalibrationSession, slotAt, symbolColor, type ArmMessage, type CalibrationIdentity, type CalibrationPhase, type Eligibility, type Palette, type PrepareMessage } from "../src/lib/calibration";
 import { COUNTDOWN_HIDE_MS, FlashRenderer, type FrameScheduler } from "../src/lib/flash-renderer";
 
@@ -42,6 +43,36 @@ test("symbolColor maps guards to neutral and bits to the plan palette", () => {
   expect([null, 0, 1].map(symbol => symbolColor(symbol as null | 0 | 1, PALETTE))).toEqual(["#111111", "#FF0000", "#0066FF"]);
 });
 
+test("v2 arm renders each 250 ms symbol and finishes at exactly 11.75 seconds", () => {
+  for (const golden of v2Goldens) {
+    const identity = { ...me, deviceId: golden.deviceId };
+    const runPlan = { ...plan, participantIds: [golden.deviceId], packetVersion: "otc-v2" as const, symbolMs: 250 as const };
+    const local = new CalibrationSession(() => {}, () => identity);
+    local.onPrepare({ ...prepare(), payload: { preparationId: "prep-1", plan: runPlan } }, eligible);
+    local.onArm({ ...arm(), payload: { preparationId: "prep-1", run: { ...runPlan, startServerMs: START } } }, START-1000);
+    const phase = local.phase;
+    expect(phase.kind).toBe("armed");
+    if (phase.kind !== "armed") throw new Error("v2 did not arm");
+    let now = START;
+    let next: (() => void) | null = null;
+    let color = "";
+    let done = false;
+    const renderer = new FlashRenderer({ clock: { nowServerMs: () => now, toLocalPerformanceMs: ms => ms, quality: () => ({ ready: true, uncertaintyMs: 0, sampleAgeMs: 0 }) },
+      clockUsable: () => true, run: phase.run, packet: phase.packet,
+      frames: { request: callback => { next = callback; return 1; }, cancel: () => { next = null; } },
+      paint: value => { color = value; }, onDone: () => { done = true; }, onClockLost: () => {} });
+    renderer.start();
+    const tick = (ms: number) => { now = ms; const callback = next; next = null; callback?.(); };
+    golden.symbols.forEach((symbol, slot) => {
+      tick(START+slot*250+125);
+      expect(color).toBe(symbolColor(symbol as 0|1|null, PALETTE));
+      expect(done).toBe(false);
+    });
+    tick(START+11749); expect(done).toBe(false);
+    tick(START+11750); expect(done).toBe(true);
+  }
+});
+
 test("legacy runs keep amber and a palette cannot change between preparation and arm", () => {
   const legacy = { paletteVersion: "amber-blue-v1", palette: { zero: "#FFB000", one: "#0066FF", neutral: "#111111" } };
   session.onPrepare(prepare(legacy), eligible);
@@ -58,7 +89,7 @@ test("a participant that is eligible says ready and arms for the matching run", 
   expect(sent[0]).toMatchObject({ type: "calibration.ready", payload: { preparationId: "prep-1", ready: true, reason: null, runId: "run-1" } });
   session.onArm(arm(), START - 3000);
   expect(session.phase).toMatchObject({ kind: "armed", run: { startServerMs: START } });
-  expect(session.phase.kind === "armed" && session.phase.packet).toEqual(calibrationPacket(7, 37));
+  expect(session.phase.kind === "armed" && session.phase.packet).toEqual(calibrationPacket(7, 37, "otc-v1"));
 });
 
 test("ineligible phones say not ready with the reason and never arm", () => {
@@ -140,7 +171,7 @@ function rendererHarness(deviceId: number, runTag: number, clockUsable = () => t
   const outcome: { done: number | null; clockLost: boolean } = { done: null, clockLost: false };
   const run = { ...plan, runTag, participantIds: [deviceId], startServerMs: START };
   const renderer = new FlashRenderer({
-    clock, clockUsable, run, packet: calibrationPacket(deviceId, runTag), frames,
+    clock, clockUsable, run, packet: calibrationPacket(deviceId, runTag, "otc-v1"), frames,
     paint: (color, text) => painted.push({ color, text }),
     onDone: ms => { outcome.done = ms; }, onClockLost: () => { outcome.clockLost = true; },
   });
@@ -169,7 +200,7 @@ test("nothing but neutral appears before the start, with the countdown hidden in
 });
 
 test("skipped frames jump to the correct slot and do not shift later slots", () => {
-  const packet = calibrationPacket(1, 37);
+  const packet = calibrationPacket(1, 37, "otc-v1");
   const { renderer, frameAt, outcome } = rendererHarness(1, 37);
   renderer.start();
   frameAt(START + 3 * 200 + 10);

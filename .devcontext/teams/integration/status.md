@@ -1,5 +1,7 @@
 # Integration status
 
+OTC v2 is active in the local/public app following a verified coordinated restart on 2026-09-20 at 03:50:58. Latest physical v1 replay improves 4/6 to 6/6 with clean identity bits; wider detector regressions and runtime state checks are in the [OTC journal](../otc-localization/journal/20260920-tolerant-detection.md). Fresh physical v2 capture is the next acceptance step.
+
 Manual-routing follow-up: **a29625e** committed/pushed before implementation. Manual section choices now assign a matching musical channel and ready late phones can join current playback. See the [current journal](journal/20260920-manual-section-routing.md) for verification and runtime status.
 
 Playback follow-up: prior fixes committed/pushed as **cb271b1**. Two-second controls, fresh-clock recovery and first-output warmup are implemented; [current verification/handoff](journal/20260920-playback-recovery.md). Older runtime/readiness descriptions below are historical.

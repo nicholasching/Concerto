@@ -1,4 +1,5 @@
 "use client";
+import { calibrationDurationMs } from "@orchestra/contracts/otc";
 import { useEffect, useState } from "react";
 import { useAdapter } from "../lib/useSnapshot";
 import { clockReady, futureServerMs, nowServerMs } from "../lib/clock";
@@ -119,20 +120,20 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   });
   const activeJob = progress && !["complete", "failed", "cancelled"].includes(progress.stage);
   const now = tick >= 0 && clockReady() ? nowServerMs() : null;
-  const finishedCapture = run?.startServerMs !== null && run?.startServerMs !== undefined && now !== null && now >= run.startServerMs + 11000;
+  const finishedCapture = run?.startServerMs !== null && run?.startServerMs !== undefined && now !== null && now >= run.startServerMs + calibrationDurationMs(run.plan);
   return <section>
     <div className="stage-heading"><span className="stage-number">01</span><div><p className="eyebrow">FIND THE AUDIENCE</p><h2>Calibration</h2></div><span className="stage-badge">{run ? run.status : "Ready to begin"}</span></div>
     <p className="muted">Start your cameras, prepare the phones, then run the 11-second pattern. Upload one, two or three views from this console or <a href="/upload" target="_blank" rel="noreferrer">a camera phone ↗</a>.</p>
     {error && <p role="alert" className="error">{error}</p>}
     {!run && <><button className="primary large" disabled={busy || !snapshot} onClick={() => void act(prepare)}>Prepare calibration <span aria-hidden="true">→</span></button><details><summary>Choose specific phones</summary><label>Target device IDs <input value={targetIds} placeholder="All ready phones" onChange={event => setTargetIds(event.target.value)} /></label></details></>}
     {run && <>
-      <p>Run tag {run.plan.runTag} · {run.status} · {run.plan.participantIds.length} participating phones</p>
+      <p>Calibration {run.plan.runTag} · {run.status} · {run.plan.participantIds.length} participating phones</p>
       {run.reports.length > 0 && <p>{run.reports.filter(report => report.completed).length} phones finished; {run.reports.filter(report => !report.completed).length} interrupted.</p>}
       {run.reports.filter(report => !report.completed).map(report => <p key={report.deviceId}>Device {report.deviceId}: {report.reason ?? "pattern interrupted"}</p>)}
       {barrier && <p>{barrier.readyIds.length}/{barrier.expectedIds.length} ready; {barrier.excluded.length} excluded; {barrier.expectedIds.length - barrier.readyIds.length - barrier.excluded.length} pending.</p>}
       {barrier?.excluded.map(item => <p key={item.deviceId}>Device {item.deviceId}: {item.reason}</p>)}
       {run.status === "created" && <button className="primary large" disabled={busy || !barrier?.readyIds.length || !clockReady()} onClick={() => void act(() => adapter.armCalibration(run.plan.runId, run.preparationId, futureServerMs(4)))}>Cameras recording — start pattern</button>}
-      {run.startServerMs !== null && now !== null && <p role="status">{now < run.startServerMs ? `Starts in ${((run.startServerMs - now) / 1000).toFixed(1)} s` : !finishedCapture ? `Pattern running · ${Math.max(0, (run.startServerMs + 11000 - now) / 1000).toFixed(1)} s remaining` : "Pattern finished. Stop recordings after the trailing margin, then upload."}</p>}
+      {run.startServerMs !== null && now !== null && <p role="status">{now < run.startServerMs ? `Starts in ${((run.startServerMs - now) / 1000).toFixed(1)} s` : !finishedCapture ? `Pattern running · ${Math.max(0, (run.startServerMs + calibrationDurationMs(run.plan) - now) / 1000).toFixed(1)} s remaining` : "Pattern finished. Stop recordings after the trailing margin, then upload."}</p>}
       <button disabled={busy || !!activeJob} onClick={() => void act(() => adapter.discardCalibration(run.plan.runId))}>Discard run and retry</button>
       <div className="slots">{slots.map((_, index) => {
         const slot = resolvedSlot(index);

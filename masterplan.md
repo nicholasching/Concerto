@@ -273,7 +273,11 @@ As a rough planning calculation, a 7 cm screen at 30 m with a 60-degree horizont
 
 If back-row screens are indistinguishable, change framing, camera position, lens, or the participating area immediately. Code cannot recover two fully overlapping emitters or an invisible screen. Keep all three cameras stationary, use the original files, record several seconds before/after calibration, and lock focus/exposure/white balance where supported. Confirm whether the phone actually produces H.264/HEVC and constant/variable frame timing. Prefer 4K30 if that is the most reliable common mode; use 60 fps only when tested.
 
-### 5.2 Packet v1: eleven identity bits with redundancy
+### 5.2 Current packet and historical v1
+
+**2026-09-20 user-approved update:** new `otc-v2` runs remove the eight optical run-tag slots and use 250 ms symbols: 47 slots / 11.75 seconds. Pilots/preamble remain, with preamble-based recovery when pilots are missing. Both identity passes are jointly decoded against the complete codebook. Correct recording selection is operator-managed; server identity/hash/order checks remain. Old `otc-v1` recordings retain their original format below. See [decision](.devcontext/decisions/20260920-otc-v2-redundancy.md).
+
+#### Historical v1: eleven identity bits with redundancy
 
 Keep the 11-bit ID capacity, but encode it as an **extended Hamming (16,11) codeword with minimum distance 4**. This supports single-bit correction and double-bit detection under the corresponding error assumptions; larger errors can still turn into a wrong valid word. Tracking, repeated evidence, participant filtering, and rejection remain necessary.
 

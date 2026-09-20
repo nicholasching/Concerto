@@ -1,3 +1,4 @@
+import { calibrationDurationMs } from "@orchestra/contracts/otc";
 import type { Hono } from "hono";
 import { z } from "zod";
 import type { AppDeps } from "./app";
@@ -31,7 +32,7 @@ export function registerStageRoutes(app: Hono, deps: AppDeps, persist: () => Pro
   const validRun = (runId: string) => {
     const run = deps.calibrations.get(runId);
     return run && ["armed", "processing"].includes(run.status) && run.startServerMs !== null
-      && deps.clock.nowServerMs() >= run.startServerMs + 11000 ? run : null;
+      && deps.clock.nowServerMs() >= run.startServerMs + calibrationDurationMs(run.plan) ? run : null;
   };
   async function prune() {
     const now = deps.clock.nowServerMs();
@@ -50,7 +51,7 @@ export function registerStageRoutes(app: Hono, deps: AppDeps, persist: () => Pro
       const snapshot = deps.state.adminSnapshot(deps.clock);
       const connected = snapshot.devices.filter(device => device.connected);
       const run = deps.calibrations.activeRun;
-      const patternFinished = run?.startServerMs != null && now >= run.startServerMs + 11000;
+      const patternFinished = run?.startServerMs != null && now >= run.startServerMs + calibrationDurationMs(run.plan);
       cachedDisplay = { at: now, epoch: deps.clock.serverEpoch, data: {
         sessionId: deps.clock.sessionId, connected: connected.length,
         synced: connected.filter(device => device.clockReady).length,

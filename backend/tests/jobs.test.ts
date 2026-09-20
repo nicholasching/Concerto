@@ -26,7 +26,7 @@ const streamOf = (lines: string[]) =>
     },
   });
 
-const manifest = (overrides: Partial<CalibrationManifestData> = {}): CalibrationManifestData => ({
+const manifest = (overrides: Partial<Extract<CalibrationManifestData, { packetVersion: "otc-v1" }>> = {}): CalibrationManifestData => ({
   protocolVersion: 1, sessionId: SESSION, serverEpoch: "epoch-a",
   runId: "run-1", runTag: 3, participantIds: [0, 1], startServerMs: 2_000_000,
   packetVersion: "otc-v1", codebookVersion: "hamming16-11-v1", paletteVersion: "palette-v1",

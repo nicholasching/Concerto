@@ -1,6 +1,6 @@
 # Optical protocol and worker boundary
 
-Use `packages/contracts/src/otc.ts`, generated `otc-codebook.json` and `otc-golden-packets.json`. The 55-symbol, 200 ms packet is fixed as `otc-v1`; `null` is the neutral guard, 0/1 are the manifest's two colors. Codewords preserve IDs 0-2047. A palette choice is metadata; pixel classification still needs camera experiments.
+Use `packages/contracts/src/otc.ts`, generated `otc-codebook.json` and `otc-golden-packets.json`. New `otc-v2` packets contain 47 symbols at 250 ms and omit the optical run tag; `otc-v1` retains 55 symbols at 200 ms for existing recordings. `null` is the neutral guard, 0/1 are the manifest's two colors. Codewords preserve IDs 0-2047. A palette choice is metadata; pixel classification still needs camera experiments.
 
 `CalibrationPlan` freezes identity, participants, versions, colors, symbol duration, and run tag. `CalibrationRun` adds `startServerMs` after readiness. `CalibrationManifest` adds the uploaded cameras/paths/hashes **after capture**. The arm message sends a run, not a processing manifest containing recordings that do not exist yet.
 
@@ -15,3 +15,5 @@ Current optional `CameraInput.frameLayout` declares `from-stage` or `from-back`.
 Python validates generated schemas and additionally checks duplicate participants/cameras/locations, result identity, exact camera hashes, and accepted-ID membership. Implement the actual decoder behind `python -m otc process --manifest ... --output ...`; successful output must validate before it is written. Emit `JobProgress` NDJSON on stdout and diagnostic logs on stderr. Failure must be nonzero and must not manufacture a successful result.
 
 Current `validate-manifest` and `replay-fixture` commands are executable fixture seams, not a decoder. No real MP4 fixture or tracking/geometry implementation is present. The master plan defines the algorithm stages and required physical experiments.
+
+V2 slots: 0–1 dark guards, 2–3 zero pilots, 4–5 one pilots, 6–12 preamble, 13–28 identity, 29–44 complemented identity, 45–46 dark guards. `runTag` remains server ordering metadata only. V2 camera `phasePtsMs` may be negative when the original capture starts after the packet; observed frame timestamps stay nonnegative. See [packet migration](../decisions/20260920-otc-v2-redundancy.md).

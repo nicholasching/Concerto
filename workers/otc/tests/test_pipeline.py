@@ -25,6 +25,29 @@ def assert_positions(result, truth, required=None):
     return localized
 
 
+@pytest.mark.parametrize("case,fps", [("clean",24), ("clean",60), ("missing-pilots",30),
+                                     ("repeat-erasures",30), ("red-glow",30),
+                                     ("emissive-background",30), ("faint-colors",30)])
+def test_v2_real_video_recovery_and_correct_positions(capture, case, fps):
+    path, manifest, truth = capture(case, count=6, fps=fps, v2=True)
+    result = process_manifest(manifest, path, "synthetic", cpu_budget=3)
+    validate_result(manifest, result)
+    assert_positions(result, truth, manifest["participantIds"])
+    assert any("no optical run tag" in warning for warning in result["warnings"])
+    if case == "repeat-erasures":
+        assert any("joint bounded repeat recovery" in o["reasons"] for o in result["observations"])
+
+
+@pytest.mark.parametrize("case", ["empty", "duplicates", "crossing"])
+def test_v2_retains_negative_scene_checks(capture, case):
+    path, manifest, _ = capture(case, count=6, v2=True)
+    result = process_manifest(manifest, path, "synthetic", cpu_budget=3)
+    if case == "empty":
+        assert not any(o["status"] == "accepted" for o in result["observations"])
+    else:
+        assert result["locations"][0]["status"] != "localized"
+
+
 @pytest.mark.parametrize("fps", [24, 30, 60])
 def test_red_blue_three_camera_mp4_decodes_ids_and_positions(capture, fps):
     path, manifest, truth = capture(count=6, fps=fps, red_blue=True)

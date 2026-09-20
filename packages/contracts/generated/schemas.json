@@ -1308,460 +1308,926 @@
   },
   "CalibrationPlan": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "properties": {
-      "protocolVersion": {
-        "type": "number",
-        "const": 1
-      },
-      "sessionId": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "serverEpoch": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "runId": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "runTag": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 255
-      },
-      "participantIds": {
-        "maxItems": 2048,
-        "type": "array",
-        "items": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 2047
-        }
-      },
-      "packetVersion": {
-        "type": "string",
-        "const": "otc-v1"
-      },
-      "codebookVersion": {
-        "type": "string",
-        "const": "hamming16-11-v1"
-      },
-      "paletteVersion": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "palette": {
+    "oneOf": [
+      {
         "type": "object",
         "properties": {
-          "zero": {
-            "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
+          "protocolVersion": {
+            "type": "number",
+            "const": 1
           },
-          "one": {
+          "sessionId": {
             "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
+            "minLength": 1,
+            "maxLength": 160
           },
-          "neutral": {
+          "serverEpoch": {
             "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runTag": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "participantIds": {
+            "maxItems": 2048,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
+            }
+          },
+          "codebookVersion": {
+            "type": "string",
+            "const": "hamming16-11-v1"
+          },
+          "paletteVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "palette": {
+            "type": "object",
+            "properties": {
+              "zero": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "one": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "neutral": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            },
+            "required": [
+              "zero",
+              "one",
+              "neutral"
+            ],
+            "additionalProperties": false
+          },
+          "packetVersion": {
+            "type": "string",
+            "const": "otc-v1"
+          },
+          "symbolMs": {
+            "type": "number",
+            "const": 200
           }
         },
         "required": [
-          "zero",
-          "one",
-          "neutral"
+          "protocolVersion",
+          "sessionId",
+          "serverEpoch",
+          "runId",
+          "runTag",
+          "participantIds",
+          "codebookVersion",
+          "paletteVersion",
+          "palette",
+          "packetVersion",
+          "symbolMs"
         ],
         "additionalProperties": false
       },
-      "symbolMs": {
-        "type": "number",
-        "const": 200
+      {
+        "type": "object",
+        "properties": {
+          "protocolVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "serverEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runTag": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "participantIds": {
+            "maxItems": 2048,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
+            }
+          },
+          "codebookVersion": {
+            "type": "string",
+            "const": "hamming16-11-v1"
+          },
+          "paletteVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "palette": {
+            "type": "object",
+            "properties": {
+              "zero": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "one": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "neutral": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            },
+            "required": [
+              "zero",
+              "one",
+              "neutral"
+            ],
+            "additionalProperties": false
+          },
+          "packetVersion": {
+            "type": "string",
+            "const": "otc-v2"
+          },
+          "symbolMs": {
+            "type": "number",
+            "const": 250
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "sessionId",
+          "serverEpoch",
+          "runId",
+          "runTag",
+          "participantIds",
+          "codebookVersion",
+          "paletteVersion",
+          "palette",
+          "packetVersion",
+          "symbolMs"
+        ],
+        "additionalProperties": false
       }
-    },
-    "required": [
-      "protocolVersion",
-      "sessionId",
-      "serverEpoch",
-      "runId",
-      "runTag",
-      "participantIds",
-      "packetVersion",
-      "codebookVersion",
-      "paletteVersion",
-      "palette",
-      "symbolMs"
-    ],
-    "additionalProperties": false
+    ]
   },
   "CalibrationRun": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "properties": {
-      "protocolVersion": {
-        "type": "number",
-        "const": 1
-      },
-      "sessionId": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "serverEpoch": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "runId": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "runTag": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 255
-      },
-      "participantIds": {
-        "maxItems": 2048,
-        "type": "array",
-        "items": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 2047
-        }
-      },
-      "packetVersion": {
-        "type": "string",
-        "const": "otc-v1"
-      },
-      "codebookVersion": {
-        "type": "string",
-        "const": "hamming16-11-v1"
-      },
-      "paletteVersion": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "palette": {
+    "oneOf": [
+      {
         "type": "object",
         "properties": {
-          "zero": {
-            "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
+          "protocolVersion": {
+            "type": "number",
+            "const": 1
           },
-          "one": {
+          "sessionId": {
             "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
+            "minLength": 1,
+            "maxLength": 160
           },
-          "neutral": {
+          "serverEpoch": {
             "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runTag": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "participantIds": {
+            "maxItems": 2048,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
+            }
+          },
+          "codebookVersion": {
+            "type": "string",
+            "const": "hamming16-11-v1"
+          },
+          "paletteVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "palette": {
+            "type": "object",
+            "properties": {
+              "zero": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "one": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "neutral": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            },
+            "required": [
+              "zero",
+              "one",
+              "neutral"
+            ],
+            "additionalProperties": false
+          },
+          "packetVersion": {
+            "type": "string",
+            "const": "otc-v1"
+          },
+          "symbolMs": {
+            "type": "number",
+            "const": 200
+          },
+          "startServerMs": {
+            "type": "number",
+            "minimum": 0
           }
         },
         "required": [
-          "zero",
-          "one",
-          "neutral"
+          "protocolVersion",
+          "sessionId",
+          "serverEpoch",
+          "runId",
+          "runTag",
+          "participantIds",
+          "codebookVersion",
+          "paletteVersion",
+          "palette",
+          "packetVersion",
+          "symbolMs",
+          "startServerMs"
         ],
         "additionalProperties": false
       },
-      "symbolMs": {
-        "type": "number",
-        "const": 200
-      },
-      "startServerMs": {
-        "type": "number",
-        "minimum": 0
+      {
+        "type": "object",
+        "properties": {
+          "protocolVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "serverEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runTag": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "participantIds": {
+            "maxItems": 2048,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
+            }
+          },
+          "codebookVersion": {
+            "type": "string",
+            "const": "hamming16-11-v1"
+          },
+          "paletteVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "palette": {
+            "type": "object",
+            "properties": {
+              "zero": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "one": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "neutral": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            },
+            "required": [
+              "zero",
+              "one",
+              "neutral"
+            ],
+            "additionalProperties": false
+          },
+          "packetVersion": {
+            "type": "string",
+            "const": "otc-v2"
+          },
+          "symbolMs": {
+            "type": "number",
+            "const": 250
+          },
+          "startServerMs": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "sessionId",
+          "serverEpoch",
+          "runId",
+          "runTag",
+          "participantIds",
+          "codebookVersion",
+          "paletteVersion",
+          "palette",
+          "packetVersion",
+          "symbolMs",
+          "startServerMs"
+        ],
+        "additionalProperties": false
       }
-    },
-    "required": [
-      "protocolVersion",
-      "sessionId",
-      "serverEpoch",
-      "runId",
-      "runTag",
-      "participantIds",
-      "packetVersion",
-      "codebookVersion",
-      "paletteVersion",
-      "palette",
-      "symbolMs",
-      "startServerMs"
-    ],
-    "additionalProperties": false
+    ]
   },
   "CalibrationManifest": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "properties": {
-      "protocolVersion": {
-        "type": "number",
-        "const": 1
-      },
-      "sessionId": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "serverEpoch": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "runId": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "runTag": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 255
-      },
-      "participantIds": {
-        "maxItems": 2048,
-        "type": "array",
-        "items": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 2047
-        }
-      },
-      "packetVersion": {
-        "type": "string",
-        "const": "otc-v1"
-      },
-      "codebookVersion": {
-        "type": "string",
-        "const": "hamming16-11-v1"
-      },
-      "paletteVersion": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 160
-      },
-      "palette": {
+    "oneOf": [
+      {
         "type": "object",
         "properties": {
-          "zero": {
-            "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
+          "protocolVersion": {
+            "type": "number",
+            "const": 1
           },
-          "one": {
+          "sessionId": {
             "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
+            "minLength": 1,
+            "maxLength": 160
           },
-          "neutral": {
+          "serverEpoch": {
             "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
-          }
-        },
-        "required": [
-          "zero",
-          "one",
-          "neutral"
-        ],
-        "additionalProperties": false
-      },
-      "symbolMs": {
-        "type": "number",
-        "const": 200
-      },
-      "startServerMs": {
-        "type": "number",
-        "minimum": 0
-      },
-      "cameras": {
-        "minItems": 1,
-        "maxItems": 3,
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "cameraId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160
-            },
-            "primaryColumn": {
-              "type": "string",
-              "enum": [
-                "left",
-                "center",
-                "right"
-              ]
-            },
-            "videoPath": {
-              "type": "string",
-              "minLength": 1
-            },
-            "sha256": {
-              "type": "string",
-              "pattern": "^[a-f0-9]{64}$"
-            },
-            "rotationDegrees": {
-              "anyOf": [
-                {
-                  "type": "number",
-                  "const": 0
-                },
-                {
-                  "type": "number",
-                  "const": 90
-                },
-                {
-                  "type": "number",
-                  "const": 180
-                },
-                {
-                  "type": "number",
-                  "const": 270
-                }
-              ]
-            },
-            "exclusionRois": {
-              "type": "array",
-              "items": {
-                "minItems": 3,
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "x": {
-                      "type": "number"
-                    },
-                    "y": {
-                      "type": "number"
-                    }
-                  },
-                  "required": [
-                    "x",
-                    "y"
-                  ],
-                  "additionalProperties": false
-                }
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runTag": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "participantIds": {
+            "maxItems": 2048,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
+            }
+          },
+          "codebookVersion": {
+            "type": "string",
+            "const": "hamming16-11-v1"
+          },
+          "paletteVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "palette": {
+            "type": "object",
+            "properties": {
+              "zero": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "one": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "neutral": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
               }
             },
-            "anchors": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": [
+            "required": [
+              "zero",
+              "one",
+              "neutral"
+            ],
+            "additionalProperties": false
+          },
+          "packetVersion": {
+            "type": "string",
+            "const": "otc-v1"
+          },
+          "symbolMs": {
+            "type": "number",
+            "const": 200
+          },
+          "startServerMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "cameras": {
+            "minItems": 1,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cameraId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "primaryColumn": {
+                  "type": "string",
+                  "enum": [
+                    "left",
+                    "center",
+                    "right"
+                  ]
+                },
+                "videoPath": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "rotationDegrees": {
+                  "anyOf": [
                     {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "x",
-                        "y"
-                      ],
-                      "additionalProperties": false
+                      "type": "number",
+                      "const": 0
                     },
                     {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "x",
-                        "y"
-                      ],
-                      "additionalProperties": false
+                      "type": "number",
+                      "const": 90
                     },
                     {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "x",
-                        "y"
-                      ],
-                      "additionalProperties": false
+                      "type": "number",
+                      "const": 180
                     },
                     {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "x",
-                        "y"
-                      ],
-                      "additionalProperties": false
+                      "type": "number",
+                      "const": 270
                     }
                   ]
                 },
-                {
-                  "type": "null"
+                "exclusionRois": {
+                  "type": "array",
+                  "items": {
+                    "minItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "anchors": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "frameLayout": {
+                  "type": "string",
+                  "enum": [
+                    "from-stage",
+                    "from-back"
+                  ]
                 }
-              ]
-            },
-            "frameLayout": {
-              "type": "string",
-              "enum": [
-                "from-stage",
-                "from-back"
-              ]
+              },
+              "required": [
+                "cameraId",
+                "primaryColumn",
+                "videoPath",
+                "sha256",
+                "rotationDegrees",
+                "exclusionRois",
+                "anchors"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "sessionId",
+          "serverEpoch",
+          "runId",
+          "runTag",
+          "participantIds",
+          "codebookVersion",
+          "paletteVersion",
+          "palette",
+          "packetVersion",
+          "symbolMs",
+          "startServerMs",
+          "cameras"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "protocolVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "serverEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "runTag": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "participantIds": {
+            "maxItems": 2048,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
             }
           },
-          "required": [
-            "cameraId",
-            "primaryColumn",
-            "videoPath",
-            "sha256",
-            "rotationDegrees",
-            "exclusionRois",
-            "anchors"
-          ],
-          "additionalProperties": false
-        }
+          "codebookVersion": {
+            "type": "string",
+            "const": "hamming16-11-v1"
+          },
+          "paletteVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "palette": {
+            "type": "object",
+            "properties": {
+              "zero": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "one": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "neutral": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            },
+            "required": [
+              "zero",
+              "one",
+              "neutral"
+            ],
+            "additionalProperties": false
+          },
+          "packetVersion": {
+            "type": "string",
+            "const": "otc-v2"
+          },
+          "symbolMs": {
+            "type": "number",
+            "const": 250
+          },
+          "startServerMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "cameras": {
+            "minItems": 1,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cameraId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "primaryColumn": {
+                  "type": "string",
+                  "enum": [
+                    "left",
+                    "center",
+                    "right"
+                  ]
+                },
+                "videoPath": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "rotationDegrees": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "const": 0
+                    },
+                    {
+                      "type": "number",
+                      "const": 90
+                    },
+                    {
+                      "type": "number",
+                      "const": 180
+                    },
+                    {
+                      "type": "number",
+                      "const": 270
+                    }
+                  ]
+                },
+                "exclusionRois": {
+                  "type": "array",
+                  "items": {
+                    "minItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "anchors": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "frameLayout": {
+                  "type": "string",
+                  "enum": [
+                    "from-stage",
+                    "from-back"
+                  ]
+                }
+              },
+              "required": [
+                "cameraId",
+                "primaryColumn",
+                "videoPath",
+                "sha256",
+                "rotationDegrees",
+                "exclusionRois",
+                "anchors"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "sessionId",
+          "serverEpoch",
+          "runId",
+          "runTag",
+          "participantIds",
+          "codebookVersion",
+          "paletteVersion",
+          "palette",
+          "packetVersion",
+          "symbolMs",
+          "startServerMs",
+          "cameras"
+        ],
+        "additionalProperties": false
       }
-    },
-    "required": [
-      "protocolVersion",
-      "sessionId",
-      "serverEpoch",
-      "runId",
-      "runTag",
-      "participantIds",
-      "packetVersion",
-      "codebookVersion",
-      "paletteVersion",
-      "palette",
-      "symbolMs",
-      "startServerMs",
-      "cameras"
-    ],
-    "additionalProperties": false
+    ]
   },
   "OtcResult": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -2285,8 +2751,7 @@
             "phasePtsMs": {
               "anyOf": [
                 {
-                  "type": "number",
-                  "minimum": 0
+                  "type": "number"
                 },
                 {
                   "type": "null"
@@ -3679,96 +4144,192 @@
                 "type": "object",
                 "properties": {
                   "plan": {
-                    "type": "object",
-                    "properties": {
-                      "protocolVersion": {
-                        "type": "number",
-                        "const": 1
-                      },
-                      "sessionId": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
-                      },
-                      "serverEpoch": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
-                      },
-                      "runId": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
-                      },
-                      "runTag": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 255
-                      },
-                      "participantIds": {
-                        "maxItems": 2048,
-                        "type": "array",
-                        "items": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 2047
-                        }
-                      },
-                      "packetVersion": {
-                        "type": "string",
-                        "const": "otc-v1"
-                      },
-                      "codebookVersion": {
-                        "type": "string",
-                        "const": "hamming16-11-v1"
-                      },
-                      "paletteVersion": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
-                      },
-                      "palette": {
+                    "oneOf": [
+                      {
                         "type": "object",
                         "properties": {
-                          "zero": {
-                            "type": "string",
-                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          "protocolVersion": {
+                            "type": "number",
+                            "const": 1
                           },
-                          "one": {
+                          "sessionId": {
                             "type": "string",
-                            "pattern": "^#[0-9a-fA-F]{6}$"
+                            "minLength": 1,
+                            "maxLength": 160
                           },
-                          "neutral": {
+                          "serverEpoch": {
                             "type": "string",
-                            "pattern": "^#[0-9a-fA-F]{6}$"
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "runId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "runTag": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "participantIds": {
+                            "maxItems": 2048,
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2047
+                            }
+                          },
+                          "codebookVersion": {
+                            "type": "string",
+                            "const": "hamming16-11-v1"
+                          },
+                          "paletteVersion": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "palette": {
+                            "type": "object",
+                            "properties": {
+                              "zero": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "one": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "neutral": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              }
+                            },
+                            "required": [
+                              "zero",
+                              "one",
+                              "neutral"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "packetVersion": {
+                            "type": "string",
+                            "const": "otc-v1"
+                          },
+                          "symbolMs": {
+                            "type": "number",
+                            "const": 200
                           }
                         },
                         "required": [
-                          "zero",
-                          "one",
-                          "neutral"
+                          "protocolVersion",
+                          "sessionId",
+                          "serverEpoch",
+                          "runId",
+                          "runTag",
+                          "participantIds",
+                          "codebookVersion",
+                          "paletteVersion",
+                          "palette",
+                          "packetVersion",
+                          "symbolMs"
                         ],
                         "additionalProperties": false
                       },
-                      "symbolMs": {
-                        "type": "number",
-                        "const": 200
+                      {
+                        "type": "object",
+                        "properties": {
+                          "protocolVersion": {
+                            "type": "number",
+                            "const": 1
+                          },
+                          "sessionId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "serverEpoch": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "runId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "runTag": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "participantIds": {
+                            "maxItems": 2048,
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2047
+                            }
+                          },
+                          "codebookVersion": {
+                            "type": "string",
+                            "const": "hamming16-11-v1"
+                          },
+                          "paletteVersion": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "palette": {
+                            "type": "object",
+                            "properties": {
+                              "zero": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "one": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "neutral": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              }
+                            },
+                            "required": [
+                              "zero",
+                              "one",
+                              "neutral"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "packetVersion": {
+                            "type": "string",
+                            "const": "otc-v2"
+                          },
+                          "symbolMs": {
+                            "type": "number",
+                            "const": 250
+                          }
+                        },
+                        "required": [
+                          "protocolVersion",
+                          "sessionId",
+                          "serverEpoch",
+                          "runId",
+                          "runTag",
+                          "participantIds",
+                          "codebookVersion",
+                          "paletteVersion",
+                          "palette",
+                          "packetVersion",
+                          "symbolMs"
+                        ],
+                        "additionalProperties": false
                       }
-                    },
-                    "required": [
-                      "protocolVersion",
-                      "sessionId",
-                      "serverEpoch",
-                      "runId",
-                      "runTag",
-                      "participantIds",
-                      "packetVersion",
-                      "codebookVersion",
-                      "paletteVersion",
-                      "palette",
-                      "symbolMs"
-                    ],
-                    "additionalProperties": false
+                    ]
                   },
                   "preparationId": {
                     "type": "string",
@@ -6492,96 +7053,192 @@
             "type": "object",
             "properties": {
               "plan": {
-                "type": "object",
-                "properties": {
-                  "protocolVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
-                  "sessionId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "serverEpoch": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "runId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "runTag": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 255
-                  },
-                  "participantIds": {
-                    "maxItems": 2048,
-                    "type": "array",
-                    "items": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 2047
-                    }
-                  },
-                  "packetVersion": {
-                    "type": "string",
-                    "const": "otc-v1"
-                  },
-                  "codebookVersion": {
-                    "type": "string",
-                    "const": "hamming16-11-v1"
-                  },
-                  "paletteVersion": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "palette": {
+                "oneOf": [
+                  {
                     "type": "object",
                     "properties": {
-                      "zero": {
-                        "type": "string",
-                        "pattern": "^#[0-9a-fA-F]{6}$"
+                      "protocolVersion": {
+                        "type": "number",
+                        "const": 1
                       },
-                      "one": {
+                      "sessionId": {
                         "type": "string",
-                        "pattern": "^#[0-9a-fA-F]{6}$"
+                        "minLength": 1,
+                        "maxLength": 160
                       },
-                      "neutral": {
+                      "serverEpoch": {
                         "type": "string",
-                        "pattern": "^#[0-9a-fA-F]{6}$"
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runTag": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "participantIds": {
+                        "maxItems": 2048,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        }
+                      },
+                      "codebookVersion": {
+                        "type": "string",
+                        "const": "hamming16-11-v1"
+                      },
+                      "paletteVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "palette": {
+                        "type": "object",
+                        "properties": {
+                          "zero": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "one": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "neutral": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          }
+                        },
+                        "required": [
+                          "zero",
+                          "one",
+                          "neutral"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "packetVersion": {
+                        "type": "string",
+                        "const": "otc-v1"
+                      },
+                      "symbolMs": {
+                        "type": "number",
+                        "const": 200
                       }
                     },
                     "required": [
-                      "zero",
-                      "one",
-                      "neutral"
+                      "protocolVersion",
+                      "sessionId",
+                      "serverEpoch",
+                      "runId",
+                      "runTag",
+                      "participantIds",
+                      "codebookVersion",
+                      "paletteVersion",
+                      "palette",
+                      "packetVersion",
+                      "symbolMs"
                     ],
                     "additionalProperties": false
                   },
-                  "symbolMs": {
-                    "type": "number",
-                    "const": 200
+                  {
+                    "type": "object",
+                    "properties": {
+                      "protocolVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "sessionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "serverEpoch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runTag": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "participantIds": {
+                        "maxItems": 2048,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        }
+                      },
+                      "codebookVersion": {
+                        "type": "string",
+                        "const": "hamming16-11-v1"
+                      },
+                      "paletteVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "palette": {
+                        "type": "object",
+                        "properties": {
+                          "zero": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "one": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "neutral": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          }
+                        },
+                        "required": [
+                          "zero",
+                          "one",
+                          "neutral"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "packetVersion": {
+                        "type": "string",
+                        "const": "otc-v2"
+                      },
+                      "symbolMs": {
+                        "type": "number",
+                        "const": 250
+                      }
+                    },
+                    "required": [
+                      "protocolVersion",
+                      "sessionId",
+                      "serverEpoch",
+                      "runId",
+                      "runTag",
+                      "participantIds",
+                      "codebookVersion",
+                      "paletteVersion",
+                      "palette",
+                      "packetVersion",
+                      "symbolMs"
+                    ],
+                    "additionalProperties": false
                   }
-                },
-                "required": [
-                  "protocolVersion",
-                  "sessionId",
-                  "serverEpoch",
-                  "runId",
-                  "runTag",
-                  "participantIds",
-                  "packetVersion",
-                  "codebookVersion",
-                  "paletteVersion",
-                  "palette",
-                  "symbolMs"
-                ],
-                "additionalProperties": false
+                ]
               },
               "preparationId": {
                 "type": "string",
@@ -8797,96 +9454,192 @@
     "type": "object",
     "properties": {
       "plan": {
-        "type": "object",
-        "properties": {
-          "protocolVersion": {
-            "type": "number",
-            "const": 1
-          },
-          "sessionId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "serverEpoch": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "runId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "runTag": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 255
-          },
-          "participantIds": {
-            "maxItems": 2048,
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 2047
-            }
-          },
-          "packetVersion": {
-            "type": "string",
-            "const": "otc-v1"
-          },
-          "codebookVersion": {
-            "type": "string",
-            "const": "hamming16-11-v1"
-          },
-          "paletteVersion": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "palette": {
+        "oneOf": [
+          {
             "type": "object",
             "properties": {
-              "zero": {
-                "type": "string",
-                "pattern": "^#[0-9a-fA-F]{6}$"
+              "protocolVersion": {
+                "type": "number",
+                "const": 1
               },
-              "one": {
+              "sessionId": {
                 "type": "string",
-                "pattern": "^#[0-9a-fA-F]{6}$"
+                "minLength": 1,
+                "maxLength": 160
               },
-              "neutral": {
+              "serverEpoch": {
                 "type": "string",
-                "pattern": "^#[0-9a-fA-F]{6}$"
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "runId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "runTag": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "participantIds": {
+                "maxItems": 2048,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2047
+                }
+              },
+              "codebookVersion": {
+                "type": "string",
+                "const": "hamming16-11-v1"
+              },
+              "paletteVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "palette": {
+                "type": "object",
+                "properties": {
+                  "zero": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  },
+                  "one": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  },
+                  "neutral": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  }
+                },
+                "required": [
+                  "zero",
+                  "one",
+                  "neutral"
+                ],
+                "additionalProperties": false
+              },
+              "packetVersion": {
+                "type": "string",
+                "const": "otc-v1"
+              },
+              "symbolMs": {
+                "type": "number",
+                "const": 200
               }
             },
             "required": [
-              "zero",
-              "one",
-              "neutral"
+              "protocolVersion",
+              "sessionId",
+              "serverEpoch",
+              "runId",
+              "runTag",
+              "participantIds",
+              "codebookVersion",
+              "paletteVersion",
+              "palette",
+              "packetVersion",
+              "symbolMs"
             ],
             "additionalProperties": false
           },
-          "symbolMs": {
-            "type": "number",
-            "const": 200
+          {
+            "type": "object",
+            "properties": {
+              "protocolVersion": {
+                "type": "number",
+                "const": 1
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "serverEpoch": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "runId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "runTag": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "participantIds": {
+                "maxItems": 2048,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2047
+                }
+              },
+              "codebookVersion": {
+                "type": "string",
+                "const": "hamming16-11-v1"
+              },
+              "paletteVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "palette": {
+                "type": "object",
+                "properties": {
+                  "zero": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  },
+                  "one": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  },
+                  "neutral": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  }
+                },
+                "required": [
+                  "zero",
+                  "one",
+                  "neutral"
+                ],
+                "additionalProperties": false
+              },
+              "packetVersion": {
+                "type": "string",
+                "const": "otc-v2"
+              },
+              "symbolMs": {
+                "type": "number",
+                "const": 250
+              }
+            },
+            "required": [
+              "protocolVersion",
+              "sessionId",
+              "serverEpoch",
+              "runId",
+              "runTag",
+              "participantIds",
+              "codebookVersion",
+              "paletteVersion",
+              "palette",
+              "packetVersion",
+              "symbolMs"
+            ],
+            "additionalProperties": false
           }
-        },
-        "required": [
-          "protocolVersion",
-          "sessionId",
-          "serverEpoch",
-          "runId",
-          "runTag",
-          "participantIds",
-          "packetVersion",
-          "codebookVersion",
-          "paletteVersion",
-          "palette",
-          "symbolMs"
-        ],
-        "additionalProperties": false
+        ]
       },
       "preparationId": {
         "type": "string",
@@ -8905,96 +9658,192 @@
     "type": "object",
     "properties": {
       "plan": {
-        "type": "object",
-        "properties": {
-          "protocolVersion": {
-            "type": "number",
-            "const": 1
-          },
-          "sessionId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "serverEpoch": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "runId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "runTag": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 255
-          },
-          "participantIds": {
-            "maxItems": 2048,
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 2047
-            }
-          },
-          "packetVersion": {
-            "type": "string",
-            "const": "otc-v1"
-          },
-          "codebookVersion": {
-            "type": "string",
-            "const": "hamming16-11-v1"
-          },
-          "paletteVersion": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "palette": {
+        "oneOf": [
+          {
             "type": "object",
             "properties": {
-              "zero": {
-                "type": "string",
-                "pattern": "^#[0-9a-fA-F]{6}$"
+              "protocolVersion": {
+                "type": "number",
+                "const": 1
               },
-              "one": {
+              "sessionId": {
                 "type": "string",
-                "pattern": "^#[0-9a-fA-F]{6}$"
+                "minLength": 1,
+                "maxLength": 160
               },
-              "neutral": {
+              "serverEpoch": {
                 "type": "string",
-                "pattern": "^#[0-9a-fA-F]{6}$"
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "runId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "runTag": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "participantIds": {
+                "maxItems": 2048,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2047
+                }
+              },
+              "codebookVersion": {
+                "type": "string",
+                "const": "hamming16-11-v1"
+              },
+              "paletteVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "palette": {
+                "type": "object",
+                "properties": {
+                  "zero": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  },
+                  "one": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  },
+                  "neutral": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  }
+                },
+                "required": [
+                  "zero",
+                  "one",
+                  "neutral"
+                ],
+                "additionalProperties": false
+              },
+              "packetVersion": {
+                "type": "string",
+                "const": "otc-v1"
+              },
+              "symbolMs": {
+                "type": "number",
+                "const": 200
               }
             },
             "required": [
-              "zero",
-              "one",
-              "neutral"
+              "protocolVersion",
+              "sessionId",
+              "serverEpoch",
+              "runId",
+              "runTag",
+              "participantIds",
+              "codebookVersion",
+              "paletteVersion",
+              "palette",
+              "packetVersion",
+              "symbolMs"
             ],
             "additionalProperties": false
           },
-          "symbolMs": {
-            "type": "number",
-            "const": 200
+          {
+            "type": "object",
+            "properties": {
+              "protocolVersion": {
+                "type": "number",
+                "const": 1
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "serverEpoch": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "runId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "runTag": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "participantIds": {
+                "maxItems": 2048,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2047
+                }
+              },
+              "codebookVersion": {
+                "type": "string",
+                "const": "hamming16-11-v1"
+              },
+              "paletteVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "palette": {
+                "type": "object",
+                "properties": {
+                  "zero": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  },
+                  "one": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  },
+                  "neutral": {
+                    "type": "string",
+                    "pattern": "^#[0-9a-fA-F]{6}$"
+                  }
+                },
+                "required": [
+                  "zero",
+                  "one",
+                  "neutral"
+                ],
+                "additionalProperties": false
+              },
+              "packetVersion": {
+                "type": "string",
+                "const": "otc-v2"
+              },
+              "symbolMs": {
+                "type": "number",
+                "const": 250
+              }
+            },
+            "required": [
+              "protocolVersion",
+              "sessionId",
+              "serverEpoch",
+              "runId",
+              "runTag",
+              "participantIds",
+              "codebookVersion",
+              "paletteVersion",
+              "palette",
+              "packetVersion",
+              "symbolMs"
+            ],
+            "additionalProperties": false
           }
-        },
-        "required": [
-          "protocolVersion",
-          "sessionId",
-          "serverEpoch",
-          "runId",
-          "runTag",
-          "participantIds",
-          "packetVersion",
-          "codebookVersion",
-          "paletteVersion",
-          "palette",
-          "symbolMs"
-        ],
-        "additionalProperties": false
+        ]
       },
       "preparationId": {
         "type": "string",
@@ -10015,8 +10864,7 @@
                     "phasePtsMs": {
                       "anyOf": [
                         {
-                          "type": "number",
-                          "minimum": 0
+                          "type": "number"
                         },
                         {
                           "type": "null"
@@ -12306,96 +13154,192 @@
                         "type": "object",
                         "properties": {
                           "plan": {
-                            "type": "object",
-                            "properties": {
-                              "protocolVersion": {
-                                "type": "number",
-                                "const": 1
-                              },
-                              "sessionId": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 160
-                              },
-                              "serverEpoch": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 160
-                              },
-                              "runId": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 160
-                              },
-                              "runTag": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 255
-                              },
-                              "participantIds": {
-                                "maxItems": 2048,
-                                "type": "array",
-                                "items": {
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 2047
-                                }
-                              },
-                              "packetVersion": {
-                                "type": "string",
-                                "const": "otc-v1"
-                              },
-                              "codebookVersion": {
-                                "type": "string",
-                                "const": "hamming16-11-v1"
-                              },
-                              "paletteVersion": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 160
-                              },
-                              "palette": {
+                            "oneOf": [
+                              {
                                 "type": "object",
                                 "properties": {
-                                  "zero": {
-                                    "type": "string",
-                                    "pattern": "^#[0-9a-fA-F]{6}$"
+                                  "protocolVersion": {
+                                    "type": "number",
+                                    "const": 1
                                   },
-                                  "one": {
+                                  "sessionId": {
                                     "type": "string",
-                                    "pattern": "^#[0-9a-fA-F]{6}$"
+                                    "minLength": 1,
+                                    "maxLength": 160
                                   },
-                                  "neutral": {
+                                  "serverEpoch": {
                                     "type": "string",
-                                    "pattern": "^#[0-9a-fA-F]{6}$"
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "runId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "runTag": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 255
+                                  },
+                                  "participantIds": {
+                                    "maxItems": 2048,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2047
+                                    }
+                                  },
+                                  "codebookVersion": {
+                                    "type": "string",
+                                    "const": "hamming16-11-v1"
+                                  },
+                                  "paletteVersion": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "palette": {
+                                    "type": "object",
+                                    "properties": {
+                                      "zero": {
+                                        "type": "string",
+                                        "pattern": "^#[0-9a-fA-F]{6}$"
+                                      },
+                                      "one": {
+                                        "type": "string",
+                                        "pattern": "^#[0-9a-fA-F]{6}$"
+                                      },
+                                      "neutral": {
+                                        "type": "string",
+                                        "pattern": "^#[0-9a-fA-F]{6}$"
+                                      }
+                                    },
+                                    "required": [
+                                      "zero",
+                                      "one",
+                                      "neutral"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "packetVersion": {
+                                    "type": "string",
+                                    "const": "otc-v1"
+                                  },
+                                  "symbolMs": {
+                                    "type": "number",
+                                    "const": 200
                                   }
                                 },
                                 "required": [
-                                  "zero",
-                                  "one",
-                                  "neutral"
+                                  "protocolVersion",
+                                  "sessionId",
+                                  "serverEpoch",
+                                  "runId",
+                                  "runTag",
+                                  "participantIds",
+                                  "codebookVersion",
+                                  "paletteVersion",
+                                  "palette",
+                                  "packetVersion",
+                                  "symbolMs"
                                 ],
                                 "additionalProperties": false
                               },
-                              "symbolMs": {
-                                "type": "number",
-                                "const": 200
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "protocolVersion": {
+                                    "type": "number",
+                                    "const": 1
+                                  },
+                                  "sessionId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "serverEpoch": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "runId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "runTag": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 255
+                                  },
+                                  "participantIds": {
+                                    "maxItems": 2048,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2047
+                                    }
+                                  },
+                                  "codebookVersion": {
+                                    "type": "string",
+                                    "const": "hamming16-11-v1"
+                                  },
+                                  "paletteVersion": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "palette": {
+                                    "type": "object",
+                                    "properties": {
+                                      "zero": {
+                                        "type": "string",
+                                        "pattern": "^#[0-9a-fA-F]{6}$"
+                                      },
+                                      "one": {
+                                        "type": "string",
+                                        "pattern": "^#[0-9a-fA-F]{6}$"
+                                      },
+                                      "neutral": {
+                                        "type": "string",
+                                        "pattern": "^#[0-9a-fA-F]{6}$"
+                                      }
+                                    },
+                                    "required": [
+                                      "zero",
+                                      "one",
+                                      "neutral"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "packetVersion": {
+                                    "type": "string",
+                                    "const": "otc-v2"
+                                  },
+                                  "symbolMs": {
+                                    "type": "number",
+                                    "const": 250
+                                  }
+                                },
+                                "required": [
+                                  "protocolVersion",
+                                  "sessionId",
+                                  "serverEpoch",
+                                  "runId",
+                                  "runTag",
+                                  "participantIds",
+                                  "codebookVersion",
+                                  "paletteVersion",
+                                  "palette",
+                                  "packetVersion",
+                                  "symbolMs"
+                                ],
+                                "additionalProperties": false
                               }
-                            },
-                            "required": [
-                              "protocolVersion",
-                              "sessionId",
-                              "serverEpoch",
-                              "runId",
-                              "runTag",
-                              "participantIds",
-                              "packetVersion",
-                              "codebookVersion",
-                              "paletteVersion",
-                              "palette",
-                              "symbolMs"
-                            ],
-                            "additionalProperties": false
+                            ]
                           },
                           "preparationId": {
                             "type": "string",
@@ -13894,96 +14838,192 @@
                 "maxLength": 160
               },
               "plan": {
-                "type": "object",
-                "properties": {
-                  "protocolVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
-                  "sessionId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "serverEpoch": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "runId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "runTag": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 255
-                  },
-                  "participantIds": {
-                    "maxItems": 2048,
-                    "type": "array",
-                    "items": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 2047
-                    }
-                  },
-                  "packetVersion": {
-                    "type": "string",
-                    "const": "otc-v1"
-                  },
-                  "codebookVersion": {
-                    "type": "string",
-                    "const": "hamming16-11-v1"
-                  },
-                  "paletteVersion": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "palette": {
+                "oneOf": [
+                  {
                     "type": "object",
                     "properties": {
-                      "zero": {
-                        "type": "string",
-                        "pattern": "^#[0-9a-fA-F]{6}$"
+                      "protocolVersion": {
+                        "type": "number",
+                        "const": 1
                       },
-                      "one": {
+                      "sessionId": {
                         "type": "string",
-                        "pattern": "^#[0-9a-fA-F]{6}$"
+                        "minLength": 1,
+                        "maxLength": 160
                       },
-                      "neutral": {
+                      "serverEpoch": {
                         "type": "string",
-                        "pattern": "^#[0-9a-fA-F]{6}$"
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runTag": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "participantIds": {
+                        "maxItems": 2048,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        }
+                      },
+                      "codebookVersion": {
+                        "type": "string",
+                        "const": "hamming16-11-v1"
+                      },
+                      "paletteVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "palette": {
+                        "type": "object",
+                        "properties": {
+                          "zero": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "one": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "neutral": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          }
+                        },
+                        "required": [
+                          "zero",
+                          "one",
+                          "neutral"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "packetVersion": {
+                        "type": "string",
+                        "const": "otc-v1"
+                      },
+                      "symbolMs": {
+                        "type": "number",
+                        "const": 200
                       }
                     },
                     "required": [
-                      "zero",
-                      "one",
-                      "neutral"
+                      "protocolVersion",
+                      "sessionId",
+                      "serverEpoch",
+                      "runId",
+                      "runTag",
+                      "participantIds",
+                      "codebookVersion",
+                      "paletteVersion",
+                      "palette",
+                      "packetVersion",
+                      "symbolMs"
                     ],
                     "additionalProperties": false
                   },
-                  "symbolMs": {
-                    "type": "number",
-                    "const": 200
+                  {
+                    "type": "object",
+                    "properties": {
+                      "protocolVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "sessionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "serverEpoch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runTag": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "participantIds": {
+                        "maxItems": 2048,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        }
+                      },
+                      "codebookVersion": {
+                        "type": "string",
+                        "const": "hamming16-11-v1"
+                      },
+                      "paletteVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "palette": {
+                        "type": "object",
+                        "properties": {
+                          "zero": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "one": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "neutral": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          }
+                        },
+                        "required": [
+                          "zero",
+                          "one",
+                          "neutral"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "packetVersion": {
+                        "type": "string",
+                        "const": "otc-v2"
+                      },
+                      "symbolMs": {
+                        "type": "number",
+                        "const": 250
+                      }
+                    },
+                    "required": [
+                      "protocolVersion",
+                      "sessionId",
+                      "serverEpoch",
+                      "runId",
+                      "runTag",
+                      "participantIds",
+                      "codebookVersion",
+                      "paletteVersion",
+                      "palette",
+                      "packetVersion",
+                      "symbolMs"
+                    ],
+                    "additionalProperties": false
                   }
-                },
-                "required": [
-                  "protocolVersion",
-                  "sessionId",
-                  "serverEpoch",
-                  "runId",
-                  "runTag",
-                  "participantIds",
-                  "packetVersion",
-                  "codebookVersion",
-                  "paletteVersion",
-                  "palette",
-                  "symbolMs"
-                ],
-                "additionalProperties": false
+                ]
               }
             },
             "required": [
@@ -14048,101 +15088,202 @@
                 "maxLength": 160
               },
               "run": {
-                "type": "object",
-                "properties": {
-                  "protocolVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
-                  "sessionId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "serverEpoch": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "runId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "runTag": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 255
-                  },
-                  "participantIds": {
-                    "maxItems": 2048,
-                    "type": "array",
-                    "items": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 2047
-                    }
-                  },
-                  "packetVersion": {
-                    "type": "string",
-                    "const": "otc-v1"
-                  },
-                  "codebookVersion": {
-                    "type": "string",
-                    "const": "hamming16-11-v1"
-                  },
-                  "paletteVersion": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
-                  },
-                  "palette": {
+                "oneOf": [
+                  {
                     "type": "object",
                     "properties": {
-                      "zero": {
-                        "type": "string",
-                        "pattern": "^#[0-9a-fA-F]{6}$"
+                      "protocolVersion": {
+                        "type": "number",
+                        "const": 1
                       },
-                      "one": {
+                      "sessionId": {
                         "type": "string",
-                        "pattern": "^#[0-9a-fA-F]{6}$"
+                        "minLength": 1,
+                        "maxLength": 160
                       },
-                      "neutral": {
+                      "serverEpoch": {
                         "type": "string",
-                        "pattern": "^#[0-9a-fA-F]{6}$"
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runTag": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "participantIds": {
+                        "maxItems": 2048,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        }
+                      },
+                      "codebookVersion": {
+                        "type": "string",
+                        "const": "hamming16-11-v1"
+                      },
+                      "paletteVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "palette": {
+                        "type": "object",
+                        "properties": {
+                          "zero": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "one": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "neutral": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          }
+                        },
+                        "required": [
+                          "zero",
+                          "one",
+                          "neutral"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "packetVersion": {
+                        "type": "string",
+                        "const": "otc-v1"
+                      },
+                      "symbolMs": {
+                        "type": "number",
+                        "const": 200
+                      },
+                      "startServerMs": {
+                        "type": "number",
+                        "minimum": 0
                       }
                     },
                     "required": [
-                      "zero",
-                      "one",
-                      "neutral"
+                      "protocolVersion",
+                      "sessionId",
+                      "serverEpoch",
+                      "runId",
+                      "runTag",
+                      "participantIds",
+                      "codebookVersion",
+                      "paletteVersion",
+                      "palette",
+                      "packetVersion",
+                      "symbolMs",
+                      "startServerMs"
                     ],
                     "additionalProperties": false
                   },
-                  "symbolMs": {
-                    "type": "number",
-                    "const": 200
-                  },
-                  "startServerMs": {
-                    "type": "number",
-                    "minimum": 0
+                  {
+                    "type": "object",
+                    "properties": {
+                      "protocolVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "sessionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "serverEpoch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "runTag": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "participantIds": {
+                        "maxItems": 2048,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2047
+                        }
+                      },
+                      "codebookVersion": {
+                        "type": "string",
+                        "const": "hamming16-11-v1"
+                      },
+                      "paletteVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "palette": {
+                        "type": "object",
+                        "properties": {
+                          "zero": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "one": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "neutral": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          }
+                        },
+                        "required": [
+                          "zero",
+                          "one",
+                          "neutral"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "packetVersion": {
+                        "type": "string",
+                        "const": "otc-v2"
+                      },
+                      "symbolMs": {
+                        "type": "number",
+                        "const": 250
+                      },
+                      "startServerMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "protocolVersion",
+                      "sessionId",
+                      "serverEpoch",
+                      "runId",
+                      "runTag",
+                      "participantIds",
+                      "codebookVersion",
+                      "paletteVersion",
+                      "palette",
+                      "packetVersion",
+                      "symbolMs",
+                      "startServerMs"
+                    ],
+                    "additionalProperties": false
                   }
-                },
-                "required": [
-                  "protocolVersion",
-                  "sessionId",
-                  "serverEpoch",
-                  "runId",
-                  "runTag",
-                  "participantIds",
-                  "packetVersion",
-                  "codebookVersion",
-                  "paletteVersion",
-                  "palette",
-                  "symbolMs",
-                  "startServerMs"
-                ],
-                "additionalProperties": false
+                ]
               }
             },
             "required": [

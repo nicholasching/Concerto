@@ -3,6 +3,7 @@
 from collections import defaultdict
 from contextlib import closing
 from dataclasses import dataclass, field
+from functools import partial
 import math
 from statistics import median
 
@@ -98,32 +99,62 @@ def _screen_components(rgb, pts_ms, mask):
         yield Sample(pts_ms, *center, width, height, color), (x, y, width, height), component
 
 
-def detect_screens(rgb, pts_ms, excluded):
+def detect_screens(rgb, pts_ms, excluded, *, red_core=False):
     hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
     preferred = np.zeros(rgb.shape[:2], np.int32)
     core_areas = []
+    core_stages = []
     screens = []
     absorbed = set()
     # Bright emissive cores survive washed-out amber pilots and separate blue
     # screens from dim clothing/glare. Keep the original dim-screen path too.
     # Color values here locate candidates; identity still uses measured pilots.
-    # A saturated blue core can remain compact while reflected blue light joins
-    # the screen to a hand. Broader bright components may restore its footprint
+    # Saturated red/blue cores stay compact when warm skin or reflected light
+    # joins the screen to a hand. Broader bright components may restore the footprint
     # only when they are solid; irregular halos never replace that core.
-    for stage, lower, upper in (("blue-core", (85, 140, 190), (135, 255, 255)),
-                                ("bright", (0, 25, 190), (179, 255, 255)),
-                                ("dim", (0, 55, 50), (179, 255, 255))):
-        mask = cv2.inRange(hsv, lower, upper)
+    # Red wraps around HSV hue zero. Union its ranges before finding components,
+    # otherwise one red screen becomes competing tracks that merge on blue.
+    masks = [("color-core", [((0, 140, 190), (10, 255, 255)),
+                              ((170, 140, 190), (179, 255, 255))])] if red_core else []
+    masks += [("color-core", [((85, 140, 190), (135, 255, 255))]),
+              ("bright", [((0, 25, 190), (179, 255, 255))])]
+    # Search much dimmer, less saturated and shifted colors after the strong
+    # footprints. A faint halo may add a candidate but cannot replace its core.
+    if red_core:
+        # A dim orange-shifted display may share skin's hue while remaining
+        # much darker. Isolate that low-brightness region before the broad pass.
+        masks.append(("faint-color", [((0, 80, 50), (20, 255, 189)),
+                                       ((150, 80, 50), (179, 255, 189))]))
+        masks.append(("faint-color", [((0, 80, 50), (8, 255, 255)),
+                                       ((150, 80, 50), (179, 255, 255))]))
+        # First separate red/magenta from warm skin, then admit orange-shifted
+        # screens where no better isolated footprint has already been found.
+        masks.append(("faint-color", [((0, 80, 50), (20, 255, 255))]))
+    masks += [("faint-color", [((80, 80, 50), (145, 255, 255))]),
+              ("dim", [((0, 55, 50), (179, 255, 255))])]
+    for stage, ranges in masks:
+        mask = cv2.inRange(hsv, *ranges[0])
+        for lower, upper in ranges[1:]:
+            mask |= cv2.inRange(hsv, lower, upper)
         mask[excluded != 0] = 0
         # Remove thin glow bridges without enlarging or joining nearby screens.
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         for sample, (x, y, width, height), component in _screen_components(rgb, pts_ms, mask):
+            if stage == "faint-color":
+                # Faint color alone also finds large irregular patches of skin
+                # and reflected light. A screen still has a compact footprint,
+                # even when tilted relative to the camera axes.
+                rect_width, rect_height = cv2.minAreaRect(cv2.findNonZero(component))[1]
+                if np.count_nonzero(component) < rect_width * rect_height * 0.75:
+                    continue
             claimed = preferred[y:y+height, x:x+width]
             inside = component != 0
-            if stage != "blue-core":
+            if stage != "color-core":
                 labels, counts = np.unique(claimed[inside], return_counts=True)
                 overlaps = [(int(label)-1, count) for label, count in zip(labels, counts) if label]
                 if overlaps:
+                    if stage == "faint-color":
+                        continue
                     if stage == "bright":
                         # An exposure band can split one blue screen into several
                         # saturated islands. Preserve a solid bright footprint,
@@ -131,7 +162,18 @@ def detect_screens(rgb, pts_ms, excluded):
                         # them compete with the original phone track. If this is
                         # a real two-phone merge, association still rejects it.
                         area = np.count_nonzero(inside)
+                        # A solid patch of warm skin can surround a red phone.
+                        # A red core must retain red color evidence when its
+                        # footprint expands; pale red exposure bands still pass.
+                        r, g, b = sample.rgb
+                        same_color = all(
+                            r > b and g-b <= (r-b)*.15
+                            for index, _ in overlaps
+                            if red_core and core_stages[index] == "color-core"
+                            and screens[index].rgb[0] > screens[index].rgb[2]
+                        )
                         if (area >= width * height * 0.75 and
+                                same_color and
                                 all(overlap >= core_areas[index] * 0.8 for index, overlap in overlaps)):
                             index = max(overlaps, key=lambda item: item[1])[0]
                             screens[index] = sample
@@ -147,7 +189,8 @@ def detect_screens(rgb, pts_ms, excluded):
                     if len(overlaps) == 1:
                         index, overlap = overlaps[0]
                         core = screens[index]
-                        if (max(core.rgb) < 210 and overlap >= core_areas[index] * 0.8 and
+                        if (core_stages[index] != "faint-color" and
+                                max(core.rgb) < 210 and overlap >= core_areas[index] * 0.8 and
                                 width * height <= core.width * core.height * 4):
                             screens[index] = sample
                     continue  # A core must not compete with its own dim halo.
@@ -155,6 +198,7 @@ def detect_screens(rgb, pts_ms, excluded):
             if stage != "dim":
                 claimed[inside] = len(screens)
                 core_areas.append(np.count_nonzero(inside))
+                core_stages.append(stage)
             if len(screens) > 4096:
                 raise ValueError("Too many screen candidates; add stage/light exclusion ROIs")
     return [sample for index, sample in enumerate(screens) if index not in absorbed]
@@ -164,23 +208,26 @@ def associate(tracks, active, detections, pts_ms, track_id_offset=0):
     # Fixed spatial bins avoid an audience-size squared assignment matrix.
     grid = defaultdict(list)
     predictions = {}
+    footprints = {}
     for index in active:
         samples = tracks[index].samples
         last = samples[-1]
         if pts_ms - last.pts_ms > 350:
             continue
+        recent = samples[-6:]
+        width, height = median(s.width for s in recent), median(s.height for s in recent)
+        footprints[index] = (width, height)
         x, y = last.x, last.y
         if len(samples) >= 2:
             # A colour transition can distort one component's centroid. A
             # single-frame velocity then extrapolates away from a stationary
             # phone for the entire association window. Use recent median motion.
-            recent = samples[-6:]
             steps = [(b.pts_ms-a.pts_ms, b.x-a.x, b.y-a.y)
                      for a, b in zip(recent, recent[1:])]
             elapsed = min(pts_ms-last.pts_ms, 3*median(step[0] for step in steps))
             x += median(dx/dt for dt, dx, _ in steps) * elapsed
             y += median(dy/dt for dt, _, dy in steps) * elapsed
-        radius = min(40.0, max(8.0, max(last.width, last.height) * 0.8))
+        radius = min(40.0, max(8.0, max(width, height) * 0.8))
         predictions[index] = (x, y, radius)
         grid[(math.floor(x / 40), math.floor(y / 40))].append(index)
     matches = defaultdict(list)
@@ -197,23 +244,27 @@ def associate(tracks, active, detections, pts_ms, track_id_offset=0):
                     if not math.hypot(detection.x - x, detection.y - y) <= radius:
                         continue
                     last = tracks[index].samples[-1]
+                    width, height = footprints[index]
                     # Proximity alone lets a dim clothing fragment steal a phone
                     # or make it ambiguous. Require compatible footprint and
                     # brightness, without assuming either pilot's hue.
-                    area_ratio = detection.width * detection.height / (last.width * last.height)
+                    # A transition frame can include a wide reflected color band.
+                    # Its footprint must not prevent the next clean frame from
+                    # returning to the recent screen size.
+                    area_ratio = detection.width * detection.height / (width * height)
                     brightness = (max(detection.rgb), max(last.rgb))
-                    overlap_width = max(0, min(x + last.width / 2, detection.x + detection.width / 2)
-                                        - max(x - last.width / 2, detection.x - detection.width / 2))
-                    overlap_height = max(0, min(y + last.height / 2, detection.y + detection.height / 2)
-                                         - max(y - last.height / 2, detection.y - detection.height / 2))
-                    smaller_area = min(last.width * last.height, detection.width * detection.height)
+                    overlap_width = max(0, min(x + width / 2, detection.x + detection.width / 2)
+                                        - max(x - width / 2, detection.x - detection.width / 2))
+                    overlap_height = max(0, min(y + height / 2, detection.y + detection.height / 2)
+                                         - max(y - height / 2, detection.y - detection.height / 2))
+                    smaller_area = min(width * height, detection.width * detection.height)
                     if (0.35 <= area_ratio <= 4 and
-                            min(brightness) >= 0.6 * max(brightness) and
+                            min(brightness) >= 0.25 * max(brightness) and
                             overlap_width * overlap_height >= smaller_area * 0.2):
                         matches[detection_index].append(index)
                         reverse[index].append(detection_index)
                         overlap = overlap_width * overlap_height
-                        union = last.width * last.height + detection.width * detection.height - overlap
+                        union = width * height + detection.width * detection.height - overlap
                         affinities[index, detection_index] = overlap / union
     # A full screen can coexist with smaller reflected fragments in the gate.
     # Prefer a distinctly better footprint match, but never resolve near ties or
@@ -224,10 +275,11 @@ def associate(tracks, active, detections, pts_ms, track_id_offset=0):
         if len(ranked) < 2:
             continue
         best, second = ranked[:2]
-        last, detection = tracks[index].samples[-1], detections[best]
+        detection = detections[best]
+        width, height = footprints[index]
         if (affinities[index, best] >= 0.65 and
                 affinities[index, best] - affinities[index, second] >= 0.25 and
-                detection.width * detection.height <= last.width * last.height * 1.25):
+                detection.width * detection.height <= width * height * 1.25):
             preferred[index] = best
     reverse.clear()
     for detection_index, choices in matches.items():
@@ -236,10 +288,11 @@ def associate(tracks, active, detections, pts_ms, track_id_offset=0):
         if len(choices) > 1:
             ranked = sorted(choices, key=lambda index: affinities[index, detection_index], reverse=True)
             best, second = ranked[:2]
-            last, detection = tracks[best].samples[-1], detections[detection_index]
+            detection = detections[detection_index]
+            width, height = footprints[best]
             if (affinities[best, detection_index] >= 0.65 and
                     affinities[best, detection_index] - affinities[second, detection_index] >= 0.25 and
-                    detection.width * detection.height <= last.width * last.height * 1.25):
+                    detection.width * detection.height <= width * height * 1.25):
                 choices = [best]
         matches[detection_index] = choices
         for index in choices:
@@ -249,6 +302,12 @@ def associate(tracks, active, detections, pts_ms, track_id_offset=0):
         candidates = matches[detection_index]
         if len(candidates) == 1 and len(reverse[candidates[0]]) == 1:
             index = candidates[0]
+            width, height = footprints[index]
+            if detection.width * detection.height > width * height * 3:
+                # A sudden broad glow is missing evidence for this phone. Keep
+                # its recent track alive for the next frame instead of adopting
+                # the halo as a new screen footprint.
+                continue
             # A cover/uncover cycle must return to the original footprint without
             # looking like a two-screen merge relative to the last half-screen.
             original = tracks[index].samples[0]
@@ -297,14 +356,15 @@ def retire_fragments(tracks, active, pts_ms):
     return next_active, removed
 
 
-def scan_camera(path, camera, progress=None, *, frame_workers=1):
+def scan_camera(path, camera, progress=None, *, frame_workers=1, zero_color="#FFB000"):
     tracks, active = [], set()
     preview = None
     width = height = frame_count = best_count = 0
     preview_pts = 0.0
     discarded_fragments = 0
+    detect = partial(detect_screens, red_core=True) if zero_color.upper() == "#FF0000" else detect_screens
     frames = detected_frames(read_frames(path, camera["rotationDegrees"]),
-                             camera["exclusionRois"], detect_screens, frame_workers)
+                             camera["exclusionRois"], detect, frame_workers)
     with closing(frames):
         for pts_ms, rgb, detections in frames:
             height, width = rgb.shape[:2]

@@ -132,7 +132,7 @@ test("a calibration run goes prepare → ready → arm → result through the re
   expect(started.participantIds).toEqual([0]);
   await until(() => session!.phase.kind === "armed");
   const armed = session.phase;
-  expect(armed.kind === "armed" && armed.packet).toEqual(calibrationPacket(0, started.runTag));
+  expect(armed.kind === "armed" && armed.packet).toEqual(calibrationPacket(0, started.runTag, "otc-v2"));
   // The renderer is covered separately; finish the run as it would.
   session.complete(3);
   const record = async () => ((await (await fetch(new URL("/__mock__/calibration", server!.url))).json()) as { ready: number[]; results: { completed: boolean }[] }[])[0];

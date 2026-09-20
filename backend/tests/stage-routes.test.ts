@@ -19,6 +19,22 @@ import { CAMERA_CHUNK_BYTES } from "../src/stage-routes";
 
 const directories: string[] = [];
 afterEach(async () => { for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true }); });
+
+test("camera upload stays closed until all 47 v2 symbols finish", async () => {
+  const { app, deps, json, addRun, cameraLogin } = await harness();
+  const run = addRun();
+  const start = 100000 - 11000;
+  deps.calibrations.arm(run.plan.runId, start);
+  const token = await cameraLogin();
+  const headers = { "x-upload-token": token };
+  const body = { runId: run.plan.runId, column: "left", label: "original.mp4", byteSize: 1 };
+  expect((await json("/api/camera/uploads", body, headers)).status).toBe(409);
+  deps.clock.nowServerMs = () => start + 11749;
+  expect((await json("/api/camera/uploads", body, headers)).status).toBe(409);
+  deps.clock.nowServerMs = () => start + 11750;
+  expect((await json("/api/camera/uploads", body, headers)).status).toBe(200);
+  expect((await app.request("/api/camera/session", { headers })).status).toBe(200);
+});
 async function harness() {
   const directory = await mkdtemp(join(tmpdir(), "orchestra-stage-")); directories.push(directory);
   const deps: AppDeps = {

@@ -1,5 +1,7 @@
 # Local integrated concert handoff
 
+OTC update (2026-09-20): local backend and both Next apps restarted at 03:50:58 with v2 (250 ms symbols, no optical tag). Persistent show/map/assignments/device IDs are verified unchanged and public routing reaches the new epoch. Wider detection recovers the latest physical six-phone clip 6/6. See [checks, runtime ownership and fresh-recording handoff](../otc-localization/journal/20260920-tolerant-detection.md). The active hidden supervisor is `runtime/otc-six-phone-investigation/run-services.ts`; its app logs are in that ignored directory. The tunnel is unchanged. Refresh phones/admin before a fresh calibration.
+
 Latest: [manual section routing](journal/20260920-manual-section-routing.md), after the pushed playback checkpoint **a29625e**. Fallback phones automatically receive section music, follow section assignments until explicitly overridden, and join running playback after readiness checks. Defaults are left/Melody, center/Vocals, right/Percussion; section evidence remains manual/coarse. No wire/schema regeneration required; checkpoint v3 has an optional automatic-routing ownership list.
 
 Latest playback follow-up: **cb271b1** checkpoint pushed first. Read [two-second controls and playback recovery](journal/20260920-playback-recovery.md) for code causes, checks, runtime updates and remaining physical phone verification.

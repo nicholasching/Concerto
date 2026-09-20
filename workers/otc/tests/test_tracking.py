@@ -244,3 +244,79 @@ def test_retained_track_resource_limit_still_refuses_an_overloaded_scene():
     tracks = [Track(f"screen-{i}", [screen(0)]) for i in range(8192)]
     with pytest.raises(ValueError, match="Too many screen tracks"):
         associate(tracks, set(), [screen(1000, x=1000)], 1000)
+
+
+def test_red_core_keeps_warm_skin_from_moving_the_screen_centroid():
+    rgb = np.zeros((180, 180, 3), dtype=np.uint8)
+    rgb[20:105, 90:100] = (220, 170, 140)
+    rgb[20:30, 30:100] = (220, 170, 140)
+    rgb[100:160, 50:90] = (255, 0, 0)
+    rgb[100:110, 85:100] = (255, 0, 0)
+    excluded = np.zeros(rgb.shape[:2], np.uint8)
+    legacy = detect_screens(rgb, 0, excluded)
+    red = detect_screens(rgb, 0, excluded, red_core=True)
+    assert len(red) == 1
+    assert 120 < red[0].y < 140 and red[0].height == 60
+    assert legacy[0].height > 100 and abs(legacy[0].y-red[0].y) > 25
+
+
+def test_red_hue_wraparound_is_one_screen_across_blue_transitions():
+    tracks, active = [], set()
+    for frame in range(12):
+        rgb = np.full((180, 180, 3), 9, np.uint8)
+        rgb[20:115, 95:105] = (220, 170, 140)
+        rgb[20:30, 50:105] = (220, 170, 140)
+        rgb[100:115, 85:105] = (220, 170, 140)
+        if frame % 4 < 2:
+            rgb[90:120, 50:90] = (255, 27, 44)  # Hue 178.
+            rgb[120:150, 50:90] = (255, 27, 11)  # Hue 2.
+        else:
+            rgb[90:150, 50:90] = (0, 47, 255)
+        found = detect_screens(rgb, frame*33, np.zeros(rgb.shape[:2], np.uint8), red_core=True)
+        phone = [s for s in found if 50 <= s.x < 90 and 90 <= s.y < 150]
+        assert len(phone) == 1
+        assert (phone[0].width, phone[0].height) == (40, 60)
+        active = associate(tracks, active, found, frame*33)
+    complete = [t for t in tracks if len(t.samples) == 12 and 50 < t.samples[0].x < 90]
+    assert len(complete) == 1
+    assert not complete[0].collisions
+
+
+@pytest.mark.parametrize("color", [(57, 75, 163), (20, 28, 70), (60, 90, 110),
+                                   (90, 35, 80), (90, 50, 40)])
+def test_faint_shifted_colors_stay_isolated_from_nearby_skin(color):
+    rgb = np.full((180, 180, 3), 9, np.uint8)
+    rgb[20:140, 30:110] = (200, 150, 120)
+    rgb[65:110, 55:80] = color
+    found = detect_screens(rgb, 0, np.zeros(rgb.shape[:2], np.uint8), red_core=True)
+    phone = [s for s in found if abs(s.x-67) < 1 and abs(s.y-87) < 1]
+    assert len(phone) == 1
+    assert (phone[0].width, phone[0].height, phone[0].rgb) == (25, 45, color)
+
+
+def test_faint_colors_do_not_override_a_strong_screen_with_a_wide_halo():
+    rgb = np.full((150, 150, 3), 9, np.uint8)
+    rgb[10:130, 10:110] = (57, 75, 163)
+    rgb[40:90, 40:70] = (0, 47, 255)
+    found = detect_screens(rgb, 0, np.zeros(rgb.shape[:2], np.uint8), red_core=True)
+    assert len(found) == 1
+    assert (found[0].width, found[0].height) == (30, 50)
+
+
+def test_large_color_brightness_difference_does_not_split_the_screen_track():
+    tracks, active = [], set()
+    for frame, color in enumerate([(247, 41, 59)]*6 + [(32, 40, 85)]*6):
+        sample = Sample(frame*33, 50, 60, 30, 50, color)
+        active = associate(tracks, active, [sample], frame*33)
+    assert len(tracks) == 1 and len(tracks[0].samples) == 12
+    assert not tracks[0].collisions
+
+
+def test_single_wide_transition_footprint_does_not_break_the_next_clean_frame():
+    tracks, active = [], set()
+    for frame, (width, height) in enumerate([(36, 54)]*6 + [(117, 65)] + [(35, 57)]*6):
+        sample = Sample(frame*33, 50, 60, width, height, (255, 27, 4))
+        active = associate(tracks, active, [sample], frame*33)
+    assert len(tracks) == 1 and len(tracks[0].samples) == 12
+    assert 6*33 not in [s.pts_ms for s in tracks[0].samples]
+    assert not tracks[0].collisions

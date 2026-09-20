@@ -26,7 +26,7 @@ Check the highlighted devices and selected count. Choose **Melody**, **Vocals**,
 
 Column-only devices remain explicitly selectable below the map, but are excluded from spatial selections because their row positions are unknown. Older or unresolved devices are not silently given invented coordinates.
 
-The decoder accepts a bounded valid device code for the captured participant set and exact run tag, with no conflicting repeat or independent screen collision. An unreadable repeat, size change, or brief fragment of the same screen is a review warning rather than a veto. Conflicting codes, duplicate IDs/reflections and real crossings remain unresolved. Review warnings and the annotated image before committing.
+New OTC v2 runs jointly decode the repeated protected identity at 250 ms per symbol. Missing or unusable pilots can use measured preamble colors; a partially erased preamble needs sufficient matching evidence with no contradictory bits. V2 has no optical run tag: upload the correct clip. Legacy v1 recordings retain their exact run-tag checks. Participant membership, ambiguous identities and independent screen collisions remain checked. An unreadable repeat, size change, or brief fragment of the same screen is a review warning rather than a veto. Conflicting codes, duplicate IDs/reflections and real crossings remain unresolved. Review warnings and the annotated image before committing.
 
 ## Verified local sample
 

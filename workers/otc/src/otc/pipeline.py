@@ -14,7 +14,7 @@ from .resources import worker_allocation
 from .validation import validate_manifest, validate_result, validate_schema
 from .video import verify_video
 
-DECODER_VERSION = "otc-v1.7"
+DECODER_VERSION = "otc-v2.0"
 
 
 def process_manifest(manifest, base_dir, evidence, *, job_id=None, debug_dir=None, progress=None,
@@ -63,6 +63,8 @@ def process_manifest(manifest, base_dir, evidence, *, job_id=None, debug_dir=Non
     blocked = reject_duplicates(observations)
     mappings = build_mappings(manifest, dimensions, observations)
     locations, warnings = fuse_locations(manifest, observations, mappings, blocked)
+    if manifest["packetVersion"] == "otc-v2":
+        warnings.append("OTC v2 carries no optical run tag; correct recording selection is operator-managed")
     for observation in observations:
         if observation["status"] == "accepted" and any(
             reason != "agreeing bounded passes" for reason in observation["reasons"]
