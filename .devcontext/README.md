@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Audience music visualizer
+
+The `feat/color-music-sync` feature is integrated with scheduled playback: ready phones display their assigned channel color, with brightness following their own audio after mix and lease gating. Calibration and recovery/manual-section controls take priority. Review fixes, tests and browser evidence are in the [integration journal](teams/integration/journal/20260920-color-music-integration.md); see the [operator guide](../docs/stage-dashboard.md). Physical phone display/audio alignment remains a rehearsal check.
+
 ### OTC CPU parallelism
 
 The worker distributes independent frame analysis across the available CPU allocation instead of stopping at one analysis core per camera. One shared budget respects container quotas; all frames retain PTS order for tracking. The user plans up to 24 Railway CPUs. See the [decision](decisions/20260920-otc-frame-parallelism.md), [performance configuration](../docs/otc-performance.md) and [measured verification journal](teams/otc-localization/journal/20260920-frame-parallelism.md). Detection and geometry accuracy work remains separate; live Railway throughput must be measured after deployment.

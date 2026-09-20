@@ -6,6 +6,8 @@ import { ClockSync } from "@orchestra/sync";
 import { CalibrationSession, type CalibrationPhase } from "../lib/calibration";
 import { browserSocket, ParticipantConnection, type ConnectionState } from "../lib/connection";
 import { FlashRenderer } from "../lib/flash-renderer";
+import { LevelMeter } from "../lib/level-meter";
+import { MusicVisualizer } from "../lib/music-visualizer";
 import { unlockWithin } from "../lib/audio-unlock";
 import { browserStorage, joinSession, tokenKey } from "../lib/join";
 import { buildReadiness, statusMessage, StatusReporter } from "../lib/readiness";
@@ -54,6 +56,8 @@ export default function Page() {
   const calibration = useRef<CalibrationSession | null>(null);
   const surface = useRef<HTMLDivElement | null>(null);
   const surfaceText = useRef<HTMLParagraphElement | null>(null);
+  const stageSurface = useRef<HTMLDivElement | null>(null);
+  const performanceShell = useRef<HTMLDivElement | null>(null);
   const showControl = useRef<ShowControl | null>(null);
   const [, setTick] = useState(0);
 
@@ -162,6 +166,21 @@ export default function Page() {
   // Download and decode while the browser waits for an audio gesture too.
   const show = conn.snapshot?.show;
   const showKey = JSON.stringify([show?.showId, show?.showRevision, show?.tracks]);
+  const playback = showControl.current?.view();
+  const playing = playback?.transport?.status === "playing" && !playback.panicked;
+  const channel = show?.channels.find(value => value.channelId === playback?.channelId);
+  const identity = conn.identity;
+  const tracks = show?.tracks ?? [];
+  const assetsVerified = tracks.length > 0 && tracks.every(track => verifiedHashes[track.trackId] === track.sha256);
+  const location = conn.snapshot?.location;
+  const stage = conn.snapshot?.calibrationStage ?? "waiting";
+  const section = location?.column;
+  const mapped = location?.status === "localized" || location?.mappingMode === "optical-column";
+  const manual = location?.mappingMode === "manual-column";
+  const needsSection = connected && stage === "complete" && !mapped && !manual && phase.kind !== "armed";
+  const holding = phase.kind === "prepared" || phase.kind === "armed";
+  const awaitingMap = phase.kind === "finished" && stage !== "complete" || stage === "processing";
+  const reset = conn.status.kind === "reset";
   useEffect(() => {
     const audio = host.current;
     if (!show || !audioState || !audio) return;
@@ -222,6 +241,32 @@ export default function Page() {
     return () => { renderer.stop(); void wakeLock?.release().catch(() => {}); };
   }, [phase]);
 
+  // Calibration, manual placement and recovery keep their controls. Only ready phones become lights.
+  const visualizerReady = connected && foreground && clockQuality.ready && outputReady
+    && audioState === "running" && assetsVerified && !holding && !needsSection;
+  const channelColors = JSON.stringify(show?.channels.map(({ channelId, color }) => [channelId, color]) ?? []);
+  useEffect(() => {
+    const audio = host.current;
+    if (!visualizerReady || !audio) return;
+    const colors = new Map<string, string>(JSON.parse(channelColors));
+    const renderer = new MusicVisualizer({
+      playback: () => showControl.current?.view(),
+      color: channelId => colors.get(channelId),
+      createMeter: () => new LevelMeter(audio.context(), audio.masterGain),
+      frames: { request: callback => requestAnimationFrame(callback), cancel: handle => cancelAnimationFrame(handle as number) },
+      now: () => performance.now(),
+      paint: (color, brightness) => {
+        if (stageSurface.current && color) {
+          stageSurface.current.style.backgroundColor = color;
+          stageSurface.current.style.opacity = String(brightness);
+        }
+        if (performanceShell.current) performanceShell.current.hidden = color === null;
+      },
+    });
+    renderer.start();
+    return () => renderer.stop();
+  }, [visualizerReady, channelColors]);
+
   async function enableSound(automatic = false) {
     if (!host.current) {
       host.current = new AudioContextHost();
@@ -247,20 +292,6 @@ export default function Page() {
     return () => { window.removeEventListener("pointerdown", gesture); window.removeEventListener("keydown", gesture); void host.current?.dispose(); };
   }, []);
 
-  const identity = conn.identity;
-  const tracks = show?.tracks ?? [];
-  const assetsVerified = tracks.length > 0 && tracks.every(track => verifiedHashes[track.trackId] === track.sha256);
-  const location = conn.snapshot?.location;
-  const stage = conn.snapshot?.calibrationStage ?? "waiting";
-  const section = location?.column;
-  const mapped = location?.status === "localized" || location?.mappingMode === "optical-column";
-  const manual = location?.mappingMode === "manual-column";
-  const needsSection = connected && stage === "complete" && !mapped && !manual && phase.kind !== "armed";
-  const holding = phase.kind === "prepared" || phase.kind === "armed";
-  const awaitingMap = phase.kind === "finished" && stage !== "complete" || stage === "processing";
-  const playing = conn.snapshot?.transport.status === "playing";
-  const channel = show?.channels.find(value => value.channelId === conn.snapshot?.assignment.channelId);
-  const reset = conn.status.kind === "reset";
   const checks = [
     { label: "Connection", value: connected ? "Connected" : connectionLabel(conn), ok: connected },
     { label: "Show clock", value: clockQuality.ready ? "In sync" : "Syncing…", ok: clockQuality.ready },
@@ -292,6 +323,9 @@ export default function Page() {
     {conn.status.kind === "replaced" && <p className="notice">This phone is open in another tab. Keep just one tab open.</p>}
     {!foreground && !reset && <p className="notice">Return to this page to stay ready.</p>}
     <footer className="audience-footer">ONE AUDIENCE. ONE ORCHESTRA.</footer>
+    <div ref={performanceShell} className="performance-shell" hidden aria-hidden="true">
+      <div ref={stageSurface} className="performance-surface" />
+    </div>
     {phase.kind === "armed" && <CalibrationOverlay surface={surface} text={surfaceText} />}
   </main>;
 }

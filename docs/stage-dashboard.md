@@ -36,6 +36,8 @@ Use **Assign** to click phones, draw a box/lasso, or move the two region divider
 
 Use **Performance → Prepare cue**, inspect readiness/exclusions, then **Start show**. The existing shared clock drives playback, pause, seek and channel changes. **MUTE ALL** remains visible in the command bar. Prepare-show editing and command history are collapsed when not needed.
 
+Ready, assigned phones automatically become full-screen music lights during playback. Each phone uses its assigned channel's color and pulses with its own audio; quiet passages or muted parts dim to a 10% resting glow. Pause, stop and panic restore the status page. Channel colors switch at the scheduled assignment time, and calibration always takes priority. No extra audience button is needed. Disconnected, unsynced, locked or unplaced phones keep their status and recovery/section controls. Refresh audience pages after updating the app. Rehearse brightness and perceived audio/display alignment on the actual phones; rendering and hardware latency can vary.
+
 ## Checks and recovery
 
 - Performance actions (play, pause, stop, seek, mute, solo and gain) take effect two seconds after the click. Assignment defaults to two seconds after preparation; calibration keeps its four-second camera countdown. Panic is immediate.

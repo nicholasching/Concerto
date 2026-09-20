@@ -1,5 +1,7 @@
 # audio-client checkpoint
 
+Music visualizer integration (2026-09-20): `feat/color-music-sync` now follows effective ShowControl transport/channel state each frame, reacts to post-mix audio, and yields to calibration/manual placement/recovery. Float samples ignore the audio keepalive; smoothing is refresh-rate independent. Client gate: 157 tests plus build passed. See [integration evidence](../integration/journal/20260920-color-music-integration.md); physical display/audio timing remains unmeasured.
+
 Integration follow-up on main (2026-09-20 UTC): two-second cue support, synchronous fresh-clock/output/assets execution gates, output warmup/keepalive, and corrected fallback latency. See [current playback evidence](../integration/journal/20260920-playback-recovery.md). Historical slice status below is superseded by main integration. Physical acoustic comparison remains pending.
 
 Status: in progress (slices 1-4 ready for integration; physical checks outstanding).
