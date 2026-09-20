@@ -26,6 +26,8 @@ Locally use `http://localhost:3000`; the configured public origin is `https://ht
 5. Recordings appear in the admin camera slots automatically. Select one, two or three distinct views, specify the seating corners or explicitly use the approximate stage-facing frame preset, and process. Review the candidate and commit it before assigning parts. Geometry changes require reprocessing.
 6. Successfully mapped phones display their section. Unmapped phones get only **left / center / right** choices after calibration is complete. These fallback choices have no invented seat coordinates.
 
+Manual choices also assign music automatically, normally within two seconds: **left → Melody, center → Vocals, right → Percussion**. An existing most common operator assignment in that column takes precedence; a tie uses the default. Manual phones follow later column assignments until you explicitly assign or clear that phone. A phone joining during playback waits for clock/audio/assets to be ready and starts at the current song position. It does not start playback while the show is paused or stopped.
+
 ## Assign and perform
 
 Use **Assign** to click phones, draw a box/lasso, or move the two region dividers. Choose **Melody**, **Vocals** or **Percussion**, then assign the selection. Column buttons include manual choices. Selection always carries the current map revision.

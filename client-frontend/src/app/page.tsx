@@ -287,6 +287,7 @@ export default function Page() {
     {assetNote?.startsWith("Failed:") && <p role="alert" className="notice">Music couldn’t finish loading. Keep this page open while the stage team checks the connection.</p>}
     {needsSection && <div className="section-picker">{(["left", "center", "right"] as const).map(column => <button key={column} onClick={() => chooseSection(column)}>{column}</button>)}</div>}
     {(mapped || manual) && !holding && channel && <p className="your-part"><span style={{ background: channel.color }} />Your part: <strong>{channel.label}</strong></p>}
+    {manual && !holding && !channel && <p className="your-part">{conn.snapshot?.pendingActions.some(action => action.domain === "assignment") ? "Joining your section’s music…" : "Waiting for the stage team to assign music to this section."}</p>}
     {conn.status.kind === "gave-up" && <button onClick={() => connection.current?.retry()}>Reconnect</button>}
     {conn.status.kind === "replaced" && <p className="notice">This phone is open in another tab. Keep just one tab open.</p>}
     {!foreground && !reset && <p className="notice">Return to this page to stay ready.</p>}

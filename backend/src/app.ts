@@ -141,7 +141,7 @@ export function createApp(deps: AppDeps) {
       deps.clock.sessionId, deps.state.durableShow,
       deps.state.mapRevision > 0 ? deps.state.audienceMap : null,
       deps.state.lastCommittedRunTag,
-      deps.state.durableAssignments, deps.calibrations.nextTag,
+      deps.state.durableAssignments, deps.calibrations.nextTag, deps.state.manualRoutingDeviceIds,
     ));
   app.use("/api/*", cors({ origin: (origin, c) => {
     const allowed = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001").split(",");

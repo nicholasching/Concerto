@@ -1,5 +1,7 @@
 # Local integrated concert handoff
 
+Latest: [manual section routing](journal/20260920-manual-section-routing.md), after the pushed playback checkpoint **a29625e**. Fallback phones automatically receive section music, follow section assignments until explicitly overridden, and join running playback after readiness checks. Defaults are left/Melody, center/Vocals, right/Percussion; section evidence remains manual/coarse. No wire/schema regeneration required; checkpoint v3 has an optional automatic-routing ownership list.
+
 Latest playback follow-up: **cb271b1** checkpoint pushed first. Read [two-second controls and playback recovery](journal/20260920-playback-recovery.md) for code causes, checks, runtime updates and remaining physical phone verification.
 
 Latest: [five-phone positioning follow-up](journal/20260919-five-phone-positioning.md). UI checkpoint eb274b3 is pushed. New uploads automatically map with a declared stage-facing frame layout; decoder v1.6 accepts valid non-colliding IDs with disclosed tracking/repeat warnings. All five phones in the supplied PXL clip are verified, including console click/box selection in an isolated physical-result review. Existing committed live map/assignments are preserved; old jobs do not change retrospectively. Refresh pages and run a new calibration to use the new backend/frontend metadata. See the journal for exact gate evidence and live runtime state.

@@ -46,7 +46,10 @@ if (restored) {
   if (restored.show) state.restoreShow(restored.show);
   if (restored.map) state.restoreMap(restored.map, restored.committedRunTag);
   state.restoreAssignments(restored.assignments);
+  state.restoreManualRouting(restored.manualRoutingDeviceIds, clock.nowServerMs());
   calibrations.restoreNextTag(Math.max(restored.nextRunTag, (restored.committedRunTag ?? -1) + 1));
+  await store.save(registry.toCheckpoint(clock.sessionId, state.durableShow, state.audienceMap,
+    state.lastCommittedRunTag, state.durableAssignments, calibrations.nextTag, state.manualRoutingDeviceIds));
 }
 if (!process.env.OPERATOR_SECRET) {
   console.warn("OPERATOR_SECRET is unset: every operator request will be refused.");
@@ -115,12 +118,13 @@ const server = Bun.serve<SocketData, string>({
       }
       if (connections.participantSocket(ws.data.deviceId) !== ws) return;
       const mapRevision = state.mapRevision;
+      const assignmentRevision = state.assignmentRevision;
       const reply = handleClientMessage({
         raw: String(raw), receivedServerMs, clock, deviceId: ws.data.deviceId, state, preparations, calibrations,
       });
       if (reply.type !== "clock.reply") telemetry.mark();
-      if (mapRevision !== state.mapRevision) await store.save(registry.toCheckpoint(clock.sessionId, state.durableShow,
-        state.audienceMap, state.lastCommittedRunTag, state.durableAssignments, calibrations.nextTag));
+      if (mapRevision !== state.mapRevision || assignmentRevision !== state.assignmentRevision) await store.save(registry.toCheckpoint(clock.sessionId, state.durableShow,
+        state.audienceMap, state.lastCommittedRunTag, state.durableAssignments, calibrations.nextTag, state.manualRoutingDeviceIds));
       ws.send(JSON.stringify(reply));
     },
   },

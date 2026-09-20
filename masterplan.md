@@ -261,6 +261,8 @@ Canonical map: stage at the top, `y=0` nearest the stage, `y=1` at the back; `x=
 
 Column names `left`, `center`, and `right` always use that audience convention. A selection resolves to an explicit ID set and `mapRevision`; later camera processing cannot silently change its membership. Reject a stale-map assignment and ask the operator to reselect. Last committed assignment wins for overlapping selections at the same effective time; server revisions determine order. Unassigned/unlocalized devices remain silent unless explicitly put into a manual fallback channel.
 
+**Manual fallback update (user-confirmed 2026-09-20):** choosing a manual column requests server-owned audio routing, defaulting left → Melody, center → Vocals, right → Percussion. Existing section assignments take precedence; ready manual phones can join the current shared playhead after synchronization and audio checks. Explicit operator overrides remain authoritative. See [manual routing semantics](.devcontext/decisions/20260920-manual-section-audio-routing.md).
+
 ## 5. Optical calibration: Team 3's critical path
 
 ### 5.1 Prove the optics before optimizing the algorithm

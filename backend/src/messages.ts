@@ -63,7 +63,8 @@ export const handleClientMessage = (input: {
   }
 
   if (message.data.type === "participant.column") {
-    state.chooseColumn(deviceId, message.data.payload.column);
+    if (!state.isRegistered(deviceId)) return error(clock, "UNKNOWN_DEVICE", "This device is not registered in the current session.");
+    state.chooseColumn(deviceId, message.data.payload.column, clock.nowServerMs());
     const snapshot = state.participantSnapshot(deviceId, clock)!;
     return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };
   }

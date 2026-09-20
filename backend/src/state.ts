@@ -12,6 +12,8 @@ type ChannelData = z.infer<typeof Channel>;
 type LocationData = z.infer<typeof Location>;
 type AudienceMapData = z.infer<typeof AudienceMap>;
 type PendingActionData = z.infer<typeof PendingAction>;
+const MANUAL_ASSIGNMENT_LEAD_MS = 2000;
+const MANUAL_PARTS = { left: "Melody", center: "Vocals", right: "Percussion" } as const;
 
 interface PendingAssignment {
   commandId: string;
@@ -66,6 +68,7 @@ export class SessionState {
   private committedRunTag: number | null = null;
   private readonly readiness = new Map<number, DeviceReadinessData>();
   private readonly assignments = new Map<number, AssignmentData>();
+  private readonly manualRouting = new Set<number>();
   private readonly locations = new Map<number, LocationData>();
   private adminContext: () => Partial<Pick<AdminSnapshotData, "preparations" | "calibration">> = () => ({});
   private readonly appliedCommands = new Set<string>();
@@ -74,7 +77,7 @@ export class SessionState {
   resetAudience(): void {
     this.pendingTransport = null; this.pendingMix = null; this.pendingAssignments.clear();
     this.pendingActionsCache = null; this.transportRecipients.clear(); this.appliedCommands.clear();
-    this.readiness.clear(); this.assignments.clear(); this.locations.clear();
+    this.readiness.clear(); this.assignments.clear(); this.locations.clear(); this.manualRouting.clear();
     this.assignmentRevisionCounter = 0; this.mixRevisionCounter = 0; this.effectiveMixRevision = 0;
     this.channelState = null; this.masterGainState = 1;
     this.mapRevisionCounter = 0; this.mapRunId = null; this.mapEvidence = "synthetic"; this.committedRunTag = null;
@@ -96,6 +99,18 @@ export class SessionState {
       this.assignments.set(assignment.deviceId, Assignment.parse(assignment));
       this.assignmentRevisionCounter = Math.max(this.assignmentRevisionCounter, assignment.assignmentRevision);
     }
+  }
+
+  get manualRoutingDeviceIds(): number[] { return [...this.manualRouting]; }
+
+  restoreManualRouting(deviceIds: number[], nowServerMs: number): void {
+    const saved = new Set(deviceIds);
+    for (const [id, location] of this.locations) {
+      const assignment = this.assignments.get(id);
+      // Migrate the old location-only fallback; an explicit operator clear has a revision.
+      if (location.mappingMode === "manual-column" && (saved.has(id) || assignment?.assignmentRevision === 0)) this.manualRouting.add(id);
+    }
+    this.routeManualColumns(nowServerMs + MANUAL_ASSIGNMENT_LEAD_MS);
   }
 
   get revision(): number {
@@ -142,6 +157,7 @@ export class SessionState {
       }
     }
     this.transportState = stoppedTransport(this.transportState.transportRevision + 1, this.savedShow.showRevision);
+    this.routeManualColumns(0); // Show edits are allowed only while stopped.
     this.revisionCounter++;
     return this.savedShow;
   }
@@ -215,9 +231,10 @@ export class SessionState {
     commandId: string;
     effectiveServerMs: number;
     assignments: AssignmentData[];
-  }): string[] {
+  }, automatic = false): string[] {
     const superseded = new Set<string>();
     for (const assignment of input.assignments) {
+      if (!automatic) this.manualRouting.delete(assignment.deviceId);
       const previous = this.pendingAssignments.get(assignment.deviceId);
       if (previous) superseded.add(previous.commandId);
       this.pendingAssignments.set(assignment.deviceId, {
@@ -230,6 +247,7 @@ export class SessionState {
     this.assignmentRevisionCounter = input.assignments[0]?.assignmentRevision ?? this.assignmentRevisionCounter;
     this.pendingActionsCache = null;
     this.revisionCounter++;
+    if (!automatic) this.routeManualColumns(input.effectiveServerMs, true);
     return [...superseded];
   }
 
@@ -306,13 +324,73 @@ export class SessionState {
     this.revisionCounter++;
   }
 
-  chooseColumn(deviceId: number, column: "left" | "center" | "right" | null): void {
+  chooseColumn(deviceId: number, column: "left" | "center" | "right" | null, nowServerMs: number): void {
     if (!this.isRegistered(deviceId)) return;
+    this.applyDue(nowServerMs);
+    const previous = this.locations.get(deviceId);
+    if (previous?.column === column && previous.mappingMode === "manual-column" && this.manualRouting.has(deviceId)) {
+      this.routeManualColumns(nowServerMs + MANUAL_ASSIGNMENT_LEAD_MS);
+      return;
+    }
     this.locations.set(deviceId, column === null ? defaultLocation(deviceId) : {
       ...defaultLocation(deviceId), status: "coarse", column, mappingMode: "manual-column", x: null, y: null,
     });
     this.mapRevisionCounter++;
     this.revisionCounter++;
+    if (column === null) {
+      this.manualRouting.delete(deviceId);
+      this.scheduleAssignments({ commandId: crypto.randomUUID(), effectiveServerMs: nowServerMs + MANUAL_ASSIGNMENT_LEAD_MS,
+        assignments: [{ deviceId, channelId: null, assignmentRevision: this.assignmentRevision + 1, mapRevision: this.mapRevision }] });
+    } else {
+      this.manualRouting.add(deviceId);
+      this.routeManualColumns(nowServerMs + MANUAL_ASSIGNMENT_LEAD_MS);
+    }
+  }
+
+  private routeManualColumns(effectiveServerMs: number, reschedulePeers = false): void {
+    for (const column of ["left", "center", "right"] as const) {
+      const followers = [...this.manualRouting].filter(id => this.locations.get(id)?.column === column);
+      if (!followers.length) continue;
+      const votes = new Map<string, number>();
+      let peerEffectiveServerMs = 0;
+      for (const [id, location] of this.locations) {
+        if (this.manualRouting.has(id) || location.column !== column || !["localized", "coarse"].includes(location.status)) continue;
+        const pending = this.pendingAssignments.get(id);
+        const assignment = pending?.assignment ?? this.assignments.get(id);
+        const channelId = assignment?.channelId;
+        if (!channelId || !this.show.channels.some(channel => channel.channelId === channelId)) continue;
+        votes.set(channelId, (votes.get(channelId) ?? 0) + 1);
+        peerEffectiveServerMs = Math.max(peerEffectiveServerMs, pending?.effectiveServerMs ?? 0);
+      }
+      const ranked = [...votes].sort((a, b) => b[1] - a[1]);
+      const channelId = ranked.length && ranked[0][1] > (ranked[1]?.[1] ?? 0) ? ranked[0][0]
+        : this.show.channels.find(channel => channel.label.trim().toLowerCase() === MANUAL_PARTS[column].toLowerCase())?.channelId ?? null;
+      const atServerMs = Math.max(effectiveServerMs, peerEffectiveServerMs);
+      const changes = followers.filter(id => {
+        const pending = this.pendingAssignments.get(id);
+        return (pending?.assignment ?? this.assignments.get(id))?.channelId !== channelId
+          || (reschedulePeers && pending && peerEffectiveServerMs > 0 && pending.effectiveServerMs !== peerEffectiveServerMs);
+      });
+      if (!changes.length) continue;
+      this.scheduleAssignments({ commandId: crypto.randomUUID(), effectiveServerMs: atServerMs,
+        assignments: changes.map(deviceId => ({ deviceId, channelId, assignmentRevision: this.assignmentRevision + 1, mapRevision: this.mapRevision })) }, true);
+    }
+  }
+
+  private admitManualPlayback(deviceId: number): void {
+    if (this.locations.get(deviceId)?.mappingMode !== "manual-column") return;
+    const readiness = this.readiness.get(deviceId);
+    const channelId = this.assignments.get(deviceId)?.channelId;
+    if (!channelId || !readiness?.connected || !readiness.foreground || !readiness.clockReady || !readiness.audioUnlocked) return;
+    const tracks = this.show.clips.filter(clip => clip.channelId === channelId).map(clip => this.show.tracks.find(track => track.trackId === clip.trackId));
+    if (tracks.some(track => !track || readiness.decodedTrackHashes[track.trackId] !== track.sha256)) return;
+    // Admit only this ready manual phone. The client still gates warmed output and schedules
+    // the current shared playhead in the future; a manual choice never starts the show itself.
+    for (const transport of [this.transportState, this.pendingTransport?.transport]) {
+      if (transport?.status !== "playing") continue;
+      const recipients = this.transportRecipients.get(transport.transportRevision);
+      if (recipients && !recipients.has(deviceId)) { recipients.add(deviceId); this.revisionCounter++; }
+    }
   }
 
   readinessOf(deviceId: number): DeviceReadinessData | undefined {
@@ -368,6 +446,7 @@ export class SessionState {
     const decoded = new Map(input.locations.map(location => [location.deviceId, location]));
     for (const deviceId of input.targets) {
       this.locations.set(deviceId, decoded.get(deviceId) ?? defaultLocation(deviceId));
+      if (this.locations.get(deviceId)?.mappingMode !== "manual-column") this.manualRouting.delete(deviceId);
     }
     this.mapRevisionCounter++;
     this.mapRunId = input.runId;
@@ -405,6 +484,7 @@ export class SessionState {
 
   participantSnapshot(deviceId: number, clock: ServerClock): ParticipantSnapshotData | null {
     this.applyDue(clock.nowServerMs());
+    this.admitManualPlayback(deviceId);
     const readiness = this.readiness.get(deviceId);
     const assignment = this.assignments.get(deviceId);
     const location = this.locations.get(deviceId);

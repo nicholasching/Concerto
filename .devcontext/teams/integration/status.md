@@ -1,5 +1,7 @@
 # Integration status
 
+Manual-routing follow-up: **a29625e** committed/pushed before implementation. Manual section choices now assign a matching musical channel and ready late phones can join current playback. See the [current journal](journal/20260920-manual-section-routing.md) for verification and runtime status.
+
 Playback follow-up: prior fixes committed/pushed as **cb271b1**. Two-second controls, fresh-clock recovery and first-output warmup are implemented; [current verification/handoff](journal/20260920-playback-recovery.md). Older runtime/readiness descriptions below are historical.
 
 Latest follow-up: UI checkpoint **eb274b3** pushed before the five-phone investigation. Decoder **v1.6** and automatic stage-facing frame layout recover all five phones with coordinates; broader acceptance follows the user's explicit direction. Read [current evidence and runtime handoff](journal/20260919-five-phone-positioning.md). The previous map-revision/active-process details below are historical snapshots.

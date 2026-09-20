@@ -19,6 +19,7 @@ export const CheckpointFile = z.strictObject({
   committedRunTag: z.number().int().min(0).max(255).nullable(),
   nextRunTag: z.number().int().min(0).max(256).default(0),
   assignments: z.array(Assignment).default([]),
+  manualRoutingDeviceIds: z.array(z.number().int().min(0).max(2047)).default([]),
 });
 export type CheckpointData = z.infer<typeof CheckpointFile>;
 

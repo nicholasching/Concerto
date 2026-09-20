@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Manual section audio routing
+
+Playback fixes are committed/pushed as **a29625e**. The manual-section follow-up now schedules a matching audio assignment and admits ready manual phones to an ongoing show at its current playhead. User-confirmed defaults: left → Melody, center → Vocals, right → Percussion. See the [decision](decisions/20260920-manual-section-audio-routing.md) and [verification/handoff](teams/integration/journal/20260920-manual-section-routing.md).
+
 ### Playback recovery and two-second controls
 
 All prior fixes are committed/pushed as **cb271b1**. The following playback changes implement two-second performance/assignment cues and gate recovery/first playback on current clock, audio-output and asset readiness. Read the [decision](decisions/20260920-playback-readiness-and-cue-lead.md) and [verification journal](teams/integration/journal/20260920-playback-recovery.md). Physical acoustic comparison remains separate from passing software/browser checks.

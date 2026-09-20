@@ -61,6 +61,7 @@ export class DeviceRegistry {
     committedRunTag: CheckpointData["committedRunTag"] = null,
     assignments: CheckpointData["assignments"] = [],
     nextRunTag = 0,
+    manualRoutingDeviceIds: number[] = [],
   ): CheckpointData {
     return {
       version: 3,
@@ -70,7 +71,7 @@ export class DeviceRegistry {
       show,
       map,
       committedRunTag,
-      assignments, nextRunTag,
+      assignments, nextRunTag, manualRoutingDeviceIds,
     };
   }
 
