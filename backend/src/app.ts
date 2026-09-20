@@ -40,6 +40,7 @@ const CameraUploadQuery = z.object({
   byteSize: numeric.int().positive().max(1024 * 1024 * 1024),
   label: z.string().min(1).max(200),
   anchors: z.string().optional(),
+  frameLayout: z.enum(["from-stage", "from-back"]).optional(),
   exclusionRois: z.string().optional(),
 });
 
@@ -531,8 +532,7 @@ export function createApp(deps: AppDeps) {
       return c.json(apiError("TOO_MANY_CAMERAS", `A run accepts at most ${MAX_CAMERAS} recordings.`), 409);
     }
 
-    // Camera geometry is optional: without it Team 3 falls back to the manual column path, which
-    // the masterplan requires to work on its own.
+    // Old callers can still request only a column. Current UIs declare frameLayout.
     const anchors = parseJson(Anchors, query.data.anchors, null);
     const exclusionRois = parseJson(ExclusionRois, query.data.exclusionRois, []);
     if (anchors === null && query.data.anchors !== undefined) {
@@ -565,7 +565,7 @@ export function createApp(deps: AppDeps) {
       primaryColumn: query.data.primaryColumn,
       rotationDegrees: query.data.rotationDegrees as 0 | 90 | 180 | 270,
       sha256: written.sha256, byteSize: written.byteSize, label: query.data.label,
-      anchors, exclusionRois,
+      anchors, exclusionRois, ...(query.data.frameLayout ? { frameLayout: query.data.frameLayout } : {}),
     };
     deps.calibrations.addUpload(upload);
     deps.commands.remember(query.data.commandId, upload);
@@ -580,9 +580,10 @@ export function createApp(deps: AppDeps) {
     if (run.status === "committed" || run.status === "discarded") return c.json(apiError("RUN_CLOSED", "This run is closed."), 409);
     const parsed = z.strictObject({ primaryColumn: z.enum(["left", "center", "right"]),
       rotationDegrees: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
-      anchors: Anchors.nullable(), exclusionRois: ExclusionRois }).safeParse(await c.req.json().catch(() => null));
+      anchors: Anchors.nullable(), frameLayout: z.enum(["from-stage", "from-back"]).optional(), exclusionRois: ExclusionRois }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json(apiError("INVALID_GEOMETRY", "Use four anchors, valid exclusion polygons, and a supported rotation."), 400);
     Object.assign(upload, parsed.data);
+    upload.frameLayout = parsed.data.frameLayout;
     return c.json(upload);
   });
 
@@ -619,6 +620,7 @@ export function createApp(deps: AppDeps) {
       videoPath: resolve(deps.uploads.path(upload!.uploadId)!), sha256: upload!.sha256,
       rotationDegrees: upload!.rotationDegrees,
       exclusionRois: upload!.exclusionRois, anchors: upload!.anchors,
+      ...(upload!.frameLayout ? { frameLayout: upload!.frameLayout } : {}),
     }));
     const participantIds = run.plan.participantIds.filter(id => run.reports.get(id)?.completed !== false);
     if (!participantIds.length) return c.json(apiError("NO_CAPTURED_PHONES", "Every participating phone reported an interrupted pattern. Capture a new run."), 409);
@@ -733,6 +735,7 @@ export function createApp(deps: AppDeps) {
       const current = [...run.uploads.values()].find(upload => upload.cameraId === camera.cameraId);
       if (!current || current.sha256 !== camera.sha256 || current.primaryColumn !== camera.primaryColumn
         || current.rotationDegrees !== camera.rotationDegrees || JSON.stringify(current.anchors) !== JSON.stringify(camera.anchors)
+        || current.frameLayout !== camera.frameLayout
         || JSON.stringify(current.exclusionRois) !== JSON.stringify(camera.exclusionRois)) {
         return c.json(apiError("STALE_GEOMETRY", "Camera metadata changed. Process and review the recordings again."), 409);
       }

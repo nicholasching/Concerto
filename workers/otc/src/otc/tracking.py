@@ -27,6 +27,27 @@ class Track:
     track_id: str
     samples: list[Sample] = field(default_factory=list)
     reasons: set[str] = field(default_factory=set)
+    # Time, competing track, independently separated footprints at its birth.
+    collisions: list[tuple[float, str, bool]] = field(default_factory=list)
+
+
+def separate_footprints(first, second):
+    """A new band inside an existing screen is not an independent second phone.
+
+    Compare at the new fragment's birth, before later exposure bands distort the
+    old track's most recent box. Fully verified competing packets still conflict
+    at decode time even when one footprint contains the other.
+    """
+    older, newer = sorted((first, second), key=lambda track: track.samples[0].pts_ms)
+    seed = newer.samples[0]
+    sample = min(older.samples, key=lambda s: abs(s.pts_ms-seed.pts_ms))
+    if abs(sample.pts_ms-seed.pts_ms) > 350:
+        return True
+    width = max(0, min(sample.x+sample.width/2, seed.x+seed.width/2)
+                - max(sample.x-sample.width/2, seed.x-seed.width/2))
+    height = max(0, min(sample.y+sample.height/2, seed.y+seed.height/2)
+                 - max(sample.y-sample.height/2, seed.y-seed.height/2))
+    return width*height < .8 * min(sample.width*sample.height, seed.width*seed.height)
 
 
 @dataclass
@@ -233,6 +254,15 @@ def associate(tracks, active, detections, pts_ms, track_id_offset=0):
         elif candidates:
             for index in candidates:
                 tracks[index].reasons.add("ambiguous screen association or merge")
+                for other in candidates:
+                    if other != index:
+                        peer = tracks[other]
+                        # One-frame pieces of a color transition are not a second
+                        # persistent screen. A later verified preamble still vetoes.
+                        independent = (len(peer.samples) >= 3 and
+                                       peer.samples[-1].pts_ms-peer.samples[0].pts_ms >= 60 and
+                                       separate_footprints(tracks[index], peer))
+                        tracks[index].collisions.append((pts_ms, peer.track_id, independent))
             # Do not create a new track from a merged/crossing candidate.
         else:
             if len(tracks) >= 8192:

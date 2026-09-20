@@ -167,3 +167,40 @@ def test_no_geometry_is_coarse_and_cross_column_disagreement_is_ambiguous():
     locations, _ = fuse_locations(manifest, [observation(), observation(camera_id="b")],
                                   {"a": [], "b": []}, set())
     assert locations[0]["status"] == "ambiguous"
+
+
+@pytest.mark.parametrize("camera_count", [1, 2, 3])
+def test_declared_frame_layout_maps_every_available_view_without_anchors(camera_count):
+    cameras = [{**camera(str(i), column, anchors=False), "frameLayout": "from-stage"}
+               for i, column in enumerate(("left", "center", "right")[:camera_count])]
+    observations = [observation(i, c["cameraId"], 75, 150) for i, c in enumerate(cameras)]
+    manifest = {"cameras": cameras, "participantIds": list(range(camera_count))}
+    mappings = build_mappings(manifest, {c["cameraId"]: (101, 201) for c in cameras}, observations)
+    locations, warnings = fuse_locations(manifest, observations, mappings, set())
+    assert not warnings
+    for i, location in enumerate(locations):
+        assert location["status"] == "localized" and location["mappingMode"] == "frame-layout"
+        assert np.allclose([location["x"], location["y"]], [(i+.25)/3, .25])
+        assert location["column"] == cameras[i]["primaryColumn"]
+
+
+def test_frame_orientation_is_explicit_and_manual_corners_take_precedence():
+    item = {**camera(anchors=False), "frameLayout": "from-back"}
+    mapping = manual_mapping(item, 201, 101)
+    assert np.allclose(mapping.project([150, 25]), [.25, .25])
+    assert mapping.mode == "frame-layout"
+    assert manual_mapping(camera(anchors=False), 201, 101) is None
+    item["anchors"] = camera()["anchors"]
+    mapping = manual_mapping(item, 201, 101)
+    assert mapping.mode == "manual-anchors"
+    assert np.allclose(mapping.project([90, 90]), [0, 0])
+
+
+def test_approximate_frame_cannot_seed_overlap_registration():
+    cameras = [{**camera("a", anchors=False), "frameLayout": "from-stage"},
+               camera("b", anchors=False)]
+    points = [(x, y) for y in (20, 50, 80) for x in (20, 50, 80)]
+    observations = [observation(i, item["cameraId"], x, y)
+                    for i, (x, y) in enumerate(points) for item in cameras]
+    mappings = build_mappings({"cameras": cameras}, {"a": (100, 100), "b": (100, 100)}, observations)
+    assert mappings["a"][0].mode == "frame-layout" and mappings["b"] == []

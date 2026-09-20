@@ -13,7 +13,7 @@ from .geometry import build_mappings, fuse_locations, reject_duplicates
 from .validation import validate_manifest, validate_result, validate_schema
 from .video import verify_video
 
-DECODER_VERSION = "otc-v1.5"
+DECODER_VERSION = "otc-v1.6"
 
 
 def process_manifest(manifest, base_dir, evidence, *, job_id=None, debug_dir=None, progress=None,
@@ -61,6 +61,12 @@ def process_manifest(manifest, base_dir, evidence, *, job_id=None, debug_dir=Non
     blocked = reject_duplicates(observations)
     mappings = build_mappings(manifest, dimensions, observations)
     locations, warnings = fuse_locations(manifest, observations, mappings, blocked)
+    for observation in observations:
+        if observation["status"] == "accepted" and any(
+            reason != "agreeing bounded passes" for reason in observation["reasons"]
+        ):
+            warnings.append(f"Device {observation['deviceId']} accepted with tracking/repeat warnings: "
+                            + "; ".join(observation["reasons"]))
     for diagnostic in diagnostics:
         camera_id = diagnostic["cameraId"]
         statuses = Counter(o["status"] for o in observations if o["cameraId"] == camera_id)

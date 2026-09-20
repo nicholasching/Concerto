@@ -38,9 +38,21 @@ def project_points(matrix, points):
 
 
 def manual_mapping(camera, width, height):
-    if camera["anchors"] is None:
-        return None
-    points = np.array([[p["x"], p["y"]] for p in camera["anchors"]], dtype=np.float32)
+    anchors = camera["anchors"]
+    mode = "manual-anchors"
+    if anchors is None:
+        view = camera.get("frameLayout")
+        if view is None:
+            return None
+        # An explicitly declared camera orientation, not measured seating corners.
+        # Dimensions are the actual decoded image after rotation, never browser metadata.
+        points = ([[width-1, height-1], [0, height-1], [0, 0], [width-1, 0]]
+                  if view == "from-stage" else
+                  [[0, 0], [width-1, 0], [width-1, height-1], [0, height-1]])
+        mode = "frame-layout"
+    else:
+        points = [[p["x"], p["y"]] for p in anchors]
+    points = np.array(points, dtype=np.float32)
     if ((points < 0).any() or (points[:, 0] >= width).any() or
             (points[:, 1] >= height).any() or not cv2.isContourConvex(points) or
             abs(cv2.contourArea(points)) < 16):
@@ -51,7 +63,7 @@ def manual_mapping(camera, width, height):
     matrix = cv2.getPerspectiveTransform(points, target)
     if not np.isfinite(matrix).all() or np.linalg.cond(matrix) > 1e12:
         raise ValueError("Degenerate camera anchors")
-    return Mapping(matrix, points, "manual-anchors")
+    return Mapping(matrix, points, mode)
 
 
 def _spread(points, dimensions):
@@ -128,6 +140,8 @@ def build_mappings(manifest, dimensions, observations):
                 if reference_id == source_id:
                     continue
                 for reference_map in reference_maps:
+                    if reference_map.mode == "frame-layout":
+                        continue  # An approximate frame is not a calibrated overlap reference.
                     common = sorted(set(by_camera[source_id]) & set(by_camera[reference_id]))
                     common = [device_id for device_id in common
                               if reference_map.project(by_camera[reference_id][device_id]) is not None]

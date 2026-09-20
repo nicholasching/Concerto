@@ -15,8 +15,9 @@ export interface CameraUpload {
   sha256: string;
   byteSize: number;
   label: string;
-  // Supplied by the operator at upload time. Without them Team 3 uses the manual column path.
+  // Explicit corners take precedence over the declared approximate frame layout.
   anchors: [Point, Point, Point, Point] | null;
+  frameLayout?: "from-stage" | "from-back";
   exclusionRois: Point[][];
 }
 

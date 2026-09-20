@@ -667,7 +667,8 @@
             "type": "string",
             "enum": [
               "manual-anchors",
-              "overlap"
+              "overlap",
+              "frame-layout"
             ]
           }
         },
@@ -1033,7 +1034,8 @@
                   "type": "string",
                   "enum": [
                     "manual-anchors",
-                    "overlap"
+                    "overlap",
+                    "frame-layout"
                   ]
                 }
               },
@@ -1722,6 +1724,13 @@
                   "type": "null"
                 }
               ]
+            },
+            "frameLayout": {
+              "type": "string",
+              "enum": [
+                "from-stage",
+                "from-back"
+              ]
             }
           },
           "required": [
@@ -1990,7 +1999,8 @@
                   "type": "string",
                   "enum": [
                     "manual-anchors",
-                    "overlap"
+                    "overlap",
+                    "frame-layout"
                   ]
                 }
               },
@@ -3181,7 +3191,8 @@
                           "type": "string",
                           "enum": [
                             "manual-anchors",
-                            "overlap"
+                            "overlap",
+                            "frame-layout"
                           ]
                         }
                       },
@@ -3924,6 +3935,13 @@
                             {
                               "type": "null"
                             }
+                          ]
+                        },
+                        "frameLayout": {
+                          "type": "string",
+                          "enum": [
+                            "from-stage",
+                            "from-back"
                           ]
                         },
                         "uploadId": {
@@ -4905,7 +4923,8 @@
                     "type": "string",
                     "enum": [
                       "manual-anchors",
-                      "overlap"
+                      "overlap",
+                      "frame-layout"
                     ]
                   }
                 },
@@ -5985,7 +6004,8 @@
                       "type": "string",
                       "enum": [
                         "manual-anchors",
-                        "overlap"
+                        "overlap",
+                        "frame-layout"
                       ]
                     }
                   },
@@ -6728,6 +6748,13 @@
                         {
                           "type": "null"
                         }
+                      ]
+                    },
+                    "frameLayout": {
+                      "type": "string",
+                      "enum": [
+                        "from-stage",
+                        "from-back"
                       ]
                     },
                     "uploadId": {
@@ -7710,7 +7737,8 @@
                 "type": "string",
                 "enum": [
                   "manual-anchors",
-                  "overlap"
+                  "overlap",
+                  "frame-layout"
                 ]
               }
             },
@@ -9135,6 +9163,13 @@
                 }
               ]
             },
+            "frameLayout": {
+              "type": "string",
+              "enum": [
+                "from-stage",
+                "from-back"
+              ]
+            },
             "uploadId": {
               "type": "string",
               "minLength": 1,
@@ -9356,6 +9391,13 @@
           {
             "type": "null"
           }
+        ]
+      },
+      "frameLayout": {
+        "type": "string",
+        "enum": [
+          "from-stage",
+          "from-back"
         ]
       },
       "uploadId": {
@@ -9687,7 +9729,8 @@
                           "type": "string",
                           "enum": [
                             "manual-anchors",
-                            "overlap"
+                            "overlap",
+                            "frame-layout"
                           ]
                         }
                       },
@@ -11775,7 +11818,8 @@
                                   "type": "string",
                                   "enum": [
                                     "manual-anchors",
-                                    "overlap"
+                                    "overlap",
+                                    "frame-layout"
                                   ]
                                 }
                               },
@@ -12518,6 +12562,13 @@
                                     {
                                       "type": "null"
                                     }
+                                  ]
+                                },
+                                "frameLayout": {
+                                  "type": "string",
+                                  "enum": [
+                                    "from-stage",
+                                    "from-back"
                                   ]
                                 },
                                 "uploadId": {
@@ -13499,7 +13550,8 @@
                             "type": "string",
                             "enum": [
                               "manual-anchors",
-                              "overlap"
+                              "overlap",
+                              "frame-layout"
                             ]
                           }
                         },

@@ -1,5 +1,7 @@
 # Local integrated concert handoff
 
+Latest: [five-phone positioning follow-up](journal/20260919-five-phone-positioning.md). UI checkpoint eb274b3 is pushed. New uploads automatically map with a declared stage-facing frame layout; decoder v1.6 accepts valid non-colliding IDs with disclosed tracking/repeat warnings. All five phones in the supplied PXL clip are verified, including console click/box selection in an isolated physical-result review. Existing committed live map/assignments are preserved; old jobs do not change retrospectively. Refresh pages and run a new calibration to use the new backend/frontend metadata. See the journal for exact gate evidence and live runtime state.
+
 Date: 2026-09-19. Owner: captain. Current implementation: main after the four feature merges.
 
 Latest mapping update: the four-device recording now plots IDs 14/15/17/21 and is committed as map revision 10. The live Assign console supports click, box/lasso and movable left/center/right dividers, verified with a 2/1/1 split. Calibration geometry is restored from uploaded metadata and editable using a completed job's preview; processing saves dirty edits. Stage-facing full-frame anchors are an explicit approximate preset, not measured seats. See the [operator guide](../../../docs/audience-mapping.md) and [verification/handoff journal](journal/20260919-seat-map-selection.md). Decoder behavior and musical assignments are unchanged; current mapping is later than the historical two-device uncommitted sample below.

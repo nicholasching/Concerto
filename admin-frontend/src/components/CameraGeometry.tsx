@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Geometry } from "../lib/adapter";
-import { anchorsError, frameAnchors, type CameraView } from "../lib/camera-geometry";
+import { anchorsError, type CameraView } from "../lib/camera-geometry";
 
 const labels = ["front-left", "front-right", "back-right", "back-left"];
 export function CameraGeometry({ file, preview, value, disabled, onChange }: {
@@ -12,7 +12,6 @@ export function CameraGeometry({ file, preview, value, disabled, onChange }: {
   const still = useRef<HTMLImageElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [url, setUrl] = useState("");
-  const [view, setView] = useState<CameraView>("from-stage");
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const savedExclusions = JSON.stringify(value.exclusionRois);
   const [exclusions, setExclusions] = useState(savedExclusions);
@@ -52,9 +51,13 @@ export function CameraGeometry({ file, preview, value, disabled, onChange }: {
   useEffect(paint, [value, url, preview?.url]);
   const geometryError = anchorsError(value.anchors, dimensions.width || undefined, dimensions.height || undefined);
   const hasImage = !!url || !!preview?.url;
-  return <details open={hasImage && (value.anchors?.length ?? 0) < 4}><summary>Set seat coordinates — camera orientation and seating corners</summary>
+  return <details><summary>Camera layout — {value.anchors?.length === 4 ? "seating corners" : "automatic approximate positions"}</summary>
     <fieldset disabled={disabled}>
     <p>Each camera maps its audience column independently. One or two recordings work without the missing views.</p>
+    <label>Camera faces <select value={value.frameLayout ?? "from-stage"} onChange={e => onChange({ ...value, frameLayout: e.target.value as CameraView, anchors: null })}>
+      <option value="from-stage">From the stage toward the audience</option><option value="from-back">From the back toward the stage</option>
+    </select></label>
+    <p>Map positions are automatic using this camera orientation. For more accurate seating placement, optionally mark four corners below.</p>
     <label>Clockwise rotation <select value={value.rotationDegrees} onChange={e => onChange({ ...value, rotationDegrees: Number(e.target.value) as Geometry["rotationDegrees"], anchors: null })}>
       {[0, 90, 180, 270].map(degrees => <option key={degrees} value={degrees}>{degrees}°</option>)}
     </select></label>
@@ -62,22 +65,17 @@ export function CameraGeometry({ file, preview, value, disabled, onChange }: {
     {!url && preview?.url && <img ref={still} src={preview.url} onLoad={paint} alt="Recorded camera frame for seating calibration" style={{ display: "none" }} />}
     {hasImage ? <>
       <p>For perspective correction, mark the four corners of this column's seating area: front-left, front-right, back-right, back-left, as the audience faces the stage. Include every seat you want to map.</p>
-      <p>{value.anchors?.length === 4 ? "Four corners selected. Save geometry and process the recordings." : `Next corner: ${labels[value.anchors?.length ?? 0]}.`}</p>
+      <p>{value.anchors?.length === 4 ? "Four corners selected. Save geometry and process the recordings." : value.anchors?.length ? `Next corner: ${labels[value.anchors.length]}.` : "Optional: click front-left to start marking seating corners."}</p>
       <canvas ref={canvas} style={{ width: "100%", cursor: "crosshair" }} onClick={event => {
         if (disabled) return;
         const target = event.currentTarget, rect = target.getBoundingClientRect();
         const point = { x: Math.min(target.width - 1, Math.max(0, (event.clientX - rect.left) / rect.width * target.width)), y: Math.min(target.height - 1, Math.max(0, (event.clientY - rect.top) / rect.height * target.height)) };
         onChange({ ...value, anchors: [...(value.anchors?.length === 4 ? [] : value.anchors ?? []), point] });
       }} role="img" aria-label="Mark seating anchors" />
-      <label>Camera faces <select value={view} onChange={e => setView(e.target.value as CameraView)}>
-        <option value="from-stage">From the stage toward the audience</option><option value="from-back">From the back toward the stage</option>
-      </select></label>
-      <button disabled={!dimensions.width} onClick={() => onChange({ ...value, anchors: frameAnchors(dimensions.width, dimensions.height, view) })}>Use full frame for approximate layout</button>
       <p className="muted">The frame preset uses observed image positions, not measured seats. Mark actual seating corners for better front/back placement. From-stage cameras mirror audience-left/right.</p>
-    </> : <p>Choose the original recording, or process it once to get a camera frame here. Then set seating corners to turn decoded IDs into map positions.</p>}
-    <p>{value.anchors?.length ?? 0}/4 seating corners. Without a camera transform, decoded devices have a column but no row position.</p>
+    </> : <p>Choose a recording or process the uploaded video to see a preview. Approximate positions work without marking corners.</p>}
     {geometryError && <p role="alert">{geometryError}</p>}
-    <button onClick={() => onChange({ ...value, anchors: null })}>Clear anchors</button>
+    <button onClick={() => onChange({ ...value, anchors: null, frameLayout: value.frameLayout ?? "from-stage" })}>Use automatic frame layout</button>
     <details><summary>Advanced light/stage exclusions</summary><label>Pixel polygons (JSON)<textarea value={exclusions} onChange={e => {
       setExclusions(e.target.value);
       try { const polygons = JSON.parse(e.target.value); if (!Array.isArray(polygons) || polygons.some((polygon: unknown) => !Array.isArray(polygon) || polygon.length < 3 || polygon.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y)))) throw new Error("Use an array of polygons with at least three {x,y} points each.");

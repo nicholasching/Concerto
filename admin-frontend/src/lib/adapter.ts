@@ -15,7 +15,7 @@ export interface PendingCommand {
 export interface AssignmentArgs { deviceIds: number[]; channelId: string | null; mapRevision: number; effectiveServerMs: number }
 export interface TransportArgs { action: "prepare" | "play" | "pause" | "seek" | "stop"; showRevision: number; positionMs: number; effectiveServerMs: number }
 export interface MixArgs { masterGain: number; channels: ShowData["channels"]; effectiveServerMs: number }
-export interface Geometry { rotationDegrees: 0 | 90 | 180 | 270; anchors: { x: number; y: number }[] | null; exclusionRois: { x: number; y: number }[][] }
+export interface Geometry { rotationDegrees: 0 | 90 | 180 | 270; anchors: { x: number; y: number }[] | null; frameLayout?: "from-stage" | "from-back"; exclusionRois: { x: number; y: number }[][] }
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 export function createAdapter(baseUrl: string, fetcher: Fetcher = fetch) {
@@ -115,10 +115,10 @@ export function createAdapter(baseUrl: string, fetcher: Fetcher = fetch) {
     },
     async getCalibration(runId: string) { return CalibrationResource.parse(await (await check(await safeFetch(`/api/calibrations/${runId}`))).json()); },
     async discardCalibration(runId: string) { await check(await safeFetch(`/api/calibrations/${runId}`, { method: "DELETE" })); },
-    async uploadCamera(runId: string, cameraId: string, primaryColumn: Column, file: File | null, geometry: Geometry = { rotationDegrees: 0, anchors: null, exclusionRois: [] }, progress?: (fraction: number) => void) {
+    async uploadCamera(runId: string, cameraId: string, primaryColumn: Column, file: File | null, geometry: Geometry = { rotationDegrees: 0, anchors: null, frameLayout: "from-stage", exclusionRois: [] }, progress?: (fraction: number) => void) {
       if (!file) throw new Error("Choose the original camera recording first.");
       return CameraUploadReceipt.parse(await upload(`/api/calibrations/${runId}/uploads`, { cameraId, primaryColumn, rotationDegrees: geometry.rotationDegrees,
-        ...(geometry.anchors ? { anchors: JSON.stringify(geometry.anchors) } : {}), exclusionRois: JSON.stringify(geometry.exclusionRois) }, file, progress));
+        ...(geometry.anchors ? { anchors: JSON.stringify(geometry.anchors) } : {}), ...(geometry.frameLayout ? { frameLayout: geometry.frameLayout } : {}), exclusionRois: JSON.stringify(geometry.exclusionRois) }, file, progress));
     },
     async createJob(runId: string, uploadIds: string[], evidence: "physical" | "synthetic" = "physical") {
       return submit(`/api/calibrations/${runId}/jobs`, { runId, uploadIds, evidence }, "calibration", value => JobProgress.parse(value));

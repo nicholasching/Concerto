@@ -1,5 +1,17 @@
+import type { Geometry } from "./adapter";
+
 export interface ImagePoint { x: number; y: number }
 export type CameraView = "from-stage" | "from-back";
+
+export function cameraGeometry(upload?: Partial<Geometry>): Geometry {
+  return { rotationDegrees: upload?.rotationDegrees ?? 0, anchors: upload?.anchors ?? null,
+    frameLayout: upload?.frameLayout ?? "from-stage", exclusionRois: upload?.exclusionRois ?? [] };
+}
+
+export function sameGeometry(a: Geometry, b: Geometry): boolean {
+  return a.rotationDegrees === b.rotationDegrees && a.frameLayout === b.frameLayout
+    && JSON.stringify(a.anchors) === JSON.stringify(b.anchors) && JSON.stringify(a.exclusionRois) === JSON.stringify(b.exclusionRois);
+}
 
 /** Explicit full-frame preset; replace with seating corners for perspective calibration. */
 export function frameAnchors(width: number, height: number, view: CameraView): ImagePoint[] {

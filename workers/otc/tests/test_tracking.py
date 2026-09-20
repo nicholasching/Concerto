@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from otc.tracking import Sample, Track, associate, detect_screens, retire_fragments, scan_camera
+from otc.tracking import Sample, Track, associate, detect_screens, retire_fragments, scan_camera, separate_footprints
 
 
 def screen(pts, x=30, width=10):
@@ -22,9 +22,24 @@ def test_partial_cover_then_uncover_preserves_the_original_track():
 def test_merge_with_two_nearby_tracks_marks_both_ambiguous():
     tracks = []
     active = associate(tracks, set(), [screen(0, x=25), screen(0, x=35)], 0)
-    associate(tracks, active, [screen(33, x=30, width=20)], 33)
+    for pts in (33, 66):
+        active = associate(tracks, active, [screen(pts, x=25), screen(pts, x=35)], pts)
+    associate(tracks, active, [screen(99, x=30, width=20)], 99)
     assert len(tracks) == 2
     assert all("ambiguous screen association or merge" in track.reasons for track in tracks)
+    assert all(track.collisions and track.collisions[0][2] for track in tracks)
+
+
+def test_exposure_fragment_inside_previous_screen_is_not_an_independent_collision():
+    # A rolling color boundary temporarily shrinks the visible saturated region.
+    # The next whole screen can then compete with that one-frame fragment.
+    phone = Track("phone", [Sample(0, 100, 100, 50, 100, (0, 20, 255)),
+                             Sample(33, 100, 80, 45, 50, (205, 150, 90))])
+    fragment = Track("band", [Sample(0, 100, 130, 40, 30, (205, 150, 90))])
+    assert not separate_footprints(phone, fragment)
+    tracks = [phone, fragment]
+    associate(tracks, {0, 1}, [Sample(66, 100, 100, 48, 96, (205, 150, 90))], 66)
+    assert phone.collisions and not any(event[2] for event in phone.collisions)
 
 
 def test_long_occlusion_starts_a_new_track_instead_of_guessing_identity():

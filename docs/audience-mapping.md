@@ -1,13 +1,13 @@
 # Map devices and choose audience groups
 
-The operator console supports one, two or three camera recordings. Optical decoding identifies each phone; camera geometry places those IDs on the audience map. Without geometry, a decoded phone has only a column and is listed below the map.
+The operator console supports one, two or three camera recordings. New uploads automatically map decoded phones using the camera frame and the demo's stage-facing orientation. These are approximate screen positions; optional seating corners improve perspective placement. Old results remain unchanged until processed again.
 
 ## Calibrate the camera views
 
 1. Record the calibration pattern with fixed cameras and upload the original clips. Include only the recordings you actually have, with one distinct recording per view. Set each camera's primary audience column.
-2. Open **Set seat coordinates — camera orientation and seating corners**. Rotate the picture upright first. You can use the original video or the processed camera preview; after a reload, the saved geometry and processed preview remain available during the run.
-3. For the demo's cameras facing **from the stage toward the audience**, audience-left is on the **right of the image**. Click the seating area's corners in this order: audience **front-left, front-right, back-right, back-left**. The front edge is nearest the stage. Enclose all the seats in that camera's primary column. Use known corners of the seating area, not four arbitrary phones.
-4. For a quick test, choose **Camera faces: From the stage toward the audience**, then **Use full frame for approximate layout**. This maps recorded screen positions and mirrors the stage-facing picture. It does not measure seat locations.
+2. Select **Process uploaded recordings** for automatic positions. The default camera direction is **From the stage toward the audience**. In **Camera layout**, rotate the picture upright if necessary or change the direction for a rear-facing camera. No corner selection is required.
+3. For optional perspective correction, open **Camera layout**. In the demo's stage-facing picture, audience-left is on the **right of the image**. Click known seating corners in order: audience **front-left, front-right, back-right, back-left**. Enclose the seats in that camera's primary column. The local video or processed preview supplies the image.
+4. **Use automatic frame layout** clears manual corners and restores approximate screen positions. The mode is recorded as `frame-layout`, distinct from manual anchors. A raised phone can appear farther back; this does not measure seat depth.
 5. Select **Process uploaded recordings**. This saves your visible geometry edits before processing. Review the device IDs, positions, orientation and unresolved devices, then check the review box and **Commit reviewed map**. Changed geometry requires a new processing result before commit.
 
 Each camera maps its primary column into the corresponding third of the audience map. Missing recordings leave the other views unavailable; they do not block the views you have. A single camera assigned to center therefore places its devices in the center third. Region dividers can still split those devices into independent groups.
@@ -25,6 +25,8 @@ Open **Assign** after committing the map:
 Check the highlighted devices and selected count. Choose **Melody**, **Vocals**, or **Percussion**, then apply the assignment. Spatial regions and musical channels are independent: any selected group can receive any channel. Divider placement lasts while the Assign panel remains open; assignments are saved by the server.
 
 Column-only devices remain explicitly selectable below the map, but are excluded from spatial selections because their row positions are unknown. Older or unresolved devices are not silently given invented coordinates.
+
+The decoder accepts a bounded valid device code for the captured participant set and exact run tag, with no conflicting repeat or independent screen collision. An unreadable repeat, size change, or brief fragment of the same screen is a review warning rather than a veto. Conflicting codes, duplicate IDs/reflections and real crossings remain unresolved. Review warnings and the annotated image before committing.
 
 ## Verified local sample
 

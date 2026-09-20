@@ -68,7 +68,7 @@ const locationBase = {
   decodeScore: z.number().min(0).max(1).nullable(), mappingResidualPx: Milliseconds.nullable(),
 };
 export const Location = z.discriminatedUnion("status", [
-  z.strictObject({ ...locationBase, status: z.literal("localized"), x: z.number().min(0).max(1), y: z.number().min(0).max(1), mappingMode: z.enum(["manual-anchors", "overlap"]) }),
+  z.strictObject({ ...locationBase, status: z.literal("localized"), x: z.number().min(0).max(1), y: z.number().min(0).max(1), mappingMode: z.enum(["manual-anchors", "overlap", "frame-layout"]) }),
   z.strictObject({ ...locationBase, status: z.literal("coarse"), column: Column, x: z.null(), y: z.null(), mappingMode: z.enum(["manual-column", "optical-column"]) }),
   z.strictObject({ ...locationBase, status: z.literal("ambiguous"), x: z.null(), y: z.null(), mappingMode: z.literal("none") }),
   z.strictObject({ ...locationBase, status: z.literal("unseen"), x: z.null(), y: z.null(), mappingMode: z.literal("none") }),
@@ -91,6 +91,7 @@ export const CameraInput = z.strictObject({
   rotationDegrees: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
   exclusionRois: z.array(z.array(Point).min(3)),
   anchors: z.tuple([Point, Point, Point, Point]).nullable(),
+  frameLayout: z.enum(["from-stage", "from-back"]).optional(),
 });
 export const CalibrationManifest = CalibrationRun.extend({ cameras: z.array(CameraInput).min(1).max(3) });
 export const Observation = z.strictObject({

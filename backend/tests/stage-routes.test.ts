@@ -94,7 +94,7 @@ test("camera access cannot control the show and completes exact video bytes thro
   }
   const response = await json(`/api/camera/uploads/${uploadId}/complete`, {}, headers); expect(response.status).toBe(200);
   const receipt = await response.json();
-  expect(receipt).toMatchObject({ cameraId: "camera-left", primaryColumn: "left", byteSize: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });
+  expect(receipt).toMatchObject({ cameraId: "camera-left", primaryColumn: "left", anchors: null, frameLayout: "from-stage", byteSize: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });
   expect(run.uploads.size).toBe(1);
   expect(await Bun.file(deps.uploads.path(uploadId)!).arrayBuffer()).toEqual(bytes.buffer);
   expect(await (await json(`/api/camera/uploads/${uploadId}/complete`, {}, headers)).json()).toEqual(receipt);

@@ -91,7 +91,7 @@ def decode_word(symbols: Sequence[int | None]) -> WordDecode:
 def decode_packet(
     symbols: Sequence[int | None], run_tag: int, participant_ids: Set[int]
 ) -> PacketDecode:
-    """Require an exact header/tag and agreeing, independently valid ID passes."""
+    """Require exact header/tag, a bounded member ID, and no conflicting repeat."""
     _validate_symbols(symbols, PACKET_SYMBOLS)
     if type(run_tag) is not int or not 0 <= run_tag <= 255:
         raise ValueError("run_tag must be 0..255")
@@ -122,5 +122,6 @@ def decode_packet(
         return PacketDecode(None, "ambiguous", errors, erased, score, "identity passes conflict")
     device_id = next(iter(ids))
     if first.device_id is None or second.device_id is None:
-        return PacketDecode(device_id, "ambiguous", errors, erased, score, "single-pass review only")
+        return PacketDecode(device_id, "accepted", errors, erased, score,
+                            "single bounded pass; repeat unreadable")
     return PacketDecode(device_id, "accepted", errors, erased, score, "agreeing bounded passes")

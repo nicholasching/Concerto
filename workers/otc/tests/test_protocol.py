@@ -122,7 +122,7 @@ def test_tag_header_and_membership_are_not_repaired():
     assert decode_packet(packet(5), 37, {4, 6}).reason == "ID outside participant set"
 
 
-def test_conflicting_passes_and_single_pass_salvage_are_never_accepted():
+def test_conflicting_passes_are_rejected_but_one_valid_member_pass_is_accepted():
     conflict = packet(4)
     conflict[37:53] = packet(5)[37:53]
     assert decode_packet(conflict, 37, {4, 5}).status == "ambiguous"
@@ -130,8 +130,14 @@ def test_conflicting_passes_and_single_pass_salvage_are_never_accepted():
     one_pass = packet(4)
     one_pass[37:53] = [None] * 16
     result = decode_packet(one_pass, 37, {4})
-    assert result.status == "ambiguous"
-    assert result.device_id == 4  # Review candidate only.
+    assert result.status == "accepted"
+    assert result.device_id == 4
+    assert result.reason == "single bounded pass; repeat unreadable"
+    assert result.score < 1
+    assert decode_packet(one_pass, 37, {5}).status == "rejected"
+    assert decode_packet(one_pass, 38, {4}).status == "rejected"
+    one_pass[21:37] = [None] * 16
+    assert decode_packet(one_pass, 37, {4}).status == "rejected"
 
 
 def test_both_passes_accept_independent_bounded_damage():

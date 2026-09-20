@@ -2,6 +2,7 @@
 
 Date / author / team: 2026-09-19, integration captain.
 Status: accepted under the user's mapping/integration request.
+Update: the explicit-opt-in frame-preset requirement is superseded by [automatic frame layout](20260919-automatic-frame-layout.md); historical rationale below is retained.
 Affected teams: admin-console, otc-localization. No wire contract change.
 
 ## Context

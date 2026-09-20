@@ -78,3 +78,30 @@ def test_preamble_verified_but_interrupted_phone_stays_visible_as_rejected():
     seen, _, _, _ = observations([phone])
     assert len(seen) == 1
     assert seen[0]["status"] == "rejected" and seen[0]["deviceId"] is None
+
+
+def test_valid_identity_survives_size_changes_and_unverified_in_screen_fragments():
+    phone = packet_track()
+    phone.reasons = {"abrupt screen size change", "ambiguous screen association or merge"}
+    phone.collisions = [(4500, "exposure-band", False)]
+    seen, _, _, _ = observations([phone])
+    assert (seen[0]["deviceId"], seen[0]["status"]) == (31, "accepted")
+    assert "abrupt screen size change" in seen[0]["reasons"]
+
+
+def test_independent_screen_collision_rejects_even_an_otherwise_valid_identity():
+    phone = packet_track()
+    phone.collisions = [(4500, "other-screen", True)]
+    seen, _, _, _ = observations([phone])
+    assert seen[0]["status"] == "ambiguous"
+    assert "independent screen tracks collided during packet" in seen[0]["reasons"]
+    phone.collisions = [(12000, "other-screen", True)]
+    assert observations([phone])[0][0]["status"] == "accepted"  # After packet, no taint.
+
+
+def test_a_verified_competing_packet_blocks_even_nested_footprints():
+    phone, other = packet_track(), packet_track()
+    other.track_id = "nested-phone"
+    phone.collisions = [(4500, other.track_id, False)]
+    seen, _, _, _ = observations([phone, other])
+    assert seen[0]["status"] == "ambiguous"

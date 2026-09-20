@@ -7,7 +7,7 @@ import type { AdminSnapshotData, OtcResultData } from "@orchestra/contracts";
 import { MapPanel } from "./MapPanel";
 import { CameraGeometry } from "./CameraGeometry";
 import { jobMessage } from "../lib/job-message";
-import { anchorsError, usesFrameAnchors } from "../lib/camera-geometry";
+import { anchorsError, cameraGeometry, sameGeometry, usesFrameAnchors } from "../lib/camera-geometry";
 
 interface Slot { cameraId: string; column: Column | null; file: File | null; geometry: Geometry | null; progress: number; busy: boolean; error: string | null }
 const columns: Column[] = ["left", "center", "right"];
@@ -100,7 +100,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
       const slot = resolvedSlot(slots.findIndex(item => item.cameraId === uploaded.cameraId));
       const invalid = anchorsError(slot.geometry.anchors); if (invalid) throw new Error(invalid);
       // A process request includes the visible geometry edits, even if the separate Save button was missed.
-      if (slot.column !== uploaded.primaryColumn || JSON.stringify(slot.geometry) !== JSON.stringify({ rotationDegrees: uploaded.rotationDegrees, anchors: uploaded.anchors, exclusionRois: uploaded.exclusionRois })) {
+      if (slot.column !== uploaded.primaryColumn || !sameGeometry(slot.geometry, uploaded)) {
         await adapter.updateCamera(run.plan.runId, uploaded.uploadId, slot.column, slot.geometry);
       }
     }
@@ -111,13 +111,11 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   function resolvedSlot(index: number) {
     const slot = slots[index];
     const uploaded = run?.uploads.find(upload => upload.cameraId === slot.cameraId);
-    return { ...slot, column: slot.column ?? uploaded?.primaryColumn ?? columns[index], geometry: slot.geometry ?? {
-      rotationDegrees: uploaded?.rotationDegrees ?? 0, anchors: uploaded?.anchors ?? null, exclusionRois: uploaded?.exclusionRois ?? [],
-    } };
+    return { ...slot, column: slot.column ?? uploaded?.primaryColumn ?? columns[index], geometry: slot.geometry ?? cameraGeometry(uploaded) };
   }
   const geometryDirty = selectedUploads.some(uploaded => {
     const slot = resolvedSlot(slots.findIndex(item => item.cameraId === uploaded.cameraId));
-    return slot.column !== uploaded.primaryColumn || JSON.stringify(slot.geometry) !== JSON.stringify({ rotationDegrees: uploaded.rotationDegrees, anchors: uploaded.anchors, exclusionRois: uploaded.exclusionRois });
+    return slot.column !== uploaded.primaryColumn || !sameGeometry(slot.geometry, uploaded);
   });
   const activeJob = progress && !["complete", "failed", "cancelled"].includes(progress.stage);
   const now = tick >= 0 && clockReady() ? nowServerMs() : null;
@@ -146,7 +144,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
           <CameraGeometry file={slot.file} preview={previews[previewIndex] ? { url: previews[previewIndex], rotationDegrees: uploaded?.rotationDegrees ?? 0 } : undefined}
             value={slot.geometry} disabled={busy || !!activeJob} onChange={geometry => setSlots(current => current.map((item, i) => i === index ? { ...item, geometry } : item))} />
           <button disabled={!slot.file || slot.busy || !!uploaded || !finishedCapture} onClick={() => void upload(index)}>{uploaded ? "Uploaded and hashed" : slot.busy ? `Uploading ${Math.round(slot.progress * 100)}%` : "Upload recording"}</button>
-          {uploaded && <p>{uploaded.label} · {(uploaded.byteSize / 1e6).toFixed(1)} MB · {uploaded.anchors ? "seating transform saved" : "Column only — set seating corners above for map positions"}</p>}
+          {uploaded && <p>{uploaded.label} · {(uploaded.byteSize / 1e6).toFixed(1)} MB · {uploaded.anchors ? "Seating corners saved" : "Automatic approximate frame layout"}</p>}
           {uploaded && <label><input type="checkbox" disabled={!!activeJob || busy} checked={!excludedUploads.includes(uploaded.uploadId)} onChange={event => {
             setExcludedUploads(current => event.target.checked ? current.filter(id => id !== uploaded.uploadId) : [...current, uploaded.uploadId]);
             setCandidate(null); setChecked(false); setJobId(null); setProgress(null); setDiagnostics([]);
@@ -169,9 +167,9 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
       {activeJob && jobId && <button onClick={() => void act(() => adapter.cancelJob(jobId))}>Cancel processing</button>}
       {candidate && snapshot && <div><h3>Candidate map — awaiting your review</h3>
         {geometryDirty && <p role="alert">Camera geometry has changed. Process the recordings again before committing this map.</p>}
-        <p>Evidence: {candidate.evidence}. {decodedCount} devices decoded; {candidate.locations.filter(location => location.status === "localized").length} with seat coordinates; {candidate.locations.filter(location => location.status === "coarse").length} with column only. {candidate.locations.length} eligible phones. Processing {(candidate.processingMs / 1000).toFixed(1)} s.</p>
-        {candidate.cameras.some(camera => usesFrameAnchors(run.uploads.find(upload => upload.cameraId === camera.cameraId)?.anchors ?? null, camera.frameWidth, camera.frameHeight)) && <p role="status">Approximate frame layout: dots follow the recorded screens. A raised phone can appear farther back. Mark the actual seating corners and hold phones at a consistent height for better row placement.</p>}
-        {candidate.locations.some(location => location.status === "coarse") && <p role="status">Decoded IDs are ready. Set four seating corners on each camera frame above, or use the approximate frame preset, then process again to place them on the map.</p>}
+        <p>Evidence: {candidate.evidence}. {decodedCount} devices accepted; {candidate.locations.filter(location => location.status === "localized").length} with map positions; {candidate.locations.filter(location => location.status === "coarse").length} with column only. {candidate.locations.length} eligible phones. Processing {(candidate.processingMs / 1000).toFixed(1)} s.</p>
+        {(candidate.locations.some(location => location.mappingMode === "frame-layout") || candidate.cameras.some(camera => usesFrameAnchors(run.uploads.find(upload => upload.cameraId === camera.cameraId)?.anchors ?? null, camera.frameWidth, camera.frameHeight))) && <p role="status">Approximate frame layout: dots follow the recorded screens. A raised phone can appear farther back. Mark the actual seating corners and hold phones at a consistent height for better row placement.</p>}
+        {candidate.locations.some(location => location.status === "coarse") && <p role="status">This result predates the automatic layout. Process the recordings again to place decoded phones on the map.</p>}
         <MapPanel map={{ mapRevision: candidateRevision, runId: candidate.runId, evidence: candidate.evidence, locations: candidate.locations }} assignments={[]} channels={snapshot.show.channels} drawable={false} />
         {candidate.cameras.map((camera, index) => <details key={camera.cameraId}><summary>{camera.cameraId}: {camera.acceptedTracks} accepted / {camera.rejectedTracks} rejected</summary>
           {previews[index] && <img src={previews[index]} alt={`Decoded tracks for ${camera.cameraId}`} style={{ width: "100%" }} />}

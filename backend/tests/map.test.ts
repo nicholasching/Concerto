@@ -99,7 +99,7 @@ const operator = (app: Harness["app"], path: string, body: Record<string, unknow
   });
 
 // Drives a whole run: create, acknowledge, arm, upload, process.
-const runThrough = async (context: Harness, options: { participantIds: number[]; commandPrefix: string }) => {
+const runThrough = async (context: Harness, options: { participantIds: number[]; commandPrefix: string; frameLayout?: "from-stage" | "from-back" }) => {
   const created = await (await operator(context.app, "/api/calibrations", {
     commandId: `${options.commandPrefix}-run`, expectedRevision: 0, participantIds: options.participantIds,
     palette: { zero: "#1020ff", one: "#ff2010", neutral: "#101010" }, paletteVersion: "palette-v1",
@@ -118,6 +118,7 @@ const runThrough = async (context: Harness, options: { participantIds: number[];
   const query = new URLSearchParams({
     commandId: `${options.commandPrefix}-upload`, cameraId: "camera-left", primaryColumn: "left",
     rotationDegrees: "0", byteSize: "64", label: "clip.mp4",
+    ...(options.frameLayout ? { frameLayout: options.frameLayout } : {}),
   });
   const upload = await (await context.app.request(`/api/calibrations/${runId}/uploads?${query}`, {
     method: "POST", headers: { "x-operator-secret": SECRET }, body: bytes.buffer as ArrayBuffer,
@@ -144,6 +145,26 @@ const commitMap = (context: Harness, options: {
   });
 
 describe("committing a map", () => {
+  test("automatic layout reaches the worker and an orientation edit invalidates its candidate", async () => {
+    const context = harness(workerWriting(manifest => resultFor(manifest, [
+      { ...localized(0, .2, .6), mappingMode: "frame-layout" },
+    ])));
+    const { runId, jobId } = await runThrough(context, { participantIds: [0], commandPrefix: "frame", frameLayout: "from-stage" });
+    const job = context.jobs.get(jobId)!;
+    expect(job.stage).toBe("complete");
+    expect(job.manifest.cameras[0].frameLayout).toBe("from-stage");
+    expect(job.result!.locations[0].mappingMode).toBe("frame-layout");
+    const upload = [...context.calibrations.get(runId)!.uploads.values()][0];
+    const patched = await context.app.request(`/api/calibrations/${runId}/uploads/${upload.uploadId}`, {
+      method: "PATCH", headers: { "content-type": "application/json", "x-operator-secret": SECRET },
+      body: JSON.stringify({ primaryColumn: "left", rotationDegrees: 0, anchors: null, frameLayout: "from-back", exclusionRois: [] }),
+    });
+    expect(patched.status).toBe(200);
+    const response = await commitMap(context, { runId, jobId, commandId: "stale-layout" });
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("STALE_GEOMETRY");
+    expect(context.state.mapRevision).toBe(0);
+  });
   test("a late interrupted-pattern report invalidates a candidate that included that phone", async () => {
     const context = harness(workerWriting(manifest => resultFor(manifest, [localized(0, 0.2, 0.6)])));
     const { runId, jobId } = await runThrough(context, { participantIds: [0], commandPrefix: "late-report" });

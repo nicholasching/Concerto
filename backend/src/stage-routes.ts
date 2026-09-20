@@ -167,7 +167,7 @@ export function registerStageRoutes(app: Hono, deps: AppDeps, persist: () => Pro
         await deps.uploads.discard(transfer.id); return c.json(problem("UPLOAD_CONFLICT", "The calibration changed while the video finished."), 409);
       }
       const upload = { uploadId: transfer.id, runId: transfer.runId, cameraId: `camera-${transfer.column}`, primaryColumn: transfer.column,
-        rotationDegrees: transfer.rotationDegrees, anchors: null, exclusionRois: [], label: transfer.label, ...written };
+        rotationDegrees: transfer.rotationDegrees, anchors: null, frameLayout: "from-stage" as const, exclusionRois: [], label: transfer.label, ...written };
       deps.calibrations.addUpload(upload); transfer.receipt = upload;
       for (const chunk of transfer.chunks.values()) await deps.uploads.discard(chunk.id);
       transfer.chunks.clear();

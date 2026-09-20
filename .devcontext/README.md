@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Five-phone positioning follow-up
+
+All outstanding UI work was committed/pushed as **eb274b3** before debugging. Decoder v1.6 now accepts all five valid devices in the supplied PXL recording; new uploads automatically request approximate stage-facing map positions. The user's broader valid-code/no-collision policy is implemented with explicit warnings, retained run/membership/collision checks, and a distinct frame-layout mode. Read [evidence and handoff](teams/integration/journal/20260919-five-phone-positioning.md), [geometry decision](decisions/20260919-automatic-frame-layout.md), and [acceptance decision](decisions/20260919-valid-code-acceptance.md). Earlier manual-preset requirements are historical.
+
 ### Stage dashboard update, 2026-09-19
 
 The mapping checkpoint was committed and pushed as **f71cb1e** before the UI work. The new shared-origin stage workflow is documented in the [operator guide](../docs/stage-dashboard.md), [decision](decisions/20260919-single-domain-stage-workflow.md), and [verification journal](teams/integration/journal/20260919-stage-dashboard.md). Audience `/`, admin `/admin`, projector `/present` and phone recordings `/upload` share one origin. Reset, one-page operation, automatic audience readiness and post-calibration section fallback are implemented. The journal separates unit/build evidence, production browser checks and outstanding physical rehearsal. It also records the live upload-route compatibility fix without restarting the user's active calibration.

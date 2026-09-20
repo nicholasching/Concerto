@@ -1,5 +1,7 @@
 # Integration status
 
+Latest follow-up: UI checkpoint **eb274b3** pushed before the five-phone investigation. Decoder **v1.6** and automatic stage-facing frame layout recover all five phones with coordinates; broader acceptance follows the user's explicit direction. Read [current evidence and runtime handoff](journal/20260919-five-phone-positioning.md). The previous map-revision/active-process details below are historical snapshots.
+
 Status: verified for local software, 2026-09-19. Physical rehearsal not started.
 Owner: integration captain / main / foundation-v1 plus all four development branches.
 

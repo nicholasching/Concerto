@@ -62,6 +62,25 @@ def test_rotation_and_variable_timestamps_preserve_identity_and_position(capture
         assert result["cameras"][1]["frameHeight"] == truth["height"]
 
 
+def test_uploaded_frame_layout_uses_decoded_rotated_dimensions_without_manual_corners(capture):
+    path, original, truth = capture("rotated", count=6)
+    manifest = copy.deepcopy(original)
+    manifest["cameras"] = [manifest["cameras"][1]]
+    manifest["cameras"][0].update(anchors=None, frameLayout="from-stage")
+    result = process_manifest(manifest, path, "synthetic")
+    assert result["cameras"][0]["frameWidth"] == truth["width"]
+    assert result["cameras"][0]["frameHeight"] == truth["height"]
+    localized = {p["deviceId"]: p for p in result["locations"] if p["status"] == "localized"}
+    accepted = [o for o in result["observations"] if o["status"] == "accepted"]
+    assert localized and len(localized) == len(accepted)
+    for observation in accepted:
+        location = localized[observation["deviceId"]]
+        x, y = observation["centerPx"]["x"], observation["centerPx"]["y"]
+        assert location["mappingMode"] == "frame-layout"
+        assert np.allclose([location["x"], location["y"]],
+                           [(1+(1-x/(truth["width"]-1)))/3, 1-y/(truth["height"]-1)])
+
+
 @pytest.mark.parametrize("fps", [24, 60])
 def test_supported_frame_rates_use_pts(capture, fps):
     path, manifest, truth = capture(count=6, fps=fps)

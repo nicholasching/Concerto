@@ -154,7 +154,7 @@ export function MapPanel({ map, assignments, channels, drawable, selection, onSe
       <p className="muted">Stage at top. Audience-left is on the left while facing the stage. Evidence: {map.evidence}. Map revision: {map.mapRevision}.</p>
       <p>{map.locations.filter(location => location.status === "localized").length} devices with map positions. {drawable && "Click a device, draw a box/lasso, or use the region dividers."}</p>
       {map.locations.some(location => location.status === "localized") && <p className="muted">Positions estimate the audience layout from camera images. Verify front/back placement against known seats before the performance.</p>}
-      {!map.locations.some(location => location.status === "localized") && <p role="status">No seat coordinates yet. Decoded column-only devices are listed below; set camera seating corners in Calibration and commit the reviewed map to enable spatial selection.</p>}
+      {!map.locations.some(location => location.status === "localized") && <p role="status">No map positions yet. Process recordings in Calibration and commit the reviewed map to enable spatial selection. Approximate frame positions are automatic; seating corners are optional.</p>}
       <canvas
         ref={canvasRef} width={W} height={H}
         style={{ width: "100%", background: "#101724", borderRadius: 8, cursor: drawable ? "crosshair" : "default", touchAction: "none" }}

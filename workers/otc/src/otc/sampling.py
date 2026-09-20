@@ -135,10 +135,14 @@ def decode_tracks(scan, manifest, camera_id):
         center = np.median(centers, axis=0)
         status = decoded.status if decoded else "rejected"
         reasons = sorted(track.reasons) + [reason]
-        if track.reasons and decoded and decoded.device_id is not None:
+        # Valid codes survive size changes and transient pieces of their own
+        # screen. Block actual crossing/merging phones, not generic track warnings.
+        collision = any(sampled.phase_ms + 2*SYMBOL_MS <= pts < sampled.phase_ms + 53*SYMBOL_MS
+                        and (separate or fitted.get(peer) is not None)
+                        for pts, peer, separate in track.collisions)
+        if collision and decoded and decoded.device_id is not None:
             status = "ambiguous"
-        elif track.reasons:
-            status = "rejected"
+            reasons.append("independent screen tracks collided during packet")
         observations.append({
             "cameraId": camera_id, "trackId": track.track_id,
             "deviceId": decoded.device_id if decoded else None, "status": status,

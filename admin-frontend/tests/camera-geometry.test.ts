@@ -1,5 +1,14 @@
 import { expect, test } from "bun:test";
-import { anchorsError, frameAnchors, usesFrameAnchors } from "../src/lib/camera-geometry";
+import { anchorsError, cameraGeometry, sameGeometry, frameAnchors, usesFrameAnchors } from "../src/lib/camera-geometry";
+
+test("new and legacy phone uploads request automatic layout on process while saved orientation survives reload", () => {
+  const legacy = { rotationDegrees: 0 as const, anchors: null, exclusionRois: [] };
+  expect(cameraGeometry()).toEqual({ ...legacy, frameLayout: "from-stage" });
+  expect(sameGeometry(cameraGeometry(legacy), legacy)).toBe(false);
+  const saved = { ...legacy, frameLayout: "from-back" as const };
+  expect(sameGeometry(cameraGeometry(saved), saved)).toBe(true);
+  expect(cameraGeometry({ ...saved, anchors: frameAnchors(100, 100, "from-stage") }).anchors).toEqual(frameAnchors(100, 100, "from-stage"));
+});
 
 test("stage-facing frame preset mirrors audience-left and places the near edge at the front", () => {
   expect(frameAnchors(1920, 1080, "from-stage")).toEqual([
