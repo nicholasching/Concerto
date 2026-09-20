@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101317">
+    <title>Phone detection boxing</title>
+    <link rel="stylesheet" href="/detection-boxing/styles.css">
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">DEBUG PHONE · LOCAL ONLY</p>
+      <h1>Phone detection boxing</h1>
+      <p class="intro">Upload one red/blue flash clip to run the current tracker with the diagnostic palette check. Cyan dots show visual tracks; a green box appears only after the same track shows red and blue twice. Neither is a decoded device ID or audience-map result.</p>
+
+      <form id="boxing-form">
+        <label>Video clip <input id="video" name="video" type="file" accept="video/*" required></label>
+        <label>Clockwise rotation
+          <select name="rotationDegrees">
+            <option value="0">No rotation</option>
+            <option value="90">90°</option>
+            <option value="180">180°</option>
+            <option value="270">270°</option>
+          </select>
+        </label>
+        <p class="limit">Maximum 512 MiB. Files and results stay in ignored local runtime storage.</p>
+        <button type="submit">Create boxed video</button>
+      </form>
+
+      <p id="status" role="status" hidden></p>
+      <section id="result" hidden>
+        <h2>Annotated result</h2>
+        <p id="summary"></p>
+        <video id="output" controls playsinline></video>
+        <p><a id="download" download="boxed.mp4">Download boxed video</a></p>
+      </section>
+    </main>
+    <script type="module" src="/detection-boxing/app.js"></script>
+  </body>
+</html>

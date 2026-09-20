@@ -1,0 +1,18 @@
+:root { color-scheme: dark; background: #101317; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; color: #f5f8f7; }
+main { width: min(100% - 40px, 760px); margin: 0 auto; padding: 64px 0; }
+.eyebrow { color: #9dd9b1; font-size: 12px; font-weight: 800; letter-spacing: .16em; }
+h1 { margin: 0; font-size: clamp(34px, 8vw, 64px); }
+.intro, .limit { color: #c4cdc8; line-height: 1.6; }
+form, #result { margin-top: 32px; border: 1px solid #405148; border-radius: 12px; padding: 22px; background: #171d1a; }
+label { display: grid; gap: 8px; margin-bottom: 18px; font-weight: 700; }
+input, select, button { font: inherit; }
+input, select { width: 100%; border: 1px solid #53615a; border-radius: 7px; padding: 10px; background: #101317; color: inherit; }
+button { border: 0; border-radius: 8px; padding: 12px 16px; background: #d7ffe8; color: #102017; cursor: pointer; font-weight: 800; }
+button:disabled { cursor: wait; opacity: .7; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #7ab8ff; outline-offset: 3px; }
+#status { margin-top: 20px; color: #b7f4cc; }
+#status.error { color: #ffb4a6; }
+#result video { display: block; width: 100%; max-height: 70svh; margin-top: 16px; background: #000; }
+a { color: #a9d7ff; }
