@@ -7,7 +7,6 @@ import tempfile
 
 import av
 import cv2
-import numpy as np
 
 from .red_blue_diagnostic import (
     SELECTED_TRACK_MAX_AGE_MS,
@@ -23,6 +22,8 @@ from .video import read_frames
 CYAN = (0, 220, 255)
 GREEN = (0, 220, 0)
 MAGENTA = (255, 0, 255)
+MIN_PALETTE_TRACK_COVERAGE = .10
+MIN_PALETTE_COMPONENT_OVERLAP = .65
 
 
 def _frame_key(pts_ms):
@@ -47,21 +48,48 @@ def _rectangle(frame, sample, color, label=None):
                     .45, color, 1, cv2.LINE_AA)
 
 
-def _palette_sample(rgb, red, blue, sample):
-    """Keep stable geometry but take colour evidence only from its palette pixels."""
-    height, width = rgb.shape[:2]
-    x0 = max(0, round(sample.x - sample.width / 2))
-    y0 = max(0, round(sample.y - sample.height / 2))
-    x1 = min(width, x0 + sample.width)
-    y1 = min(height, y0 + sample.height)
-    region = rgb[y0:y1, x0:x1]
-    red_mask = red[y0:y1, x0:x1] != 0
-    blue_mask = blue[y0:y1, x0:x1] != 0
-    mask = red_mask if np.count_nonzero(red_mask) >= np.count_nonzero(blue_mask) else blue_mask
-    if np.count_nonzero(mask) < 4:
-        return sample
-    color = tuple(float(value) for value in np.median(region[mask], axis=0))
-    return Sample(sample.pts_ms, sample.x, sample.y, sample.width, sample.height, color)
+def _overlap_area(first, second):
+    """Return the intersection area of two centre/width/height samples."""
+    width = max(0, min(first.x + first.width / 2, second.x + second.width / 2)
+                - max(first.x - first.width / 2, second.x - second.width / 2))
+    height = max(0, min(first.y + first.height / 2, second.y + second.height / 2)
+                 - max(first.y - first.height / 2, second.y - second.height / 2))
+    return width * height
+
+
+def _palette_evidence_by_track(rgb, pts_ms, red, blue, screen_tracks):
+    """Assign each palette component to one compatible screen footprint.
+
+    Colour inside a broad candidate is not enough: the coloured component must
+    cover a material part of the screen box and mostly lie within it. This
+    prevents a large wall/door track from inheriting a small phone's colours.
+    """
+    best_by_track = {}
+    for palette_mask in (red, blue):
+        for component, _bounds, _mask in _screen_components(rgb, pts_ms, palette_mask):
+            component_area = component.width * component.height
+            choices = []
+            for track_id, screen in screen_tracks:
+                overlap = _overlap_area(component, screen)
+                screen_area = screen.width * screen.height
+                coverage = overlap / screen_area
+                component_overlap = overlap / component_area
+                if (coverage < MIN_PALETTE_TRACK_COVERAGE or
+                        component_overlap < MIN_PALETTE_COMPONENT_OVERLAP):
+                    continue
+                union = component_area + screen_area - overlap
+                choices.append((overlap / union, coverage, track_id, screen))
+            if not choices:
+                continue
+            # The strongest geometric match owns this coloured blob. It cannot
+            # also supply red/blue evidence to a containing ghost track.
+            score, coverage, track_id, screen = max(choices)
+            previous = best_by_track.get(track_id)
+            if previous is None or (score, coverage) > previous[:2]:
+                best_by_track[track_id] = (score, coverage, Sample(
+                    pts_ms, screen.x, screen.y, screen.width, screen.height, component.rgb
+                ))
+    return {track_id: evidence[-1] for track_id, evidence in best_by_track.items()}
 
 
 def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
@@ -113,10 +141,19 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
                 annotated[palette != 0] = rgb[palette != 0]
                 for sample in _masked_screens(rgb, pts_ms, flash):
                     _rectangle(annotated, sample, MAGENTA)
-                for track_id, sample in boxes_by_frame.get(key, []):
+                frame_tracks = boxes_by_frame.get(key, [])
+                palette_evidence = _palette_evidence_by_track(
+                    rgb, pts_ms, red, blue, frame_tracks
+                )
+                for track_id, sample in frame_tracks:
                     cv2.circle(annotated, (round(sample.x), round(sample.y)), 3, CYAN, -1)
+                    evidence = palette_evidence.get(track_id)
+                    # Qualification receives colour only from an exclusively
+                    # owned, scale-compatible palette component. Generic track
+                    # colour cannot turn a broad enclosing candidate green.
+                    color = evidence.rgb if evidence else (0.0, 0.0, 0.0)
                     qualification_tracks.setdefault(track_id, Track(track_id)).samples.append(
-                        _palette_sample(rgb, red, blue, sample)
+                        Sample(sample.pts_ms, sample.x, sample.y, sample.width, sample.height, color)
                     )
                 current_tracks = list(qualification_tracks.values())
                 for track in current_tracks:

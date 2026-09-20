@@ -2,10 +2,11 @@ from pathlib import Path
 
 import numpy as np
 
-from otc.boxing import box_video
+from otc.boxing import _palette_evidence_by_track, box_video
 from otc.red_blue_diagnostic import (
     DEFAULT_PALETTE_SETTINGS,
     carry_qualification_to_current_fragment,
+    palette_masks,
     track_has_both_palette_colors,
 )
 from otc.tracking import Sample, Track
@@ -51,3 +52,21 @@ def test_red_blue_qualification_requires_both_colors_and_follows_one_fragment():
     qualified_ids = {qualified.track_id}
     carry_qualification_to_current_fragment([qualified, replacement], qualified_ids, 320)
     assert qualified_ids == {replacement.track_id}
+
+
+def test_palette_evidence_is_exclusive_and_rejects_an_enclosing_ghost_track():
+    rgb = np.zeros((120, 120, 3), dtype=np.uint8)
+    rgb[40:60, 50:65] = (255, 0, 0)
+    red, blue = palette_masks(rgb)
+    tracks = [
+        ("phone", Sample(0, 57, 49, 15, 20, (0, 0, 0))),
+        ("nearby-fragment", Sample(0, 58, 50, 16, 20, (0, 0, 0))),
+        ("large-enclosing-ghost", Sample(0, 60, 60, 100, 100, (0, 0, 0))),
+    ]
+
+    evidence = _palette_evidence_by_track(rgb, 0, red, blue, tracks)
+
+    # The exact phone footprint owns the red blob. The near match cannot share
+    # it, and the large candidate fails the minimum colour-coverage requirement.
+    assert set(evidence) == {"phone"}
+    assert evidence["phone"].rgb == (255.0, 0.0, 0.0)
