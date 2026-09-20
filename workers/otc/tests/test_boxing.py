@@ -76,11 +76,18 @@ def test_pending_flash_sequence_does_not_cross_a_long_gap_or_fragment():
     assert not _observe_phase(sequence, "red", 560)
     assert not _observe_phase(sequence, "blue", 760)
 
-    replacement = Track("replacement", [Sample(320, 10, 10, 20, 20, (0, 102, 255))])
+    replacement = Track("replacement", [Sample(320, 10, 10, 12, 16, (0, 102, 255))])
     qualified = Track("qualified", [Sample(300, 10, 10, 8, 12, (255, 0, 0))])
     qualified_ids = {qualified.track_id}
     carry_qualification_to_current_fragment([qualified, replacement], qualified_ids, 320)
     assert qualified_ids == {replacement.track_id}
+
+    broad_replacement = Track("broad", [Sample(320, 10, 10, 30, 30, (0, 102, 255))])
+    qualified_ids = {qualified.track_id}
+    assert carry_qualification_to_current_fragment(
+        [qualified, broad_replacement], qualified_ids, 320
+    ) == []
+    assert qualified_ids == {qualified.track_id}
 
 
 def test_palette_evidence_is_exclusive_and_rejects_an_enclosing_ghost_track():

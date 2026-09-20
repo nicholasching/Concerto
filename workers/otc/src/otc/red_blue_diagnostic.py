@@ -32,6 +32,9 @@ PHASE_MIN_SAMPLES = 2
 PHASE_MIN_DURATION_MS = 50
 PHASE_MAX_GAP_MS = 100
 REQUIRED_FLASH_SEQUENCE = ("red", "blue", "red", "blue")
+FRAGMENT_HANDOFF_MIN_AREA_RATIO = .5
+FRAGMENT_HANDOFF_MAX_AREA_RATIO = 2.0
+FRAGMENT_HANDOFF_MIN_OVERLAP = .35
 
 
 @dataclass
@@ -168,9 +171,9 @@ def carry_qualification_to_current_fragment(tracks, qualified_track_ids, now_ms)
                                 - max(previous.x - previous.width / 2, current.x - current.width / 2))
             overlap_height = max(0, min(previous.y + previous.height / 2, current.y + current.height / 2)
                                  - max(previous.y - previous.height / 2, current.y - current.height / 2))
-            if (.2 <= area_ratio <= 6 and
+            if (FRAGMENT_HANDOFF_MIN_AREA_RATIO <= area_ratio <= FRAGMENT_HANDOFF_MAX_AREA_RATIO and
                     overlap_width * overlap_height >= min(previous.width * previous.height,
-                                                          current.width * current.height) * .1):
+                                                          current.width * current.height) * FRAGMENT_HANDOFF_MIN_OVERLAP):
                 parents.append(parent.track_id)
         if len(parents) == 1:
             links.setdefault(parents[0], []).append(child.track_id)

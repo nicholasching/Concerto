@@ -177,3 +177,22 @@ changing the production detector or identity policy.
   fragment and for ambiguous/expired rejection. The local HTTP red/blue upload
   completed with 3 logical detections, 780 green-box frames, and an HTTP 200
   result video. No full gate was run.
+
+## Real-scene fragment-handoff tuning
+
+- User supplied a 14.1-second, 1920x1080 clip that showed a phone-sized green
+  box at 5.0 seconds followed by a much larger green box around clothing/seat
+  pixels at 5.5 seconds. This was not clothing independently passing temporal
+  qualification.
+- Root cause: `carry_qualification_to_current_fragment()` transferred an
+  already-qualified phone to an enclosing raw candidate. Its old acceptance
+  range allowed area ratios from 0.2--6.0 with only 10% overlap; the observed
+  phone-sized to broad-fragment jump fit that rule.
+- Tuned the direct handoff to area ratio 0.5--2.0 and at least 35% overlap of
+  the smaller footprint, matching the conservative recovery scale. A focused
+  regression retains a compatible fragment handoff and rejects a 5x broad
+  replacement.
+- Checks: boxing tests passed (8) and worker Ruff passed. Reprocessing the
+  exact source clip completed with 424 frames, 3 logical detections and 544
+  green-box frames. Visual inspection at the same 5.5-second point confirmed
+  the oversized enclosing green box is absent. No full gate was run.
