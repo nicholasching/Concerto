@@ -61,3 +61,31 @@ red/blue temporal detector.
 - Physical camera evidence, and any decision to replace the normal production
   identity-decoding path with the diagnostic `box-video` path, remain outside
   this merge and require an explicit follow-up.
+
+## Scope correction
+
+The user clarified that this branch must make the normal OTC worker use the
+complete `phone-detection` algorithm, not merely expose it beside the old
+pipeline. The intended behavior is the current red/blue palette-only detector
+with its ordered red-blue-red-blue qualification and session recovery. The
+user explicitly does not require legacy amber-hue compatibility. The next
+change will remove the generic screen detector from the production red/blue
+path while retaining main's bounded parallel frame scheduling around the
+replacement detector.
+
+## Replacement implementation and focused evidence
+
+- `camera_worker.process_camera` now calls `boxing.scan_phone_detection_camera`; it no longer calls the old generic `tracking.scan_camera` path.
+- The new scanner shares phone-detection's palette-component finder, exclusive component ownership, ordered flash sequence, qualified-session handoff and recovery helpers. It exposes only confirmed `flash-*` sessions to packet decoding. The bounded frame worker still performs independent palette component analysis; tracking and session state remain PTS ordered.
+- Focused Ruff passed. `test_boxing.py` passed 12 tests, including a new equivalence check: the scan and `box-video` report the same confirmed-session count on a red/blue capture.
+- The first normal red/blue production test decoded all expected IDs and positions. Its old final assertion expected a generic candidate to be rejected for a red/blue preamble. That is intentionally absent now because generic bright/dim candidates no longer enter the replacement detector; the assertion now requires no ignored generic candidate.
+- The red/blue production round-trip passed at 24, 30 and 60 fps. A current `otc-v2` clean capture also passed. An older synthetic amber fixture still localized its expected phones under the palette-only scanner; it exposed the same obsolete generic-candidate assertion, which now likewise requires no ignored generic candidate. The user does not require legacy palette tuning; this is retained regression coverage, not a fallback to the old generic detector.
+
+## Final implementation direction
+
+At the user's direction, removed the now-unused generic `detect_screens` and
+`scan_camera` production implementation and its old-only test file. The only
+production camera scan entry point is `scan_phone_detection_camera`, which is
+built from the current phone-detection branch's red/blue palette-only logic.
+The next activity is a manual integrated-app check, not further regression
+test expansion.

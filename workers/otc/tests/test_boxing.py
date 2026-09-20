@@ -10,6 +10,7 @@ from otc.boxing import (
     _palette_screens,
     _recovery_session,
     box_video,
+    scan_phone_detection_camera,
 )
 from otc.red_blue_diagnostic import (
     FlashSequence,
@@ -46,6 +47,18 @@ def test_box_video_tracks_palette_components_and_writes_visible_boxes(capture, t
                          & (rgb[:, :, 1] > 130)) > 20
         for _, rgb in read_frames(output)
     )
+
+
+def test_production_scan_uses_the_same_confirmed_phone_sessions_as_boxing(capture, tmp_path):
+    _path, manifest, _truth = capture(count=6, red_blue=True)
+    source = Path(manifest["cameras"][0]["videoPath"])
+    summary = box_video(source, tmp_path / "boxed.mp4")
+
+    scan = scan_phone_detection_camera(source, manifest["cameras"][0], zero_color="#FF0000")
+
+    assert len(scan.tracks) == summary["qualifiedTrackCount"]
+    assert scan.tracks
+    assert all(track.track_id.startswith("flash-") for track in scan.tracks)
 
 
 def _observe_phase(sequence, color, started_ms):

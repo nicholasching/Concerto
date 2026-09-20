@@ -1,8 +1,9 @@
 """Render local red/blue palette tracks as a diagnostic video."""
 
-from contextlib import ExitStack
+from contextlib import ExitStack, closing
 from dataclasses import dataclass
 from fractions import Fraction
+from functools import partial
 from math import hypot
 from pathlib import Path
 import tempfile
@@ -14,10 +15,12 @@ import numpy as np
 from .red_blue_diagnostic import (
     DEFAULT_PALETTE_SETTINGS,
     FlashSequence,
+    PaletteSettings,
     carry_qualification_to_current_fragment,
     palette_masks,
 )
-from .tracking import Sample, _screen_components, associate, retire_fragments
+from .frame_worker import detected_frames
+from .tracking import CameraScan, Sample, Track, _screen_components, associate, retire_fragments
 from .video import read_frames
 
 
@@ -31,6 +34,7 @@ RECOVERY_MIN_AREA_RATIO = .5
 RECOVERY_MAX_AREA_RATIO = 2.0
 RECOVERY_MIN_OVERLAP = .10
 GREEN_BOX_HOLD_MS = 750
+AMBER_PALETTE_SETTINGS = PaletteSettings(red_hue=21)
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,22 @@ def _masked_screens(rgb, pts_ms, mask):
 def _palette_screens(rgb, pts_ms, red, blue):
     """Use only saturated red/blue components as track candidates."""
     return _masked_screens(rgb, pts_ms, cv2.bitwise_or(red, blue))
+
+
+def _palette_settings(zero_color):
+    if zero_color.upper() == "#FF0000":
+        return DEFAULT_PALETTE_SETTINGS
+    return AMBER_PALETTE_SETTINGS
+
+
+def _phone_detection_components(rgb, pts_ms, _excluded, *, settings):
+    """Run the phone-detection branch's palette-only candidate step.
+
+    This top-level callable is intentionally spawn-safe for main's bounded
+    frame-analysis pool. It has no generic bright/dim screen fallback.
+    """
+    red, blue = palette_masks(rgb, settings=settings)
+    return _palette_screens(rgb, pts_ms, red, blue)
 
 
 def _rectangle(frame, sample, color, label=None):
@@ -196,6 +216,124 @@ def _palette_evidence_by_track(rgb, pts_ms, red, blue, screen_tracks):
         )
         for track_id, colors in best_by_track.items()
     }
+
+
+def scan_phone_detection_camera(path, camera, progress=None, *, frame_workers=1,
+                                zero_color="#FF0000"):
+    """Return only sessions confirmed by the current phone-detection algorithm.
+
+    Its candidate source, ordered palette qualification, exclusive evidence,
+    fragment handoff and recovered-session behavior are the same primitives as
+    ``box_video``. Frame component extraction remains parallelized through
+    main's bounded pool; stateful association stays PTS-ordered in this process.
+    """
+    settings = _palette_settings(zero_color)
+    detect = partial(_phone_detection_components, settings=settings)
+    tracks, active, phase_by_track = [], set(), {}
+    discarded_fragments = 0
+    qualified_track_ids = set()
+    sessions, session_by_track, session_samples = {}, {}, {}
+    next_session_number = 0
+    preview = None
+    preview_pts = 0.0
+    width = height = frame_count = best_count = 0
+    frames = detected_frames(read_frames(path, camera["rotationDegrees"]),
+                             camera["exclusionRois"], detect, frame_workers)
+
+    with closing(frames):
+        for pts_ms, rgb, detections in frames:
+            height, width = rgb.shape[:2]
+            active, removed = retire_fragments(tracks, active, pts_ms)
+            discarded_fragments += removed
+            active = associate(tracks, active, detections, pts_ms, discarded_fragments)
+            if preview is None or len(detections) > best_count or (
+                len(detections) == best_count and frame_count % 30 == 0
+            ):
+                preview, preview_pts, best_count = rgb.copy(), pts_ms, len(detections)
+            frame_count += 1
+            if progress and frame_count % 90 == 0:
+                progress(frame_count, pts_ms)
+
+            red, blue = palette_masks(rgb, settings=settings)
+            frame_tracks = [
+                (track.track_id, track.samples[-1])
+                for track in tracks if track.samples[-1].pts_ms == pts_ms
+            ]
+            current = dict(frame_tracks)
+            source_tracks = {track.track_id: track for track in tracks}
+            active_track_ids = set(current)
+            palette_evidence = _palette_evidence_by_track(
+                rgb, pts_ms, red, blue, frame_tracks
+            )
+
+            def remember(session, track_id, sample):
+                samples = session_samples.setdefault(session.session_id, [])
+                if not samples:
+                    samples.extend(source_tracks[track_id].samples)
+                elif samples[-1].pts_ms < sample.pts_ms:
+                    samples.append(sample)
+
+            for track_id, sample in frame_tracks:
+                session_id = session_by_track.get(track_id)
+                if session_id:
+                    session = sessions[session_id]
+                    _attach_session(session_by_track, qualified_track_ids,
+                                    session, track_id, sample, pts_ms)
+                    _remember_palette_evidence(
+                        session, palette_evidence.get(track_id, PaletteEvidence())
+                    )
+                    remember(session, track_id, sample)
+
+            for track_id, sample in frame_tracks:
+                if track_id in session_by_track:
+                    continue
+                session = _recovery_session(sessions, active_track_ids, sample, pts_ms)
+                if session:
+                    _attach_session(session_by_track, qualified_track_ids,
+                                    session, track_id, sample, pts_ms)
+                    _remember_palette_evidence(
+                        session, palette_evidence.get(track_id, PaletteEvidence())
+                    )
+                    remember(session, track_id, sample)
+
+            for track_id, sample in frame_tracks:
+                sequence = phase_by_track.setdefault(track_id, FlashSequence())
+                evidence = palette_evidence.get(track_id, PaletteEvidence())
+                if sequence.observe(evidence.phase, pts_ms):
+                    session_id = session_by_track.get(track_id)
+                    if session_id is None:
+                        session = _recovery_session(sessions, active_track_ids, sample, pts_ms)
+                        if session is None:
+                            next_session_number += 1
+                            session = ConfirmedSession(
+                                f"flash-{next_session_number}", track_id, sample, pts_ms
+                            )
+                            sessions[session.session_id] = session
+                        _attach_session(session_by_track, qualified_track_ids,
+                                        session, track_id, sample, pts_ms)
+                        _remember_palette_evidence(session, evidence)
+                        remember(session, track_id, sample)
+
+            for parent_id, child_id in carry_qualification_to_current_fragment(
+                tracks, qualified_track_ids, pts_ms
+            ):
+                session_id = session_by_track.get(parent_id)
+                child_sample = current.get(child_id)
+                if session_id and child_sample:
+                    session = sessions[session_id]
+                    _attach_session(session_by_track, qualified_track_ids,
+                                    session, child_id, child_sample, pts_ms)
+                    _remember_palette_evidence(
+                        session, palette_evidence.get(child_id, PaletteEvidence())
+                    )
+                    remember(session, child_id, child_sample)
+
+    confirmed = [
+        Track(session.session_id, session_samples[session.session_id])
+        for session in sessions.values()
+    ]
+    return CameraScan(confirmed, width, height, frame_count, preview, preview_pts,
+                      discarded_fragments)
 
 
 def _mask_preview(rgb, mask, label):
