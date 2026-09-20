@@ -15,7 +15,6 @@ import numpy as np
 from .red_blue_diagnostic import (
     DEFAULT_PALETTE_SETTINGS,
     FlashSequence,
-    SELECTED_TRACK_MAX_AGE_MS,
     carry_qualification_to_current_fragment,
     flash_seed_mask,
     palette_masks,
@@ -35,6 +34,7 @@ RECOVERY_WINDOW_MS = 750
 RECOVERY_MIN_AREA_RATIO = .5
 RECOVERY_MAX_AREA_RATIO = 2.0
 RECOVERY_MIN_OVERLAP = .10
+GREEN_BOX_HOLD_MS = 750
 
 
 @dataclass(frozen=True)
@@ -354,7 +354,7 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None,
                         )
                 for track in current_tracks:
                     if (track.track_id not in qualified_track_ids or
-                            pts_ms - track.samples[-1].pts_ms > SELECTED_TRACK_MAX_AGE_MS):
+                            pts_ms - track.samples[-1].pts_ms > GREEN_BOX_HOLD_MS):
                         continue
                     track_id, sample = track.track_id, track.samples[-1]
                     _rectangle(annotated, sample, GREEN, "flash sequence")

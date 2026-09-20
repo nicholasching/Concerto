@@ -73,3 +73,10 @@ qualification between tracks. A focused sequence test covers a 170 ms gap;
 the existing 300 ms gap rejection remains the upper-bound regression check.
 Focused automated verification was intentionally deferred at the user's
 request; the next action is a front-end rerun of the representative clip.
+
+## Follow-up implementation: green-box display hold
+
+Approved change: hold the last confirmed green rectangle for 750 ms after its
+raw screen sample disappears. The 350 ms selected-fragment handoff window is
+unchanged, so this is visual persistence only and cannot widen identity
+transfer behavior.
