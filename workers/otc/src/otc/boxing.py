@@ -1,13 +1,13 @@
 """Render the existing OTC screen tracks as a local diagnostic video."""
 
 from collections import defaultdict
-from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 import tempfile
 
 import av
 import cv2
+import numpy as np
 
 from .red_blue_diagnostic import (
     SELECTED_TRACK_MAX_AGE_MS,
@@ -16,24 +16,13 @@ from .red_blue_diagnostic import (
     palette_masks,
     track_has_both_palette_colors,
 )
-from .tracking import _screen_components, associate, retire_fragments
+from .tracking import Sample, Track, _screen_components, scan_camera
 from .video import read_frames
 
 
 CYAN = (0, 220, 255)
 GREEN = (0, 220, 0)
 MAGENTA = (255, 0, 255)
-
-
-@dataclass
-class BoxingScan:
-    tracks: list
-    width: int
-    height: int
-    frame_count: int
-    discarded_fragments: int
-    flash_by_frame: dict
-    qualified_by_frame: dict
 
 
 def _frame_key(pts_ms):
@@ -58,41 +47,21 @@ def _rectangle(frame, sample, color, label=None):
                     .45, color, 1, cv2.LINE_AA)
 
 
-def _scan_red_blue(path, rotation_degrees, progress):
-    tracks, active, qualified_track_ids = [], set(), set()
-    previous_value = None
-    width = height = frame_count = discarded_fragments = 0
-    flash_by_frame, qualified_by_frame = defaultdict(list), defaultdict(list)
-    for pts_ms, rgb in read_frames(path, rotation_degrees):
-        if width == 0:
-            height, width = rgb.shape[:2]
-        elif rgb.shape[:2] != (height, width):
-            raise ValueError("Video dimensions changed during capture")
-        red, blue = palette_masks(rgb)
-        palette = cv2.bitwise_or(red, blue)
-        flash, previous_value = flash_seed_mask(rgb, previous_value)
-        flash_detections = _masked_screens(rgb, pts_ms, flash)
-        palette_detections = _masked_screens(rgb, pts_ms, palette)
-        active, removed = retire_fragments(tracks, active, pts_ms)
-        discarded_fragments += removed
-        active = associate(tracks, active, flash_detections + palette_detections, pts_ms,
-                           discarded_fragments)
-        for track in tracks:
-            if track_has_both_palette_colors(track, now_ms=pts_ms):
-                qualified_track_ids.add(track.track_id)
-        carry_qualification_to_current_fragment(tracks, qualified_track_ids, pts_ms)
-        key = _frame_key(pts_ms)
-        flash_by_frame[key].extend(flash_detections)
-        qualified_by_frame[key].extend(
-            (track.track_id, track.samples[-1]) for track in tracks
-            if track.track_id in qualified_track_ids and
-            pts_ms - track.samples[-1].pts_ms <= SELECTED_TRACK_MAX_AGE_MS
-        )
-        frame_count += 1
-        if progress and frame_count % 90 == 0:
-            progress("detect", frame_count, f"Tracked {frame_count} frames")
-    return BoxingScan(tracks, width, height, frame_count, discarded_fragments,
-                      dict(flash_by_frame), dict(qualified_by_frame))
+def _palette_sample(rgb, red, blue, sample):
+    """Keep stable geometry but take colour evidence only from its palette pixels."""
+    height, width = rgb.shape[:2]
+    x0 = max(0, round(sample.x - sample.width / 2))
+    y0 = max(0, round(sample.y - sample.height / 2))
+    x1 = min(width, x0 + sample.width)
+    y1 = min(height, y0 + sample.height)
+    region = rgb[y0:y1, x0:x1]
+    red_mask = red[y0:y1, x0:x1] != 0
+    blue_mask = blue[y0:y1, x0:x1] != 0
+    mask = red_mask if np.count_nonzero(red_mask) >= np.count_nonzero(blue_mask) else blue_mask
+    if np.count_nonzero(mask) < 4:
+        return sample
+    color = tuple(float(value) for value in np.median(region[mask], axis=0))
+    return Sample(sample.pts_ms, sample.x, sample.y, sample.width, sample.height, color)
 
 
 def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
@@ -111,7 +80,12 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
     if progress:
         progress("detect", 0, "Running the red/blue diagnostic tracker")
 
-    scan = _scan_red_blue(input_path, rotation_degrees, progress)
+    camera = {"rotationDegrees": rotation_degrees, "exclusionRois": []}
+    scan = scan_camera(
+        input_path,
+        camera,
+        lambda frames, _pts: progress("detect", frames, f"Tracked {frames} frames") if progress else None,
+    )
     boxes_by_frame = defaultdict(list)
     for track in scan.tracks:
         for sample in track.samples:
@@ -120,7 +94,8 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     frames_written = boxes_drawn = 0
-    qualified_track_ids = set()
+    qualification_tracks, qualified_track_ids, seen_qualified_track_ids = {}, set(), set()
+    previous_value = None
     try:
         with tempfile.NamedTemporaryFile(dir=output_path.parent, suffix=".mp4", delete=False) as target:
             temporary = Path(target.name)
@@ -133,15 +108,29 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
                 key = _frame_key(pts_ms)
                 red, blue = palette_masks(rgb)
                 palette = cv2.bitwise_or(red, blue)
+                flash, previous_value = flash_seed_mask(rgb, previous_value)
                 annotated = cv2.convertScaleAbs(rgb, alpha=.25)
                 annotated[palette != 0] = rgb[palette != 0]
-                for sample in scan.flash_by_frame.get(key, []):
+                for sample in _masked_screens(rgb, pts_ms, flash):
                     _rectangle(annotated, sample, MAGENTA)
-                for _track_id, sample in boxes_by_frame.get(key, []):
+                for track_id, sample in boxes_by_frame.get(key, []):
                     cv2.circle(annotated, (round(sample.x), round(sample.y)), 3, CYAN, -1)
-                for track_id, sample in scan.qualified_by_frame.get(key, []):
+                    qualification_tracks.setdefault(track_id, Track(track_id)).samples.append(
+                        _palette_sample(rgb, red, blue, sample)
+                    )
+                current_tracks = list(qualification_tracks.values())
+                for track in current_tracks:
+                    if track_has_both_palette_colors(track, now_ms=pts_ms):
+                        qualified_track_ids.add(track.track_id)
+                carry_qualification_to_current_fragment(current_tracks, qualified_track_ids, pts_ms)
+                for track in current_tracks:
+                    if (track.track_id not in qualified_track_ids or
+                            pts_ms - track.samples[-1].pts_ms > SELECTED_TRACK_MAX_AGE_MS):
+                        continue
+                    track_id, sample = track.track_id, track.samples[-1]
                     _rectangle(annotated, sample, GREEN, "red + blue")
                     qualified_track_ids.add(track_id)
+                    seen_qualified_track_ids.add(track_id)
                     boxes_drawn += 1
                 frame = av.VideoFrame.from_ndarray(annotated, format="rgb24")
                 frame.pts = round(pts_ms)
@@ -161,7 +150,7 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
     summary = {
         "frameCount": frames_written,
         "trackCount": len(scan.tracks),
-        "qualifiedTrackCount": len(qualified_track_ids),
+        "qualifiedTrackCount": len(seen_qualified_track_ids),
         "boxesDrawn": boxes_drawn,
         "discardedFragments": scan.discarded_fragments,
         "width": scan.width,

@@ -91,3 +91,22 @@ Commit this isolated diagnostic baseline, then change the boxing path to use a
 stable full-screen tracker for box geometry and red/blue only for qualification.
 That follow-up should eliminate the demonstrated stacked-fragment boxes without
 changing the production detector or identity policy.
+
+## Stable-footprint follow-up completed
+
+- Checkpoint commit before this change: `6f480d4`
+  (`feat(debug-phone): add local clip boxing diagnostics`).
+- The boxing renderer now gets its geometry from the existing `scan_camera()`
+  screen tracks. Red/blue pixels are sampled only inside that stable footprint
+  to qualify the one existing track; they no longer create independent boxes.
+  The existing 350 ms visibility and one-unambiguous-overlap handoff remain in
+  effect for a genuine tracker fragment.
+- A first manual local result of zero qualified tracks was correctly diagnosed
+  as an `amber-blue-v1` fixture rather than a red/blue regression. The stricter
+  red ±5 setting is intentionally expected to reject that legacy amber input.
+- Focused post-change check: `.venv\\Scripts\\python.exe -m pytest
+  workers/otc/tests/test_boxing.py -q` passed (2 tests). This test generates a
+  true `red-blue-v1` source and verifies the rendered MP4 has a stable screen
+  track and visible green qualified boxes. `.venv\\Scripts\\python.exe -m
+  ruff check workers/otc` also passed. The local debug server remains listening
+  on `127.0.0.1:3002`; no full gate was run.
