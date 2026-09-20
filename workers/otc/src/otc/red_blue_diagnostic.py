@@ -16,7 +16,7 @@ class PaletteSettings:
     blue_hue_tolerance: int = 20
     # Tuned against the diagnostic auditorium clip: displayed phone colours
     # remain above ~207 while the dim pink shirt stays at or below ~155.
-    saturation: int = 170
+    saturation: int = 160
     value: int = 50
 
 

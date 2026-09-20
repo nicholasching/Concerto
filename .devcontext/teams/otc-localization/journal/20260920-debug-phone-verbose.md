@@ -97,3 +97,9 @@ Verification after this change:
   completed with four qualified sequences, where the generic-anchor result
   had three. Its source contained no cyan candidate dots; visual inspection
   showed boxes around all four flashing screens during the packet.
+
+## Follow-up tuning: saturation floor
+
+Approved change: lower the red/blue palette saturation floor from 170 to 160.
+The measured pink-shirt samples remain at or below 155, while the new focused
+regression accepts a 165-saturation red phone sample.
