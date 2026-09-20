@@ -1,0 +1,63 @@
+const form = document.querySelector("#boxing-form");
+const status = document.querySelector("#status");
+const result = document.querySelector("#result");
+const summary = document.querySelector("#summary");
+const output = document.querySelector("#output");
+const download = document.querySelector("#download");
+const verboseResult = document.querySelector("#verbose-result");
+const redOutput = document.querySelector("#red-output");
+const redDownload = document.querySelector("#red-download");
+const blueOutput = document.querySelector("#blue-output");
+const blueDownload = document.querySelector("#blue-download");
+
+function showStatus(message, error = false) {
+  status.hidden = false;
+  status.textContent = message;
+  status.classList.toggle("error", error);
+}
+
+async function waitForJob(jobId) {
+  for (;;) {
+    const response = await fetch(`/api/boxing/jobs/${jobId}`, { cache: "no-store" });
+    const job = await response.json();
+    if (!response.ok || job.status === "failed") throw new Error(job.error ?? "Boxing failed.");
+    if (job.status === "complete") return job;
+    await new Promise(resolve => setTimeout(resolve, 750));
+  }
+}
+
+form.addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = form.querySelector("button");
+  button.disabled = true;
+  result.hidden = true;
+  verboseResult.hidden = true;
+  showStatus("Uploading clip and tracking screens…");
+  try {
+    const response = await fetch("/api/boxing/jobs", { method: "POST", body: new FormData(form) });
+    const started = await response.json();
+    if (!response.ok) throw new Error(started.error ?? "Could not start boxing.");
+    showStatus("Tracking screens and drawing boxes…");
+    const job = await waitForJob(started.jobId);
+    const videoUrl = `/api/boxing/jobs/${started.jobId}/video`;
+    output.src = videoUrl;
+    download.href = videoUrl;
+    if (job.verbose) {
+      const redUrl = `/api/boxing/jobs/${started.jobId}/red-mask`;
+      const blueUrl = `/api/boxing/jobs/${started.jobId}/blue-mask`;
+      redOutput.src = redUrl;
+      redDownload.href = redUrl;
+      blueOutput.src = blueUrl;
+      blueDownload.href = blueUrl;
+      verboseResult.hidden = false;
+    }
+    const details = job.summary ?? {};
+    summary.textContent = `${details.qualifiedTrackCount ?? 0} flash-sequence-qualified tracks, ${details.boxesDrawn ?? 0} green boxes across ${details.frameCount ?? 0} frames.`;
+    result.hidden = false;
+    showStatus("Boxed video ready.");
+  } catch (error) {
+    showStatus(error instanceof Error ? error.message : "Boxing failed.", true);
+  } finally {
+    button.disabled = false;
+  }
+});
