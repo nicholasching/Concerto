@@ -70,9 +70,7 @@ diagnosis alone.
 Approved change: increase only the per-phase gap allowance from 100 ms to 200
 ms. This is below the 350 ms raw-track expiry and does not transfer pending
 qualification between tracks. A focused sequence test covers a 170 ms gap;
-the existing 300 ms gap rejection remains the upper-bound regression check.
-Focused automated verification was intentionally deferred at the user's
-request; the next action is a front-end rerun of the representative clip.
+the existing 240 ms gap rejection remains the upper-bound regression check.
 
 ## Follow-up implementation: green-box display hold
 
@@ -80,3 +78,22 @@ Approved change: hold the last confirmed green rectangle for 750 ms after its
 raw screen sample disappears. The 350 ms selected-fragment handoff window is
 unchanged, so this is visual persistence only and cannot widen identity
 transfer behavior.
+
+## Follow-up implementation: palette-only tracking
+
+Approved change: boxing no longer runs the generic bright/dim screen detector
+or renders its cyan dots. It creates and associates tracks only from connected
+components in the union of the red and blue HSV masks, then applies the
+existing exclusive red/blue evidence and temporal qualification rules. This
+directly prevents a neutral room object becoming an anchor. The 750 ms green
+display hold is now driven by confirmed logical sessions rather than the
+350 ms current-fragment set, so it is genuinely display-only.
+
+Verification after this change:
+
+- `python -m pytest workers/otc/tests/test_boxing.py -q` — 11 passed.
+- `python -m ruff check workers/otc/src/otc/boxing.py workers/otc/tests/test_boxing.py` — passed.
+- A fresh local verbose job using the same representative 14.13-second clip
+  completed with four qualified sequences, where the generic-anchor result
+  had three. Its source contained no cyan candidate dots; visual inspection
+  showed boxes around all four flashing screens during the packet.

@@ -7,6 +7,7 @@ from otc.boxing import (
     ConfirmedSession,
     _attach_session,
     _palette_evidence_by_track,
+    _palette_screens,
     _recovery_session,
     box_video,
 )
@@ -15,11 +16,11 @@ from otc.red_blue_diagnostic import (
     carry_qualification_to_current_fragment,
     palette_masks,
 )
-from otc.tracking import Sample, Track, detect_screens
+from otc.tracking import Sample, Track
 from otc.video import read_frames
 
 
-def test_box_video_reuses_screen_tracking_and_writes_visible_boxes(capture, tmp_path):
+def test_box_video_tracks_palette_components_and_writes_visible_boxes(capture, tmp_path):
     _path, manifest, _truth = capture(count=6, red_blue=True)
     source = Path(manifest["cameras"][0]["videoPath"])
     output = tmp_path / "boxed.mp4"
@@ -78,10 +79,10 @@ def test_flash_qualification_requires_distinct_ordered_colour_phases():
 def test_pending_flash_sequence_does_not_cross_a_long_gap_or_fragment():
     sequence = FlashSequence()
     assert not _observe_phase(sequence, "red", 0)
-    assert not sequence.observe("none", 300)
-    assert not _observe_phase(sequence, "blue", 360)
-    assert not _observe_phase(sequence, "red", 560)
-    assert not _observe_phase(sequence, "blue", 760)
+    assert not sequence.observe("none", 400)  # 240 ms after the last red sample.
+    assert not _observe_phase(sequence, "blue", 460)
+    assert not _observe_phase(sequence, "red", 660)
+    assert not _observe_phase(sequence, "blue", 860)
 
     replacement = Track("replacement", [Sample(320, 10, 10, 12, 16, (0, 102, 255))])
     qualified = Track("qualified", [Sample(300, 10, 10, 8, 12, (255, 0, 0))])
@@ -135,13 +136,22 @@ def test_static_red_blue_split_is_mixed_not_a_flash_phase():
     assert _palette_evidence_by_track(rgb, 0, red, blue, tracks)["split-screen"].phase == "mixed"
 
 
-def test_dim_red_candidate_can_start_without_a_blue_core():
+def test_saturated_red_palette_can_start_without_a_blue_component():
     rgb = np.full((90, 120, 3), 9, dtype=np.uint8)
     rgb[30:50, 45:60] = (125, 6, 5)  # Saturated red, intentionally below bright/blue-core value.
+    red, blue = palette_masks(rgb)
 
-    detections = detect_screens(rgb, 0, np.zeros(rgb.shape[:2], dtype=np.uint8))
+    detections = _palette_screens(rgb, 0, red, blue)
 
     assert any(sample.width >= 15 and sample.height >= 20 for sample in detections)
+
+
+def test_palette_tracking_ignores_a_bright_nonpalette_object():
+    rgb = np.full((90, 120, 3), 9, dtype=np.uint8)
+    rgb[30:50, 45:60] = (255, 255, 255)
+    red, blue = palette_masks(rgb)
+
+    assert _palette_screens(rgb, 0, red, blue) == []
 
 
 def test_palette_mask_excludes_dim_pink_but_retains_saturated_phone_red():
