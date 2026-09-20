@@ -7,7 +7,7 @@ const children: ReturnType<typeof Bun.spawn>[] = [];
 try {
   children.push(Bun.spawn([process.execPath, "backend/dist/index.js"], { cwd: ROOT, env: { ...process.env, PORT: "18080", SESSION_ID: "smoke-test", OPERATOR_SECRET: crypto.randomUUID(), CHECKPOINT_PATH: resolve(ROOT, "runtime/smoke", crypto.randomUUID(), "checkpoint.json") }, stdout: "ignore", stderr: "inherit" }));
   for (const [app, port] of [["client-frontend", "13000"], ["admin-frontend", "13001"]]) children.push(Bun.spawn([nextRuntime(), nextCli(app), "start", app, "--port", port], { cwd: ROOT, env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" }, stdout: "ignore", stderr: "inherit" }));
-  for (const [index, port, path, expected] of [[0, 18080, "/api/health", "audience-orchestra-control"], [1, 13000, "/", "Phone readiness"], [1, 13000, "/present", "SCAN TO JOIN THE SHOW"], [1, 13000, "/upload", "Upload password"], [2, 13001, "/admin", "Admin password"]] as const) {
+  for (const [index, port, path, expected] of [[0, 18080, "/api/health", "audience-orchestra-control"], [1, 13000, "/", "Phone readiness"], [1, 13000, "/present", "Scan to join"], [1, 13000, "/upload", "Upload password"], [2, 13001, "/admin", "Admin password"]] as const) {
     const deadline = Date.now() + 30000;
     let passed = false;
     while (Date.now() < deadline) {

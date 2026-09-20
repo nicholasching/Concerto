@@ -1,4 +1,4 @@
-# Audience Orchestra
+# Concerto
 
 An integrated local concert app: audience phones preload audio, synchronize clocks, flash an optical identity, and play the channel assigned by the operator.
 

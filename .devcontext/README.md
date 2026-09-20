@@ -1,8 +1,12 @@
-# Audience Orchestra development context
+# Concerto development context
 
 Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage/status/handoff and relevant decisions before coding.
 
 ## Current checkpoint
+
+### Concerto metal UI
+
+Audience `/` and projector `/present` now use brushed silver surfaces and the monochrome `thinking-orbs` package, with minimal contextual copy and expandable audience diagnostics. Product labels across all four screens are Concerto; operator controls use a neutral metal palette. Client/admin gates, production smoke and responsive browser checks pass. See the [UI journal and physical-check limits](teams/integration/journal/20260920-concerto-metal-ui.md).
 
 ### Automatic audience sections and show recovery
 

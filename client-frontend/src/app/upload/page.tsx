@@ -47,7 +47,7 @@ export default function UploadPage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Upload interrupted. Keep this page open and retry."); } finally { setBusy(false); }
   }
   const taken = run?.uploads.some(upload => upload.column === column);
-  return <main className="upload-shell"><header className="audience-brand"><span className="brand-mark">◒</span><span>AUDIENCE ORCHESTRA</span><span className="device-number">CAMERA CREW</span></header>
+  return <main className="upload-shell"><header className="audience-brand"><span className="brand-mark">◒</span><span>Concerto</span><span className="device-number">CAMERA CREW</span></header>
     <p className="eyebrow">FROM CAMERA TO CONCERT</p><h1>Send your<br />camera view.</h1><p className="audience-instruction">Upload the original recording. The stage team will handle calibration.</p>
     {!token ? <form className="upload-card" onSubmit={event => { event.preventDefault(); void login(); }}><label>Upload password<input type="password" value={password} autoComplete="current-password" onChange={event => setPassword(event.target.value)} /></label><button className="primary" disabled={busy || !password}>{busy ? "Connecting…" : "Connect camera"}</button></form>
       : <section className="upload-card"><div className="upload-state"><i className={`status-dot ${run?.canUpload ? "ok" : ""}`} />{run?.canUpload ? "Ready for your recording" : run ? "Wait for the phone pattern to finish" : "Waiting for the stage team to start calibration"}</div>

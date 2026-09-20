@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { AudioContextHost, DecodedBudget, isAudioContextPaused, PlaybackEngine, preloadTracks, type LoadedTrack } from "@orchestra/audio";
+import { AudioContextHost, DecodedBudget, PlaybackEngine, preloadTracks, type LoadedTrack } from "@orchestra/audio";
 import { AUDIENCE_SECTIONS, ClientMessage, type AudienceSectionId } from "@orchestra/contracts";
 import { ClockSync } from "@orchestra/sync";
 import { CalibrationSession, type CalibrationPhase } from "../lib/calibration";
@@ -14,6 +14,7 @@ import { buildReadiness, statusMessage, StatusReporter } from "../lib/readiness"
 import { ShowControl } from "../lib/show-control";
 import { participantEndpoints } from "../lib/endpoints";
 import { CalibrationOverlay } from "./calibration-overlay";
+import { ConcertoOrb } from "./concerto-orb";
 
 const { api, wsUrl } = participantEndpoints(typeof window === "undefined" ? "http://localhost:3000" : window.location.origin,
   { api: process.env.NEXT_PUBLIC_API_URL, ws: process.env.NEXT_PUBLIC_WS_URL });
@@ -299,6 +300,8 @@ export default function Page() {
     { label: "Music", value: assetsVerified ? "Verified" : tracks.length ? "Loading…" : "Waiting for show", ok: assetsVerified },
     { label: "Sound", value: outputReady ? "Ready" : audioState === "running" ? "Warming up…" : "Tap to enable", ok: outputReady },
   ];
+  const ready = connected && foreground && checks.every(check => check.ok);
+  const readiness = !foreground ? "Keep this page open" : checks.find(check => !check.ok)?.value ?? "Ready";
   function chooseSection(section: AudienceSectionId) {
     const snapshot = connection.current?.current.snapshot;
     if (snapshot) connection.current?.send(ClientMessage.parse({ protocolVersion: 1, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch,
@@ -306,24 +309,28 @@ export default function Page() {
   }
 
   return <main className="audience-shell">
-    <header className="audience-brand"><span className="brand-mark" aria-hidden="true">◒</span><span>AUDIENCE<br />ORCHESTRA</span>
-      <span className="device-number">{identity ? `PHONE ${String(identity.deviceId).padStart(3, "0")}` : "LIVE EXPERIENCE"}</span></header>
+    <header className="audience-brand"><span className="brand-mark" aria-hidden="true">c</span><span>Concerto</span>
+      {identity && <span className="device-number">NO. {String(identity.deviceId).padStart(3, "0")}</span>}</header>
     {mock && <p className="notice">Test session</p>}
-    <div className={`audience-orbit ${connected ? "ready" : ""}`} aria-hidden="true"><span>♪</span></div>
-    <p className="eyebrow">{reset ? "SESSION RESET" : playing ? "THE SHOW IS LIVE" : holding ? "CALIBRATION" : mapped || manual ? "YOU’RE IN POSITION" : "YOUR PHONE. PART OF THE ORCHESTRA."}</p>
-    <h1>{reset ? "Ready for a fresh start." : holding ? "Raise your phone." : needsSection ? "Where are you sitting?" : mapped || manual ? `${section?.toUpperCase()} SECTION` : awaitingMap ? "Finding your place." : "You’re part of the show."}</h1>
-    <p className="audience-instruction">{reset ? "Refresh this page when you’re ready to join again." : holding ? "Face your screen toward the stage and hold it steady." : needsSection ? "We couldn’t locate your phone. Choose your section while facing the stage." : awaitingMap ? "You can lower your phone. We’re processing the camera recordings." : "Turn your volume all the way up. Keep this page open and wait for the stage team."}</p>
-    {!reset && <div className="audience-checks" aria-label="Phone readiness">{checks.map(check => <div key={check.label}><span className={check.ok ? "status-dot ok" : "status-dot"} /><span>{check.label}</span><strong>{check.value}</strong></div>)}</div>}
-    {!reset && audioState !== "running" && <div className="sound-prompt"><button className="primary" onClick={() => void enableSound()}>{isAudioContextPaused(audioState) ? "Tap to enable sound" : "Enable sound"}</button><small>Your browser needs one tap before it can play music.</small></div>}
+    <section className="audience-main">
+    <ConcertoOrb ready={ready} paused={!foreground || holding || playing || reset} />
+    <div className="audience-copy" aria-live="polite">
+      <h1>{reset ? "Until next time." : !connected ? conn.status.kind === "joining" ? "Joining the show." : connectionLabel(conn) : holding ? "Raise your phone." : needsSection ? "Choose your section." : awaitingMap ? "Finding your place." : mapped || manual ? `${section}.` : ready ? "You’re in." : "Getting ready."}</h1>
+      <p className="audience-instruction">{reset ? "Refresh to join again." : holding ? "Screen toward the stage. Hold steady." : needsSection ? "While facing the stage." : awaitingMap ? "You can lower your phone." : "Volume up. Keep this page open."}</p>
+    </div>
+    {!reset && <details className="readiness-details"><summary><span className={ready ? "status-dot ok" : "status-dot"} /><span role="status">{readiness}</span><span className="details-chevron" aria-hidden="true">⌄</span></summary>
+      <div className="audience-checks" aria-label="Phone readiness">{checks.map(check => <div key={check.label}><span className={check.ok ? "status-dot ok" : "status-dot"} /><span>{check.label}</span><strong>{check.value}</strong></div>)}</div>
+    </details>}
+    {!reset && audioState !== "running" && <div className="sound-prompt"><button className="primary" onClick={() => void enableSound()}>Enable sound <span aria-hidden="true">↗</span></button></div>}
     {audioNote && <p role="alert" className="notice">{audioNote}</p>}
-    {assetNote?.startsWith("Failed:") && <p role="alert" className="notice">Music couldn’t finish loading. Keep this page open while the stage team checks the connection.</p>}
+    {assetNote?.startsWith("Failed:") && <p role="alert" className="notice">Music couldn’t load. Check your connection.</p>}
     {needsSection && <div className="section-picker audience-four-sections">{AUDIENCE_SECTIONS.map(section => <button key={section.id} onClick={() => chooseSection(section.id)}>{section.label}</button>)}</div>}
-    {(mapped || manual) && !holding && channel && <p className="your-part"><span style={{ background: channel.color }} />Your part: <strong>{channel.label}</strong></p>}
-    {manual && !holding && !channel && <p className="your-part">{conn.snapshot?.pendingActions.some(action => action.domain === "assignment") ? "Joining your section’s music…" : "Waiting for the stage team to assign music to this section."}</p>}
+    {(mapped || manual) && !holding && channel && <p className="your-part"><span style={{ background: channel.color }} /><strong>{channel.label}</strong></p>}
+    {manual && !holding && !channel && <p className="your-part">{conn.snapshot?.pendingActions.some(action => action.domain === "assignment") ? "Joining your part…" : "Waiting for your part."}</p>}
     {conn.status.kind === "gave-up" && <button onClick={() => connection.current?.retry()}>Reconnect</button>}
-    {conn.status.kind === "replaced" && <p className="notice">This phone is open in another tab. Keep just one tab open.</p>}
-    {!foreground && !reset && <p className="notice">Return to this page to stay ready.</p>}
-    <footer className="audience-footer">ONE AUDIENCE. ONE ORCHESTRA.</footer>
+    {conn.status.kind === "replaced" && <p className="notice">Keep just one tab open.</p>}
+    </section>
+    <footer className="audience-footer"><span aria-hidden="true" className="speaker-grille" /></footer>
     <div ref={performanceShell} className="performance-shell" hidden aria-hidden="true">
       <div ref={stageSurface} className="performance-surface" />
     </div>

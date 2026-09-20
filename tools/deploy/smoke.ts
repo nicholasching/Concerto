@@ -36,7 +36,7 @@ async function stop() { child?.kill(); if (child) await child.exited; child = un
 const snapshot = async () => AdminSnapshot.parse(await (await fetch(`${base}/control/api/sessions/${sessionId}/snapshot`, { headers })).json());
 try {
   const identity = await start();
-  for (const [path, text] of [["/", "Audience Orchestra"], ["/admin", "Admin password"], ["/present", "SCAN TO JOIN THE SHOW"], ["/upload", "Upload password"]]) {
+  for (const [path, text] of [["/", "Concerto"], ["/admin", "Admin password"], ["/present", "Scan to join"], ["/upload", "Upload password"]]) {
     const response = await fetch(`${base}${path}`); assert.equal(response.status, 200, path); assert((await response.text()).includes(text), path);
   }
   assert.equal((await fetch(`${base}/control/api/sessions/${sessionId}/snapshot`)).status, 401);

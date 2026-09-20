@@ -1,5 +1,7 @@
 # audio-client checkpoint
 
+Concerto UI (2026-09-20): metal audience/projector surfaces, thinking-orbs 0.3.1, concise state copy and expandable readiness checks are implemented. Client gate passes 160 tests plus 19 contract tests and build. [Evidence and browser/physical limits](../integration/journal/20260920-concerto-metal-ui.md).
+
 Music visualizer integration (2026-09-20): `feat/color-music-sync` now follows effective ShowControl transport/channel state each frame, reacts to post-mix audio, and yields to calibration/manual placement/recovery. Float samples ignore the audio keepalive; smoothing is refresh-rate independent. Client gate: 157 tests plus build passed. See [integration evidence](../integration/journal/20260920-color-music-integration.md); physical display/audio timing remains unmeasured.
 
 Integration follow-up on main (2026-09-20 UTC): two-second cue support, synchronous fresh-clock/output/assets execution gates, output warmup/keepalive, and corrected fallback latency. See [current playback evidence](../integration/journal/20260920-playback-recovery.md). Historical slice status below is superseded by main integration. Physical acoustic comparison remains pending.

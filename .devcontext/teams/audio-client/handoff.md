@@ -1,5 +1,7 @@
 # audio-client handoff
 
+Latest UI: [Concerto metal redesign](../integration/journal/20260920-concerto-metal-ui.md). Refresh audience/projector pages. Optical/audio timing and storage identities are unchanged; verify real-phone audio and projected QR scanning separately.
+
 Latest: [music visualizer integration](../integration/journal/20260920-color-music-integration.md). The page uses MusicVisualizer with the existing ShowControl view and a disposable LevelMeter tap on AudioContextHost.masterGain. Preserve frame-time effective state, calibration/recovery/manual controls, the keepalive noise floor and analysis-only cleanup. No protocol or audio-engine API changes. Refresh audience pages, assign parts and play to test the feature; compare actual phones during rehearsal.
 
 Main integration follow-up: [playback recovery journal](../integration/journal/20260920-playback-recovery.md) supersedes the historical readiness/timing details below. ShowControl callers must supply current `audioOutputReady` and call `refreshReadiness()` after clock/output changes; all source/lease updates are gated. See the linked decision for the internal API, two-second controls, checks and physical limitations.

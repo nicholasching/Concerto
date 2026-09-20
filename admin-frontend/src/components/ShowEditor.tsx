@@ -49,7 +49,7 @@ export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData;
           <option value="">Silent</option>{draft.channels.map(channel => <option key={channel.channelId} value={channel.channelId}>{channel.label}</option>)}
         </select>
       </label>)}</div>
-      {draft.clips.length === 0 && <button onClick={() => edit({ showId: crypto.randomUUID(), showRevision: snapshot.show.showRevision, label: "Audience Orchestra", tracks: [], clips: [],
+      {draft.clips.length === 0 && <button onClick={() => edit({ showId: crypto.randomUUID(), showRevision: snapshot.show.showRevision, label: "Concerto", tracks: [], clips: [],
         channels: DEFAULT_SHOW_CHANNELS.map(channel => ({ ...channel, gain: 0.5, mute: false, solo: false })) })}>Set up three channels</button>}
       {draft.channels.map(channel => <div key={channel.channelId}><h3 style={{ color: channel.color }}>{channel.label}</h3>
         <label>Add prepared audio <input type="file" accept="audio/*" aria-label={`Upload ${channel.label} audio`} onChange={e => void upload(e.target.files?.[0], channel.channelId)} /></label>

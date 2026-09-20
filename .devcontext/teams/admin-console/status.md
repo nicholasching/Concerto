@@ -1,5 +1,7 @@
 # admin-console checkpoint
 
+Concerto UI (2026-09-20): product labels/new-show default and neutral metal theme updated under the cross-application request. Admin gate passes 25 focused tests plus 19 contract tests and build. [Evidence](../integration/journal/20260920-concerto-metal-ui.md).
+
 Status: in progress (review remediation; producer contract blockers remain).
 Owner: Team 4 human lead, to be named.
 Branch: feat/admin-console. Base: foundation-v1 (ab59c27).
