@@ -30,6 +30,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint backend client-frontend/src admin-frontend/src packages scripts tools",
     "build": "bun scripts/build.ts all",
+    "start": "bun scripts/start-production.ts",
     "dev:sync-demo": "bun scripts/dev.ts sync-demo",
     "dev:client-demo": "bun scripts/dev.ts client-demo",
     "dev:admin-demo": "bun scripts/dev.ts admin-demo",

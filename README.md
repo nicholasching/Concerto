@@ -2,7 +2,7 @@
 
 An integrated local concert app: audience phones preload audio, synchronize clocks, flash an optical identity, and play the channel assigned by the operator.
 
-All four development branches are merged into `main`. Start with `AGENTS.md`, `rules.md`, `masterplan.md`, and `.devcontext/README.md` for ownership and evidence. Local software integration is implemented; physical phone/camera/acoustic and venue acceptance remain separate. Railway deployment is deferred until after local review.
+All four development branches are merged into `main`. Start with `AGENTS.md`, `rules.md`, `masterplan.md`, and `.devcontext/README.md` for ownership and evidence. Local software integration is implemented; physical phone/camera/acoustic and venue acceptance remain separate. For production at `htnlive.nicholasching.ca`, follow the [Railway deployment guide](docs/railway-deployment.md). The existing `htn.nicholasching.ca` reverse proxy remains development.
 
 ## Run the local concert
 
@@ -15,15 +15,15 @@ bun run demo:seed
 
 Open [the operator console](http://localhost:3000/admin) and enter the `OPERATOR_SECRET` from your ignored `.env` (`local-demo-only` is only the unconfigured development default). All pages now share port 3000: [audience](http://localhost:3000/), [projector](http://localhost:3000/present), and [camera uploads](http://localhost:3000/upload). Shows use **Melody, Vocals and Percussion**. `demo:seed` uploads three original eight-second tones and refuses to overwrite an existing show. See the [stage operator guide](docs/stage-dashboard.md).
 
-1. Audience phones join, synchronize and verify assets automatically. They turn their volume up and wait. Sound starts automatically where the browser allows it; otherwise one **Tap to enable sound** action appears. After calibration, phones display their section; unlocated phones get three manual section buttons. Manual locations remain coarse.
+1. Audience phones join, synchronize and verify assets automatically. They turn their volume up and wait. Sound starts automatically where the browser allows it; otherwise one **Tap to enable sound** action appears. After calibration, phones display their automatic section; unlocated phones can choose Left, Center left, Center right or Right. Manual locations remain coarse.
 2. In **Performance**, select **Prepare cue**, inspect ready/excluded counts, then **Start show**. Stop, pause, seek, gain, mute/solo and the persistent **MUTE ALL** use the real server. Live reassignment verifies readiness for the new channel before scheduling it.
 3. For optical localization, keep participating pages visible; open **Calibration**, prepare, start three camera recordings, then arm. Leave recording margin around the 11.75-second pattern (250 ms symbols, no optical run tag). Upload each original clip, specify column/rotation and four ordered seating anchors (or accept a coarse result), process, review annotated stills and unresolved IDs, then commit the map. For a one-camera test, select only that upload with **Include Camera**; use each original recording once. The review distinguishes decoded devices, seat coordinates and column-only results.
-4. Use rectangle/lasso selection for localized phones, or explicit IDs/manual columns for unresolved phones. Geometry corrections require processing and review again. A generated video must be labeled **synthetic**.
+4. Committing reviewed calibration automatically divides localized phones into four balanced groups from audience-left to audience-right and applies saved section-to-music presets. Step **02 Sections** shows the results. Geometry corrections require processing and review again. A generated video must be labeled **synthetic**.
 5. Replace the tones through **Perform → Prepare show and stems**. Edit clip start/source offset/duration/gain while stopped; save the show before preparing playback. The shared 512 MiB decoded budget is per phone; browser and temporary decoding memory are additional, so rehearse large shows on the intended phones. Cue markers persist with the show; waveforms are computed only in the console.
 
 Local state and media live under ignored `runtime/local/`. Restart restores identities, show, map, run-tag allocation and routing, starts a fresh clock epoch, and stays stopped. An unfinished calibration must be repeated after restart. To start a separate concert, set a new `SESSION_ID` and separate `CHECKPOINT_PATH` rather than deleting the existing concert.
 
-For other devices, follow [Cloudflare Tunnel setup](docs/cloudflare-tunnel.md). The single tunnel targets port 3000 and serves `/`, `/admin`, `/present` and `/upload`. Open `/present` on the public hostname to show its audience QR, or set `NEXT_PUBLIC_PARTICIPANT_URL` before starting/building. Operator actions remain password protected; phone uploads use a limited camera token and verified 8 MiB chunks. Railway setup remains a separate milestone.
+For other devices during development, follow [Cloudflare Tunnel setup](docs/cloudflare-tunnel.md). The single tunnel targets port 3000 and serves `/`, `/admin`, `/present` and `/upload`. Open `/present` on the public hostname to show its audience QR, or set `NEXT_PUBLIC_PARTICIPANT_URL` before starting/building. Operator actions remain password protected; phone uploads use a limited camera token and verified 8 MiB chunks. Production uses the [Railway Docker service](docs/railway-deployment.md).
 
 ## Setup
 
