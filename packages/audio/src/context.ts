@@ -1,5 +1,6 @@
 // Adapted from BeatSync apps/client/src/lib/audioContextManager.ts (MIT).
 // See THIRD_PARTY_NOTICES.md and .devcontext/beat-sync-extraction.md.
+import { OutputClockReadiness } from "./timing";
 
 /** iOS 18+ uses a non-standard "interrupted" state (e.g. phone call, Siri). */
 export function isAudioContextPaused(state: string | null | undefined): boolean {
@@ -10,6 +11,9 @@ export function isAudioContextPaused(state: string | null | undefined): boolean 
 export class AudioContextHost {
   private ctx: AudioContext | null = null;
   private gain: GainNode | null = null;
+  private keepalive: OscillatorNode | null = null;
+  private keepaliveGain: GainNode | null = null;
+  private readonly outputClock = new OutputClockReadiness();
   private wakeLock: WakeLockSentinel | null = null;
   private visibilityListener: (() => void) | null = null;
   private readonly listeners = new Set<(state: string) => void>();
@@ -21,7 +25,20 @@ export class AudioContextHost {
       const ctx = this.create();
       this.gain = ctx.createGain();
       this.gain.connect(ctx.destination);
-      ctx.onstatechange = () => { for (const listener of this.listeners) listener(ctx.state); };
+      // BeatSync's 1 Hz / -80 dB keepalive warms the output path before the first music cue.
+      // A zero-gain graph can be optimized away. This is below the audible frequency range.
+      this.keepalive = ctx.createOscillator();
+      this.keepalive.frequency.value = 1;
+      this.keepaliveGain = ctx.createGain();
+      this.keepaliveGain.gain.value = 0.0001;
+      this.keepalive.connect(this.keepaliveGain);
+      this.keepaliveGain.connect(this.gain);
+      this.keepalive.start();
+      this.outputClock.reset();
+      ctx.onstatechange = () => {
+        this.outputClock.reset();
+        for (const listener of this.listeners) listener(ctx.state);
+      };
       this.ctx = ctx;
     }
     return this.ctx;
@@ -35,6 +52,8 @@ export class AudioContextHost {
   get state(): string | null {
     return this.ctx?.state ?? null;
   }
+
+  outputReady(): boolean { return this.ctx !== null && this.outputClock.ready(this.ctx); }
 
   onStateChange(listener: (state: string) => void): () => void {
     this.listeners.add(listener);
@@ -56,6 +75,12 @@ export class AudioContextHost {
     await this.wakeLock?.release().catch(() => {});
     this.wakeLock = null;
     const ctx = this.ctx;
+    this.keepalive?.stop();
+    this.keepalive?.disconnect();
+    this.keepaliveGain?.disconnect();
+    this.keepalive = null;
+    this.keepaliveGain = null;
+    this.outputClock.reset();
     this.ctx = null;
     this.gain = null;
     if (ctx && ctx.state !== "closed") await ctx.close();

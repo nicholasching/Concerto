@@ -46,7 +46,7 @@ class Phone {
   readonly control = new ShowControl({
     send: message => this.ws.send(JSON.stringify(message)), identity: () => this.snapshot ? { sessionId, serverEpoch: this.snapshot.serverEpoch, deviceId: this.id } : null,
     now: () => this.clock.nowServerMs(), preload: show => this.preload(show),
-    facts: () => ({ audioRunning: this.audioReady, clockUsable: this.clock.quality().ready, verified: (id, hash) => this.hashes[id] === hash }),
+    facts: () => ({ audioRunning: this.audioReady, audioOutputReady: this.audioReady, clockUsable: this.clock.quality().ready, verified: (id, hash) => this.hashes[id] === hash }),
   });
   readonly engine: Engine = {
     load: () => this.calls.push("load"), setTransport: transport => this.calls.push(`transport:${transport.status}:${transport.transportRevision}`),
@@ -147,14 +147,14 @@ try {
     assert.equal(location.status, "localized");
     const selected = selectRectangle(current.audienceMap.locations, { x: location.x! - 0.01, y: location.y! - 0.01 }, { x: location.x! + 0.01, y: location.y! + 0.01 }, current.audienceMap.mapRevision);
     assert.deepEqual(selected.deviceIds, [phones[index].id]);
-    await request("/api/assignments", { expectedRevision: current.assignmentRevision, mapRevision: selected.mapRevision, deviceIds: selected.deviceIds, channelId: show.channels[index % show.channels.length].channelId, effectiveServerMs: current.serverMs + 4000 });
+    await request("/api/assignments", { expectedRevision: current.assignmentRevision, mapRevision: selected.mapRevision, deviceIds: selected.deviceIds, channelId: show.channels[index % show.channels.length].channelId, effectiveServerMs: current.serverMs + 2000 });
   }
   await until(snapshot, s => s.pendingActions.length === 0);
   current = await snapshot();
   await request("/api/transport", { expectedRevision: current.transport.transportRevision, action: "prepare", showRevision: current.show.showRevision, positionMs: 0, effectiveServerMs: 0 });
   await until(snapshot, s => s.preparations.find(p => p.domain === "transport")?.readyIds.length === 4);
   current = await snapshot();
-  await request("/api/transport", { expectedRevision: current.transport.transportRevision, action: "play", showRevision: current.show.showRevision, positionMs: 0, effectiveServerMs: current.serverMs + 4000 });
+  await request("/api/transport", { expectedRevision: current.transport.transportRevision, action: "play", showRevision: current.show.showRevision, positionMs: 0, effectiveServerMs: current.serverMs + 2000 });
   await until(snapshot, s => s.transport.status === "playing");
   await until(() => phones.every(phone => phone.calls.some(call => call.startsWith("transport:playing:"))), Boolean);
   assert.deepEqual(show.channels.map(channel => channel.label), ["Melody", "Vocals", "Percussion"]);
@@ -167,7 +167,7 @@ try {
   const switchAck = await request("/api/assignments", { ...assignment, preparationId: prep.preparationId });
   assert.equal(switchAck.ready, 1); assert.deepEqual(switchAck.excluded.map((item: { deviceId: number }) => item.deviceId), [phones[1].id]);
   current = await snapshot();
-  await request("/api/mix", { expectedRevision: current.mix.mixRevision, masterGain: 0.3, channels: current.show.channels, effectiveServerMs: current.serverMs + 4000 });
+  await request("/api/mix", { expectedRevision: current.mix.mixRevision, masterGain: 0.3, channels: current.show.channels, effectiveServerMs: current.serverMs + 2000 });
   await until(snapshot, s => s.mix.masterGain === 0.3);
   phones[0].status(); await Bun.sleep(150);
   assert.ok(phones[0].calls.includes("mix:0.3"));

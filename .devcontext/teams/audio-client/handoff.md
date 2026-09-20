@@ -1,5 +1,7 @@
 # audio-client handoff
 
+Main integration follow-up: [playback recovery journal](../integration/journal/20260920-playback-recovery.md) supersedes the historical readiness/timing details below. ShowControl callers must supply current `audioOutputReady` and call `refreshReadiness()` after clock/output changes; all source/lease updates are gated. See the linked decision for the internal API, two-second controls, checks and physical limitations.
+
 Read [stage brief](../../stages/02-audio-client.md), root rules/masterplan and shared schema notes before changing code. Workflow: take the next slice from the stage brief, write a subplan under `plans/`, get it reviewed, then implement.
 
 ## Slice 4 (2026-09-19): channel playback, transport, mix, panic and lease

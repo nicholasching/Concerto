@@ -33,6 +33,13 @@ describe("timing", () => {
     ctx.outputLatency = 0.2;
     expect(serverMsToAudioTime(new FakeClock(), asAudioContext(ctx), 6000)).toBe(before);
   });
+
+  test("the timestamp fallback compensates reported output delay once", () => {
+    const ctx = new FakeAudioContext();
+    ctx.currentTime = 3;
+    ctx.outputLatency = 0.12;
+    expect(serverMsToAudioTime(new FakeClock(), asAudioContext(ctx), 2500, 1000)).toBeCloseTo(4.38, 9);
+  });
 });
 
 describe("context", () => {
@@ -45,6 +52,8 @@ describe("context", () => {
     expect(fakes).toHaveLength(1);
     expect(fakes[0].resumeCalls).toBe(1);
     expect(host.state).toBe("running");
+    expect(fakes[0].oscillators).toHaveLength(1);
+    expect(fakes[0].oscillators[0].frequency.value).toBe(1);
   });
 
   test("resumes from the iOS interrupted state and reports state changes", async () => {
@@ -71,6 +80,7 @@ describe("context", () => {
     host.context();
     await host.dispose();
     expect(fakes[0].state).toBe("closed");
+    expect(fakes[0].oscillators[0].stopped).toBe(1);
     host.context();
     expect(fakes).toHaveLength(2);
   });

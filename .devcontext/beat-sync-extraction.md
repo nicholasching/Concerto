@@ -1,5 +1,11 @@
 # BeatSync extraction provenance
 
+## First-play/recovery follow-up — 2026-09-20 UTC
+
+`packages/audio/src/context.ts` additionally adapts the 1 Hz oscillator and 0.0001 (-80 dB) keepalive gain from `audioContextManager.ts` (SHA-256 `b71b602d6e655d9f9dc8f1381be25f13c68d7c4b82eeb4c5fd0dad0b42d9268a`). Unlike the source, node references are retained for explicit disposal. The reference remains unchanged; the existing full MIT attribution applies. This supersedes slice 1's omission of the keepalive.
+
+New output-readiness tests characterize warmup/interruption. Valid timestamp conversion is unchanged; fallback now subtracts finite nonnegative `baseLatency + outputLatency` once, superseding the uncompensated fallback. No optical adjustment/manual nudge. [Decision and evidence](decisions/20260920-playback-readiness-and-cue-lead.md).
+
 Reference: supplied beatsync-source/ tree. The source files have not been edited. The upstream commit is not supplied; SHA-256 identifies the exact input. Full MIT notice is in THIRD_PARTY_NOTICES.md.
 
 The clock estimator and audio engine are extracted. The source's own two-device physical

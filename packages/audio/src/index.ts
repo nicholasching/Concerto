@@ -11,7 +11,7 @@ export interface AudioEngine {
 export interface AudioEngineOptions { clock: SynchronizedClock }
 
 export { AudioContextHost, isAudioContextPaused, setPlaybackAudioSession } from "./context";
-export { perfToAudioTime, serverMsToAudioTime } from "./timing";
+export { OutputClockReadiness, perfToAudioTime, serverMsToAudioTime } from "./timing";
 export { AssetError, DecodedBudget, DEFAULT_DECODED_BUDGET_BYTES, decodedBytes, loadTrack, preloadTracks, sha256Hex, type LoadedTrack, type PreloadFailure, type TrackData } from "./assets";
 export { scheduleClick, type ScheduledClick } from "./schedule";
 export { clipStarts, REJOIN_LEAD_MS, showPositionAt, type ClipStart, type TransportData } from "./timeline";

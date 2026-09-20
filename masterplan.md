@@ -370,7 +370,7 @@ Deliver in this order:
 
 A phone reports separate connection, clock, foreground, audio-unlocked, assets-decoded, and assignment states. These are not interchangeable. Start with a measured clock-quality eligibility threshold of about 20 ms; tune from test results and report the configured value. Avoid broadcasting the full registry after each probe/join; aggregate operator telemetry to roughly 1-2 updates per second.
 
-For normal concert cues, start with at least three seconds of lead time **after preparation is ready**. Reuse BeatSync's measured network-delay approach to tune this. The operator sees ready/expected/excluded counts and can postpone or explicitly run the ready subset. One slow client must not freeze the entire show.
+For normal concert cues, the user now requests **two seconds after preparation is ready**, superseding the original three-second baseline. Transport, mix and default assignment use this delay. Backend admission requires 1500 ms remaining on receipt, leaving 500 ms for command transit without shifting the shared deadline. Calibration keeps its four-second camera countdown; panic stays immediate. See the [playback readiness decision](.devcontext/decisions/20260920-playback-readiness-and-cue-lead.md). The operator sees ready/expected/excluded counts and can postpone or explicitly run the ready subset. One slow client must not freeze the entire show.
 
 ### Team 2: audio engine and audience client
 
@@ -400,6 +400,8 @@ Before a future transport change becomes effective, retain the previous effectiv
 Convert a cue's server time to client performance time using `packages/sync/`, then to AudioContext time using one tested output-clock strategy. Schedule with Web Audio source/gain methods. JavaScript timers may maintain a queue but must not be the mechanism that starts sound at the deadline. The [Web Audio specification](https://www.w3.org/TR/webaudio/#dom-audiocontext-getoutputtimestamp) defines the relationship returned by `getOutputTimestamp()`; feature-detect valid support and test the fallback. Never subtract output latency again when the chosen mapping already accounts for it.
 
 During reassignment, prepare the target assets first, then atomically change subscription and schedule a short gain ramp at the common switch time. Retain the old channel until the target is ready or explicitly mute the device; do not silently play a missing asset. Preserve the common playhead instead of restarting the target track at zero. For a late cue, compute a new future rendezvous from current authoritative state or remain silent and request resync; calibration packets are never locally restarted late.
+
+Playback execution now requires a fresh full clock warmup, running and warmed output, and verified channel assets. Snapshots/commits/leases cannot bypass these checks. The output path warms before first music with the attributed below-audible keepalive; fallback platforms compensate reported latency only when no output timestamp is used. Returning phones rejoin at the future shared playhead. Physical acoustic verification remains separate.
 
 Panic invalidates all queued audio actions and mutes immediately on receipt. Add a bounded playback lease, initially 10 seconds renewed by control heartbeats, so disconnected phones stop instead of playing indefinitely. A disconnected phone cannot receive an instantaneous panic; expose the lease bound and test it. A fresh authenticated snapshot and explicit ready state are required before it resumes.
 

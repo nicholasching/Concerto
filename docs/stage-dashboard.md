@@ -34,6 +34,9 @@ Use **Performance → Prepare cue**, inspect readiness/exclusions, then **Start 
 
 ## Checks and recovery
 
+- Performance actions (play, pause, stop, seek, mute, solo and gain) take effect two seconds after the click. Assignment defaults to two seconds after preparation; calibration keeps its four-second camera countdown. Panic is immediate.
+- Wait for **Show clock: In sync**, **Music: Verified**, and **Sound: Ready** before preparing the cue. Sound warms automatically after the browser permits playback. A reconnecting/backgrounded phone waits for fresh clock samples and audio readiness, then rejoins at the running show's position. No audience play/stop/play sequence is needed.
+
 - A connection check, clock check and verified music are separate conditions. Keep phones visible and rehearse their actual audio output; software readiness does not measure speaker onset.
 - Uploads reporting a missing progress route during an in-place frontend update can retry against the older server's idempotent chunk endpoint. If the phone retains old frontend code, refresh `/upload`, sign in and reselect its original file. Do not reset or restart the active calibration just to refresh the uploader.
 - Backend restart preserves committed show/map/routing and identities, but an unfinished calibration must be repeated. Reset deliberately clears those audience identities and mappings.

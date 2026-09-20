@@ -36,7 +36,7 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
     setError(null); setStatus(null);
     try {
       const pos = action === "stop" ? 0 : (positionMsArg ?? (action === "play" ? cuePosition : null) ?? showPositionMs(transport));
-      await adapter.sendTransport({ action, showRevision: show.showRevision, positionMs: pos, effectiveServerMs: futureMs(3) });
+      await adapter.sendTransport({ action, showRevision: show.showRevision, positionMs: pos, effectiveServerMs: futureMs(2) });
       setStatus(`${action} sent — pending.`);
       refresh();
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
@@ -46,14 +46,14 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
     setError(null);
     try {
       const channels = mixChannels.map(c => c.channelId === channelId ? { ...c, ...patch } : c);
-      await adapter.sendMix({ masterGain, channels, effectiveServerMs: futureMs(4) });
+      await adapter.sendMix({ masterGain, channels, effectiveServerMs: futureMs(2) });
       refresh();
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
   async function setMaster(value: number) {
     setError(null);
-    try { await adapter.sendMix({ masterGain: value, channels: mixChannels, effectiveServerMs: futureMs(4) }); refresh(); }
+    try { await adapter.sendMix({ masterGain: value, channels: mixChannels, effectiveServerMs: futureMs(2) }); refresh(); }
     catch (cause) { setError(String(cause)); }
   }
 

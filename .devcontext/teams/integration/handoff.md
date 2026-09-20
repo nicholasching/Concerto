@@ -1,5 +1,7 @@
 # Local integrated concert handoff
 
+Latest playback follow-up: **cb271b1** checkpoint pushed first. Read [two-second controls and playback recovery](journal/20260920-playback-recovery.md) for code causes, checks, runtime updates and remaining physical phone verification.
+
 Latest: [five-phone positioning follow-up](journal/20260919-five-phone-positioning.md). UI checkpoint eb274b3 is pushed. New uploads automatically map with a declared stage-facing frame layout; decoder v1.6 accepts valid non-colliding IDs with disclosed tracking/repeat warnings. All five phones in the supplied PXL clip are verified, including console click/box selection in an isolated physical-result review. Existing committed live map/assignments are preserved; old jobs do not change retrospectively. Refresh pages and run a new calibration to use the new backend/frontend metadata. See the journal for exact gate evidence and live runtime state.
 
 Date: 2026-09-19. Owner: captain. Current implementation: main after the four feature merges.

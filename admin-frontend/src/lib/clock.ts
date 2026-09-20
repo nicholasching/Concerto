@@ -40,9 +40,9 @@ export function connectClock(url: string): () => void {
 export const nowServerMs = () => clock.nowServerMs();
 export const clockReady = () => clock.quality().ready;
 export const lastSyncAgeMs = () => clock.quality().sampleAgeMs ?? Infinity;
-export function futureServerMs(seconds = 4): number {
+export function futureServerMs(seconds = 2): number {
   if (!clockReady()) throw new Error("Wait for the operator clock to synchronize.");
-  return nowServerMs() + Math.max(4, seconds) * 1000;
+  return nowServerMs() + Math.max(2, seconds) * 1000;
 }
 export function showPositionMs(transport: { status: string; positionMs: number; startServerMs: number | null }): number {
   return transport.status === "playing" && transport.startServerMs !== null && clockReady()

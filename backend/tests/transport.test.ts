@@ -213,6 +213,21 @@ describe("scheduled transport", () => {
     expect(context.state.transport.status).toBe("stopped");
   });
 
+  test("a two-second cue survives command transit and retains the exact shared deadline", async () => {
+    const context = await prepared();
+    await transport(context.app, { commandId: "prep-1", action: "prepare", expectedRevision: 1, showRevision: 1 });
+    acknowledge(context, 0, { preparationId: preparationIdOf(context) });
+    const effectiveServerMs = serverMs + 2000;
+    serverMs += 300; // HTTP travel time: do not reject a correctly scheduled two-second cue.
+    const response = await transport(context.app, { commandId: "play-1", action: "play", expectedRevision: 1, showRevision: 1, effectiveServerMs });
+    expect(response.status).toBe(200);
+    expect(context.state.pendingIn("transport")?.effectiveServerMs).toBe(effectiveServerMs);
+    context.state.applyDue(effectiveServerMs - 1);
+    expect(context.state.transport.status).toBe("stopped");
+    context.state.applyDue(effectiveServerMs);
+    expect(context.state.transport).toMatchObject({ status: "playing", startServerMs: effectiveServerMs });
+  });
+
   test("the pending action becomes effective at its moment and not before", async () => {
     const context = await prepared();
     await transport(context.app, { commandId: "prep-1", action: "prepare", expectedRevision: 1, showRevision: 1 });

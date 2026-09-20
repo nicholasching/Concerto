@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Playback recovery and two-second controls
+
+All prior fixes are committed/pushed as **cb271b1**. The following playback changes implement two-second performance/assignment cues and gate recovery/first playback on current clock, audio-output and asset readiness. Read the [decision](decisions/20260920-playback-readiness-and-cue-lead.md) and [verification journal](teams/integration/journal/20260920-playback-recovery.md). Physical acoustic comparison remains separate from passing software/browser checks.
+
 ### Five-phone positioning follow-up
 
 All outstanding UI work was committed/pushed as **eb274b3** before debugging. Decoder v1.6 now accepts all five valid devices in the supplied PXL recording; new uploads automatically request approximate stage-facing map positions. The user's broader valid-code/no-collision policy is implemented with explicit warnings, retained run/membership/collision checks, and a distinct frame-layout mode. Read [evidence and handoff](teams/integration/journal/20260919-five-phone-positioning.md), [geometry decision](decisions/20260919-automatic-frame-layout.md), and [acceptance decision](decisions/20260919-valid-code-acceptance.md). Earlier manual-preset requirements are historical.

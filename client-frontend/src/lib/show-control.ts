@@ -17,6 +17,7 @@ export interface Engine {
 
 export interface PlaybackFacts {
   audioRunning: boolean;
+  audioOutputReady: boolean;
   clockUsable: boolean;
   /** True when this exact track (id and hash) is decoded and verified. */
   verified: (trackId: string, sha256: string) => boolean;
@@ -57,26 +58,34 @@ export class ShowControl {
   private panicRevision = -1;
   private panicked = false;
   private engine: Engine | null = null;
+  private engineActive = false;
   /** Effective master gain, including recovery from the authoritative snapshot. */
   private lastMasterGain = 1;
   private epoch: string | null = null;
-  private needsReload = false;
+  private needsReload = true;
+  private awaitingSnapshot = true;
 
   constructor(private readonly options: ShowControlOptions) {}
 
   attach(engine: Engine | null): void {
     this.engine = engine;
-    this.settle();
+    this.engineActive = false;
+    this.needsReload = true;
     this.reloadEngine();
   }
 
   disconnected(): void {
     this.engine?.panic();
+    this.engineActive = false;
     this.leaseExpiresMs = null;
     this.needsReload = true;
+    this.awaitingSnapshot = true;
   }
 
-  contextResumed(): void { this.engine?.contextResumed(); }
+  /** Called on current clock/output changes, not just after React has rendered them. */
+  refreshReadiness(): void { this.settle(); this.updateEngine(); }
+
+  contextResumed(): void { this.needsReload = true; this.engine?.panic(); this.refreshReadiness(); }
 
   applySnapshot(snapshot: ParticipantSnapshotData): void {
     const epochChanged = this.epoch !== snapshot.serverEpoch;
@@ -88,6 +97,7 @@ export class ShowControl {
       this.leaseExpiresMs = null;
       this.lastMasterGain = 1;
     }
+    this.awaitingSnapshot = false;
     this.settle();
     const before = { show: JSON.stringify([this.show?.showId, this.show?.showRevision]),
       transport: JSON.stringify([this.transport, this.pendingTransport]), channel: JSON.stringify([this.channelId, this.pendingChannel]),
@@ -114,17 +124,18 @@ export class ShowControl {
     }
     if (epochChanged || this.needsReload || before.show !== JSON.stringify([this.show.showId, this.show.showRevision])) this.reloadEngine();
     else {
-      const now = this.options.now() ?? snapshot.serverMs;
-      if (before.transport !== JSON.stringify([this.transport, this.pendingTransport])) this.engine?.setTransport(this.pendingTransport?.value ?? this.transport, this.pendingTransport?.atServerMs ?? now);
-      if (before.channel !== JSON.stringify([this.channelId, this.pendingChannel])) this.engine?.setChannel(this.pendingChannel ? this.pendingChannel.value : this.channelId, this.pendingChannel?.atServerMs ?? now);
-      if (before.mix !== JSON.stringify([this.mix, this.pendingMix])) this.engine?.setMix(this.pendingMix?.value ?? this.mix, this.pendingMix?.atServerMs ?? now);
+      this.updateEngine(engine => {
+        const now = this.options.now()!;
+        if (before.transport !== JSON.stringify([this.transport, this.pendingTransport])) engine.setTransport(this.pendingTransport?.value ?? this.transport!, this.pendingTransport?.atServerMs ?? now);
+        if (before.channel !== JSON.stringify([this.channelId, this.pendingChannel])) engine.setChannel(this.pendingChannel ? this.pendingChannel.value : this.channelId, this.pendingChannel?.atServerMs ?? now);
+        if (before.mix !== JSON.stringify([this.mix, this.pendingMix])) engine.setMix(this.pendingMix?.value ?? this.mix!, this.pendingMix?.atServerMs ?? now);
+      });
     }
     this.transportRevision = Math.max(this.transportRevision, this.pendingTransport?.value.transportRevision ?? -1);
     for (const action of snapshot.pendingActions) {
       if (action.domain === "mix") this.mixRevision = Math.max(this.mixRevision, action.mixRevision);
       if (action.domain === "assignment") this.assignmentRevision = Math.max(this.assignmentRevision, action.assignments.find(item => item.deviceId === snapshot.deviceId)?.assignmentRevision ?? -1);
     }
-    this.needsReload = false;
   }
 
   handle(message: ServerMessageData): void {
@@ -138,7 +149,7 @@ export class ShowControl {
       case "panic": this.onPanic(); break;
       case "lease.renew":
         this.leaseExpiresMs = message.payload.expiresServerMs;
-        this.engine?.renewLease(message.payload.expiresServerMs);
+        this.updateEngine(engine => engine.renewLease(message.payload.expiresServerMs));
         break;
     }
   }
@@ -175,7 +186,8 @@ export class ShowControl {
     const me = this.options.identity();
     const { preparationId, assignment } = message.payload;
     if (!me || assignment.deviceId !== me.deviceId) return;
-    const reason = !this.options.facts().audioRunning ? "audio-locked" : !this.options.facts().clockUsable ? "clock-or-foreground" : !this.channelReady(assignment.channelId) ? "assets-missing" : null;
+    const facts = this.options.facts();
+    const reason = !facts.audioRunning ? "audio-locked" : !facts.clockUsable ? "clock-or-foreground" : !facts.audioOutputReady ? "audio-warming-up" : !this.channelReady(assignment.channelId) ? "assets-missing" : null;
     this.reply({ type: "assignment.ready", payload: { preparationId, ready: reason === null, reason, assignmentRevision: assignment.assignmentRevision } });
   }
 
@@ -186,7 +198,7 @@ export class ShowControl {
     this.assignmentRevision = mine.assignmentRevision;
     this.settle();
     this.pendingChannel = { value: mine.channelId, atServerMs: message.effectiveServerMs };
-    this.engine?.setChannel(mine.channelId, message.effectiveServerMs);
+    this.updateEngine(engine => engine.setChannel(mine.channelId, message.effectiveServerMs));
   }
 
   private onTransportPrepare(message: Message<"transport.prepare">): void {
@@ -195,6 +207,7 @@ export class ShowControl {
     const channel = this.pendingChannel ? this.pendingChannel.value : this.channelId;
     const reason = !facts.audioRunning ? "audio-locked"
       : !facts.clockUsable ? "clock"
+      : !facts.audioOutputReady ? "audio-warming-up"
       : this.show?.showRevision !== showRevision ? "show-mismatch"
       : !this.channelReady(channel) ? "assets-missing"
       : null;
@@ -208,7 +221,7 @@ export class ShowControl {
     this.panicked = false;
     this.settle();
     this.pendingTransport = { value: transport, atServerMs: message.effectiveServerMs };
-    this.engine?.setTransport(transport, message.effectiveServerMs);
+    this.updateEngine(engine => engine.setTransport(transport, message.effectiveServerMs));
   }
 
   private onMixCommit(message: Message<"mix.commit">): void {
@@ -218,7 +231,8 @@ export class ShowControl {
     this.lastMasterGain = masterGain;
     this.settle();
     this.pendingMix = { value: { masterGain, channels }, atServerMs: message.effectiveServerMs };
-    this.engine?.setMix(this.pendingMix.value, message.effectiveServerMs);
+    const mix = this.pendingMix.value;
+    this.updateEngine(engine => engine.setMix(mix, message.effectiveServerMs));
   }
 
   private onPanic(): void {
@@ -254,13 +268,30 @@ export class ShowControl {
   }
 
   private reloadEngine(): void {
+    this.needsReload = true;
+    this.updateEngine();
+  }
+
+  private updateEngine(change?: (engine: Engine) => void): void {
     const engine = this.engine;
     if (!engine || !this.show || !this.transport) return;
+    const facts = this.options.facts();
+    if (this.awaitingSnapshot || !facts.audioRunning || !facts.audioOutputReady || !facts.clockUsable || this.options.now() === null
+      || !this.channelReady(this.channelId) || (this.pendingChannel !== null && !this.channelReady(this.pendingChannel.value))) {
+      if (this.engineActive) engine.panic();
+      this.engineActive = false;
+      this.needsReload = true;
+      return;
+    }
+    if (!this.needsReload) { change?.(engine); return; }
+    this.settle();
     engine.load(this.show, this.transport, this.channelId, this.mix ?? { masterGain: this.lastMasterGain, channels: this.show.channels });
     if (this.pendingTransport) engine.setTransport(this.pendingTransport.value, this.pendingTransport.atServerMs);
     if (this.pendingChannel) engine.setChannel(this.pendingChannel.value, this.pendingChannel.atServerMs);
     if (this.pendingMix) engine.setMix(this.pendingMix.value, this.pendingMix.atServerMs);
     if (this.leaseExpiresMs !== null) engine.renewLease(this.leaseExpiresMs);
+    this.needsReload = false;
+    this.engineActive = true;
   }
 
   private reply(body: Pick<Extract<ClientMessageData, { type: "assets.ready" | "assignment.ready" | "transport.ready" }>, "type" | "payload">): void {

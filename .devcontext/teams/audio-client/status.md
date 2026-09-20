@@ -1,5 +1,7 @@
 # audio-client checkpoint
 
+Integration follow-up on main (2026-09-20 UTC): two-second cue support, synchronous fresh-clock/output/assets execution gates, output warmup/keepalive, and corrected fallback latency. See [current playback evidence](../integration/journal/20260920-playback-recovery.md). Historical slice status below is superseded by main integration. Physical acoustic comparison remains pending.
+
 Status: in progress (slices 1-4 ready for integration; physical checks outstanding).
 Owner: Team 2 human lead, to be named.
 Branch: feat/audio-client. Base: foundation-v1 = ab59c27105627977ee52dc2bcd4276b4532b9e2a.

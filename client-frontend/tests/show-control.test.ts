@@ -29,7 +29,7 @@ beforeEach(() => {
   now = T0;
   sent = [];
   calls = [];
-  facts = { audioRunning: true, clockUsable: true, verified: () => true };
+  facts = { audioRunning: true, audioOutputReady: true, clockUsable: true, verified: () => true };
   control = new ShowControl({ send: message => sent.push(ClientMessage.parse(message)), identity: () => me, facts: () => facts, preload: async () => {}, now: () => now });
   control.applySnapshot(base);
   control.attach(engine);
@@ -170,4 +170,75 @@ test("a server restart clears panic revisions and previous audio lease", () => {
   control.handle(transportCommit(playing(1, T0 + 3000), T0 + 3000));
   expect(calls).toEqual([["transport", 1, T0 + 3000]]);
   expect(control.view().panicked).toBe(false);
+});
+
+test("reconnect snapshots and leases cannot schedule with an uncalibrated clock", () => {
+  control.disconnected();
+  facts.clockUsable = false;
+  calls = [];
+  control.applySnapshot({ ...base, transport: playing(7, T0 - 1000) });
+  control.handle({ ...envelope, type: "lease.renew", payload: { expiresServerMs: T0 + 5000 } });
+  control.handle(transportCommit(playing(8, T0 + 2000), T0 + 2000));
+  expect(calls.filter(call => call[0] !== "panic")).toEqual([]);
+});
+
+test("a clock reset blocks a commit synchronously before the next UI render", () => {
+  facts.clockUsable = false;
+  control.handle(transportCommit(playing(1, T0 + 2000), T0 + 2000));
+  expect(calls).toEqual([["panic"]]);
+});
+
+test("recovery waits for clock, output, and assets then loads only the latest state once", () => {
+  control.disconnected();
+  facts.clockUsable = facts.audioOutputReady = false;
+  control.applySnapshot({ ...base, assignment: { ...base.assignment, channelId: "channel-0" }, transport: playing(7, T0 - 1000) });
+  control.handle(transportCommit(playing(8, T0 + 500), T0 + 500));
+  control.handle({ ...envelope, type: "lease.renew", payload: { expiresServerMs: T0 + 5000 } });
+  calls = [];
+  facts.clockUsable = true;
+  control.refreshReadiness();
+  expect(calls).toEqual([]);
+  facts.audioOutputReady = true;
+  facts.verified = () => false;
+  control.refreshReadiness();
+  expect(calls).toEqual([]);
+  facts.verified = () => true;
+  now += 1500;
+  control.refreshReadiness();
+  expect(calls).toEqual([["load", 8, "channel-0"], ["lease", T0 + 5000]]);
+  control.refreshReadiness();
+  expect(calls).toHaveLength(2);
+  expect(control.view().positionMs).toBe(1000);
+});
+
+test("a healthy clock does not replay the old show before the reconnect snapshot arrives", () => {
+  control.disconnected();
+  calls = [];
+  control.refreshReadiness();
+  expect(calls).toEqual([]);
+  control.applySnapshot({ ...base, serverEpoch: "new-epoch" });
+  expect(calls.filter(call => call[0] === "load")).toHaveLength(1);
+});
+
+test("prepare excludes a cold output even with an unlocked context and good clock", () => {
+  facts.audioOutputReady = false;
+  control.handle({ ...envelope, type: "transport.prepare", payload: { preparationId: "p", showRevision: 1, transportRevision: 1 } });
+  expect(lastReply().payload).toMatchObject({ ready: false, reason: "audio-warming-up" });
+});
+
+test("show replacement while timing is lost immediately silences the previous engine", () => {
+  facts.clockUsable = false;
+  control.applySnapshot({ ...base, show: { ...base.show, showRevision: 2 } });
+  expect(calls).toEqual([["panic"]]);
+});
+
+test("recovery checks assets for the assignment effective now, not an expired old channel", () => {
+  control.applySnapshot({ ...base, assignment: { ...base.assignment, channelId: "channel-0" } });
+  control.handle(assignmentCommit(null, 1, T0 + 1000));
+  facts.verified = () => false;
+  control.refreshReadiness();
+  calls = [];
+  now += 1500;
+  control.refreshReadiness();
+  expect(calls).toEqual([["load", 0, null]]);
 });

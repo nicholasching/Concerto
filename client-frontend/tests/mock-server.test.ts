@@ -161,7 +161,7 @@ test("assign, play, then reconnect mid-song rebuilds the same playhead from the 
   let connection: ParticipantConnection | null = null;
   const control = new ShowControl({
     send: message => { connection!.send(message); }, identity,
-    facts: () => ({ audioRunning: true, clockUsable: true, verified: () => true }),
+    facts: () => ({ audioRunning: true, audioOutputReady: true, clockUsable: true, verified: () => true }),
     preload: async () => {}, now: nowMs,
   });
   control.attach({

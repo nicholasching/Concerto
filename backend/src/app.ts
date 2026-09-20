@@ -29,7 +29,9 @@ import { nextTransport, positionAt } from "./transport";
 import { validateShow } from "./show-validation";
 import { registerStageRoutes } from "./stage-routes";
 
-export const DEFAULT_LEAD_TIME_MS = 3000;
+// Operator schedules two seconds ahead; allow 500 ms for the HTTP command to reach us.
+// Commands delayed beyond this still fail instead of silently starting phones late.
+export const DEFAULT_LEAD_TIME_MS = 1500;
 
 const numeric = z.coerce.number();
 const CameraUploadQuery = z.object({

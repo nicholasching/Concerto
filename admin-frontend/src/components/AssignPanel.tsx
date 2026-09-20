@@ -10,7 +10,7 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
   const adapter = useAdapter();
   const [selected, setSelected] = useState<DeviceSelection | null>(null);
   const [channelId, setChannelId] = useState<string>(snapshot.show.channels[0]?.channelId ?? "");
-  const [effectiveDelay, setEffectiveDelay] = useState(4);
+  const [effectiveDelay, setEffectiveDelay] = useState(2);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [undo, setUndo] = useState<Map<string | null, number[]> | null>(null);
@@ -80,7 +80,7 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
       <div className="actions">
         <div className="channel-picker" role="group" aria-label="Musical part">{snapshot.show.channels.map(ch => <button key={ch.channelId} aria-pressed={ch.channelId === channelId} className={ch.channelId === channelId ? "chosen" : ""} style={{ borderColor: ch.channelId === channelId ? channelColor : undefined }} onClick={() => setChannelId(ch.channelId)}><span className="swatch" style={{ background: ch.color }} />{ch.label}</button>)}</div>
         <label>Apply in
-        <input type="number" min={4} value={effectiveDelay} onChange={e => setEffectiveDelay(Math.max(4, Number(e.target.value)))} /> seconds after preparation
+        <input type="number" min={2} value={effectiveDelay} onChange={e => setEffectiveDelay(Math.max(2, Number(e.target.value)))} /> seconds after preparation
         </label>
         <button className="primary large" disabled={!selected?.deviceIds.length || selected.mapRevision !== snapshot.audienceMap.mapRevision} onClick={() => assign(channelId, effectiveDelay, selected)}>Assign {selected?.deviceIds.length ?? 0} phones</button>
         <button onClick={() => assign(null, effectiveDelay, selected)}>Clear assignment</button>

@@ -46,6 +46,7 @@ export default function Page() {
   const [conn, setConn] = useState<ConnectionState>({ status: { kind: "joining", attempt: 0 }, identity: null, snapshot: null, notice: null });
   const [foreground, setForeground] = useState(true);
   const [audioState, setAudioState] = useState<string | null>(null);
+  const [outputReady, setOutputReady] = useState(false);
   const [verifiedHashes, setVerifiedHashes] = useState<Record<string, string>>({});
   const [assetNote, setAssetNote] = useState<string | null>(null);
   const [audioNote, setAudioNote] = useState<string | null>(null);
@@ -74,7 +75,8 @@ export default function Page() {
       },
       facts: () => ({
         audioRunning: host.current?.state === "running",
-        clockUsable: document.visibilityState === "visible" && serverClock.quality().ready,
+        audioOutputReady: host.current?.outputReady() ?? false,
+        clockUsable: connection.current?.current.status.kind === "connected" && document.visibilityState === "visible" && serverClock.quality().ready,
         verified: (trackId, sha256) => cache.current.get(trackId)?.sha256 === sha256,
       }),
       preload: async showToLoad => {
@@ -83,7 +85,7 @@ export default function Page() {
         await preloadTracks(showToLoad.tracks, { ctx: audio.context(), budget: budget.current, baseUrl: api }, cache.current);
         setVerifiedHashes(Object.fromEntries([...cache.current.values()].map(track => [track.trackId, track.sha256])));
       },
-      now: () => serverClock?.nowServerMs() ?? null,
+      now: () => serverClock.quality().ready ? serverClock.nowServerMs() : null,
     });
     showControl.current = control;
     const client = new ParticipantConnection({
@@ -97,11 +99,18 @@ export default function Page() {
       onChange: state => {
         // A run can't survive losing the socket or a server restart.
         if (state.status.kind !== "connected") { session.abort("disconnected"); control.disconnected(); serverClock.stop(); }
-        else if (state.snapshot) serverClock.start(state.snapshot.serverEpoch);
+        else if (state.snapshot) {
+          serverClock.start(state.snapshot.serverEpoch);
+          control.applySnapshot(state.snapshot);
+        }
+        setClockQuality(serverClock.quality());
         setConn(state);
       },
       onMessage: message => {
-        if (message.type === "clock.reply") serverClock.accept({ ...message.payload, serverEpoch: message.serverEpoch });
+        if (message.type === "clock.reply") {
+          serverClock.accept({ ...message.payload, serverEpoch: message.serverEpoch });
+          control.refreshReadiness();
+        }
         else if (message.type === "calibration.prepare") {
           session.onPrepare(message, { foreground: document.visibilityState === "visible", clockUsable: serverClock.quality().ready, optedOut: false });
         } else if (message.type === "calibration.arm" && serverClock.quality().ready) {
@@ -118,6 +127,8 @@ export default function Page() {
       setForeground(visible);
       if (!visible) session.abort("hidden");
       if (visible) { serverClock.refresh(); client.wake(); }
+      control.refreshReadiness();
+      setClockQuality(serverClock.quality());
     };
     const onOnline = () => client.wake();
     onVisibility();
@@ -160,30 +171,31 @@ export default function Page() {
       if (cancelled) return;
       setVerifiedHashes(Object.fromEntries([...cache.current.values()].map(track => [track.trackId, track.sha256])));
       setAssetNote(failures.length ? `Failed: ${failures.map(failure => failure.message).join("; ")}` : null);
+      showControl.current?.refreshReadiness();
     });
     return () => { cancelled = true; };
   }, [showKey, audioState]);
 
-  // Every new authoritative snapshot rebuilds playback state (reconnect, late join).
-  useEffect(() => {
-    if (connected && conn.snapshot) showControl.current?.applySnapshot(conn.snapshot);
-  }, [conn.snapshot, connected]);
-
-  // The engine exists only while audio runs and a server clock exists. It is rebuilt when verified
-  // tracks change, so a finished preload is picked up; a resumed context gets a fresh engine too.
+  // ShowControl gates every engine call on fresh clock/output/assets. Keep the engine stable
+  // across telemetry and asset reports; reconnect or context interruption gets a new graph.
   useEffect(() => {
     const audio = host.current;
     const control = showControl.current;
-    if (!audio || !control || audioState !== "running" || !connected || !clockQuality.ready) return;
+    if (!audio || !control || audioState !== "running" || !connected) return;
     const engine = new PlaybackEngine({ ctx: audio.context(), output: audio.masterGain, clock: serverClock, buffer: trackId => cache.current.get(trackId)?.buffer });
     control.attach(engine);
     const housekeeping = window.setInterval(() => engine.tick(), 1000);
     return () => { window.clearInterval(housekeeping); control.attach(null); engine.dispose(); };
-  }, [audioState, verifiedHashes, connected, clockQuality.ready, conn.snapshot?.serverEpoch]);
+  }, [audioState, connected, conn.snapshot?.serverEpoch]);
 
   // Refresh the playback display (playhead, countdowns, received commands) whether or not audio runs.
   useEffect(() => {
-    const refresh = window.setInterval(() => { setTick(value => value + 1); setClockQuality(serverClock.quality()); }, 250);
+    const refresh = window.setInterval(() => {
+      showControl.current?.refreshReadiness();
+      setOutputReady(host.current?.outputReady() ?? false);
+      setTick(value => value + 1);
+      setClockQuality(serverClock.quality());
+    }, 250);
     return () => window.clearInterval(refresh);
   }, []);
 
@@ -213,7 +225,11 @@ export default function Page() {
   async function enableSound(automatic = false) {
     if (!host.current) {
       host.current = new AudioContextHost();
-      host.current.onStateChange(setAudioState);
+      host.current.onStateChange(state => {
+        showControl.current?.refreshReadiness();
+        setAudioState(state);
+        setOutputReady(false);
+      });
     }
     host.current.context();
     setAudioState(host.current.state);
@@ -249,6 +265,7 @@ export default function Page() {
     { label: "Connection", value: connected ? "Connected" : connectionLabel(conn), ok: connected },
     { label: "Show clock", value: clockQuality.ready ? "In sync" : "Syncing…", ok: clockQuality.ready },
     { label: "Music", value: assetsVerified ? "Verified" : tracks.length ? "Loading…" : "Waiting for show", ok: assetsVerified },
+    { label: "Sound", value: outputReady ? "Ready" : audioState === "running" ? "Warming up…" : "Tap to enable", ok: outputReady },
   ];
   function chooseSection(column: "left" | "center" | "right") {
     const snapshot = connection.current?.current.snapshot;

@@ -1,7 +1,7 @@
 # Local integrated software verification
 
-Date: 2026-09-20T00:43:47.560Z
-Duration: 21.4 s
+Date: 2026-09-20T01:18:45.429Z
+Duration: 15.5 s
 
 - PASS: operator authentication, four real joins, shared clock convergence, hash-verified media download
 - PASS: manual column remains explicitly coarse with no fabricated coordinates
@@ -10,4 +10,4 @@ Duration: 21.4 s
 - PASS: live assignment readiness exclusions, scheduled mix recovery, immediate panic and cancellation
 - PASS: restart creates a fresh epoch, preserves identities/show/map/assignments, and stays stopped
 
-Evidence: real HTTP/WS and Python processing; generated MP4s are synthetic. Audio scheduling uses a recording double. No physical acoustic, phone, camera or venue claim. Runtime artifacts: C:\Users\nicho\OneDrive\Desktop\HackTheNorth\runtime\e2e\e2bf14c0-df87-4b32-af23-39ea15fb07f1
+Evidence: real HTTP/WS and Python processing; generated MP4s are synthetic. Audio scheduling uses a recording double. No physical acoustic, phone, camera or venue claim. Runtime artifacts: C:\Users\nicho\OneDrive\Desktop\HackTheNorth\runtime\e2e\fe3c0ba9-9511-4101-acf2-84cac7013107

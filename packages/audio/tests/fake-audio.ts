@@ -51,9 +51,11 @@ export class FakeAudioContext {
   state: string = "suspended";
   currentTime = 0;
   outputLatency = 0;
+  baseLatency = 0;
   outputTimestamp: { contextTime?: number; performanceTime?: number } = {};
   resumeCalls = 0;
   sources: FakeSource[] = [];
+  oscillators: (FakeSource & { frequency: { value: number } })[] = [];
   gains: FakeGain[] = [];
   destination = {};
   onstatechange: (() => void) | null = null;
@@ -64,6 +66,7 @@ export class FakeAudioContext {
   setState(state: string) { this.state = state; this.onstatechange?.(); }
   createGain() { const gain = new FakeGain(); this.gains.push(gain); return gain; }
   createBufferSource() { const source = new FakeSource(); this.sources.push(source); return source; }
+  createOscillator() { const source = Object.assign(new FakeSource(), { frequency: { value: 440 } }); this.oscillators.push(source); return source; }
   getOutputTimestamp() { return this.outputTimestamp; }
   async decodeAudioData(_bytes: ArrayBuffer) { return this.decoded; }
 }
