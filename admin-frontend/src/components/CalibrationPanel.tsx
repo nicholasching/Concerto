@@ -122,12 +122,12 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   const now = tick >= 0 && clockReady() ? nowServerMs() : null;
   const finishedCapture = run?.startServerMs !== null && run?.startServerMs !== undefined && now !== null && now >= run.startServerMs + calibrationDurationMs(run.plan);
   return <section>
-    <div className="stage-heading"><span className="stage-number">01</span><div><p className="eyebrow">FIND THE AUDIENCE</p><h2>Calibration</h2></div><span className="stage-badge">{run ? run.status : "Ready to begin"}</span></div>
-    <p className="muted">Start your cameras, prepare the phones, then run the 11-second pattern. Upload one, two or three views from this console or <a href="/upload" target="_blank" rel="noreferrer">a camera phone ↗</a>.</p>
+    <div className="stage-heading"><span className="stage-number">01</span><h2>Calibration</h2><span className="stage-badge">{run ? run.status : "Ready"}</span></div>
+    <p className="muted">Record the phone pattern, then upload up to three views here or from <a href="/upload" target="_blank" rel="noreferrer">a camera phone ↗</a>.</p>
     {error && <p role="alert" className="error">{error}</p>}
-    {!run && <><button className="primary large" disabled={busy || !snapshot} onClick={() => void act(prepare)}>Prepare calibration <span aria-hidden="true">→</span></button><details><summary>Choose specific phones</summary><label>Target device IDs <input value={targetIds} placeholder="All ready phones" onChange={event => setTargetIds(event.target.value)} /></label></details></>}
+    {!run && <><button className="primary large" disabled={busy || !snapshot} onClick={() => void act(prepare)}>Prepare calibration</button><details><summary>Choose specific phones</summary><label>Target device IDs <input value={targetIds} placeholder="All ready phones" onChange={event => setTargetIds(event.target.value)} /></label></details></>}
     {run && <>
-      <p>Calibration {run.plan.runTag} · {run.status} · {run.plan.participantIds.length} participating phones</p>
+      <p className="muted">Run {run.plan.runTag} · {run.plan.participantIds.length} phones</p>
       {run.reports.length > 0 && <p>{run.reports.filter(report => report.completed).length} phones finished; {run.reports.filter(report => !report.completed).length} interrupted.</p>}
       {run.reports.filter(report => !report.completed).map(report => <p key={report.deviceId}>Device {report.deviceId}: {report.reason ?? "pattern interrupted"}</p>)}
       {barrier && <p>{barrier.readyIds.length}/{barrier.expectedIds.length} ready; {barrier.excluded.length} excluded; {barrier.expectedIds.length - barrier.readyIds.length - barrier.excluded.length} pending.</p>}
@@ -144,7 +144,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
           <input type="file" accept="video/*" aria-label={`Camera ${index + 1} video`} disabled={!!activeJob} onChange={e => setSlots(current => current.map((item, i) => i === index ? { ...item, file: e.target.files?.[0] ?? null } : item))} />
           <CameraGeometry file={slot.file} preview={previews[previewIndex] ? { url: previews[previewIndex], rotationDegrees: uploaded?.rotationDegrees ?? 0 } : undefined}
             value={slot.geometry} disabled={busy || !!activeJob} onChange={geometry => setSlots(current => current.map((item, i) => i === index ? { ...item, geometry } : item))} />
-          <button disabled={!slot.file || slot.busy || !!uploaded || !finishedCapture} onClick={() => void upload(index)}>{uploaded ? "Uploaded and hashed" : slot.busy ? `Uploading ${Math.round(slot.progress * 100)}%` : "Upload recording"}</button>
+          <button disabled={!slot.file || slot.busy || !!uploaded || !finishedCapture} onClick={() => void upload(index)}>{uploaded ? "Uploaded" : slot.busy ? `Uploading ${Math.round(slot.progress * 100)}%` : "Upload recording"}</button>
           {uploaded && <p>{uploaded.label} · {(uploaded.byteSize / 1e6).toFixed(1)} MB · {uploaded.anchors ? "Seating corners saved" : "Automatic approximate frame layout"}</p>}
           {uploaded && <label><input type="checkbox" disabled={!!activeJob || busy} checked={!excludedUploads.includes(uploaded.uploadId)} onChange={event => {
             setExcludedUploads(current => event.target.checked ? current.filter(id => id !== uploaded.uploadId) : [...current, uploaded.uploadId]);

@@ -24,24 +24,24 @@ export default function Page() {
     catch (cause) { setActionError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setResetting(false); }
   }
-  if (!snapshot) return <main className="login-shell"><div className="brand"><span className="brand-mark">◒</span>Concerto</div>
-    <div className="login-panel"><p className="eyebrow">STAGE CONTROL</p><h1>Bring the crowd<br />into the music.</h1><p className="muted">Sign in to run the show.</p>
+  if (!snapshot) return <main className="login-shell"><div className="brand"><span className="brand-mark" aria-hidden="true">c</span>Concerto</div>
+    <div className="login-panel"><h1>Stage control.</h1><p className="muted">Sign in to run the show.</p>
       <form onSubmit={event => { event.preventDefault(); setActionError(null); void login(secret).catch(cause => setActionError(cause instanceof Error ? cause.message : String(cause))); }}>
         <label>Admin password<input type="password" autoComplete="current-password" autoFocus value={secret} onChange={event => setSecret(event.target.value)} /></label>
-        <button className="primary large" type="submit" disabled={!secret}>Enter control room <span aria-hidden="true">→</span></button>
+        <button className="primary large" type="submit" disabled={!secret}>Sign in</button>
       </form>
       {actionError && <p role="alert" className="error">{actionError}</p>}
-      {!loading && error?.includes("not detected") && <p className="error">The control server is unavailable. Start the concert services to connect.</p>}
-    </div><p className="muted">One audience. One orchestra.</p></main>;
+      {!loading && error?.includes("not detected") && <p className="error">Control server unavailable. Start the concert services.</p>}
+    </div><div className="speaker-grille" aria-hidden="true" /></main>;
 
   return <main className="console-shell">
-    <header className="console-header"><div><div className="brand"><span className="brand-mark">◒</span>Concerto</div><h1>Stage control<span className="live-tag">LIVE</span></h1></div>
-      <div className="header-links"><a href="/present" target="_blank" rel="noreferrer">Projector view ↗</a><a href="/upload" target="_blank" rel="noreferrer">Camera uploads ↗</a></div></header>
+    <header className="console-header"><div><div className="brand"><span className="brand-mark" aria-hidden="true">c</span>Concerto</div><h1>Stage control</h1></div>
+      <div className="header-links"><a href="/present" target="_blank" rel="noreferrer">Projector ↗</a><a href="/upload" target="_blank" rel="noreferrer">Camera upload ↗</a></div></header>
     <div className="command-bar"><nav aria-label="Show stages"><button className="reset-control" onClick={() => setResetOpen(true)}>↺ Reset</button><a href="#calibration"><span>01</span> Calibration</a><a href="#assign"><span>02</span> Sections</a><a href="#performance"><span>03</span> Performance</a></nav>
       <button className="panic" onClick={() => { setActionError(null); void adapter.panic().then(refresh).catch(cause => setActionError(String(cause))); }}>■ MUTE ALL</button></div>
     {(error || actionError) && <p role="alert" className="error notice-box">{actionError ?? error}</p>}
-    <div className="session-overview"><div className="section-caption"><span>AUDIENCE STATUS</span><span className={clockReady() ? "status" : "muted"}>{clockReady() ? "● Control clock in sync" : "○ Synchronizing control clock"}</span></div>
-      <div className="metric-grid">{[[summary?.connected, "Connected", "Live phones"], [summary?.clockReady, "In sync", "Ready for timing"], [musicReady, "Music verified", "Assets on device"], [summary?.audioUnlocked, "Sound enabled", "Audio ready"], [summary?.localized, "Mapped", "Positions confirmed"]].map(([count, label, description]) => <div className="metric" key={String(label)}><span>{label}</span><strong>{count ?? 0}</strong><small>{description}</small></div>)}</div>
+    <div className="session-overview"><div className="section-caption"><span>Audience</span><span className={clockReady() ? "status" : "muted"}>{clockReady() ? "● Clock synced" : "○ Syncing clock…"}</span></div>
+      <div className="metric-grid">{[[summary?.connected, "Connected"], [summary?.clockReady, "In sync"], [musicReady, "Music ready"], [summary?.audioUnlocked, "Sound enabled"], [summary?.localized, "Mapped"]].map(([count, label]) => <div className="metric" key={String(label)}><span>{label}</span><strong>{count ?? 0}</strong></div>)}</div>
     </div>
     <div className="stage-panels" key={snapshot.serverEpoch}>
       <div id="calibration"><CalibrationPanel refresh={refresh} snapshot={snapshot} /></div>

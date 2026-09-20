@@ -64,8 +64,8 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
 
   return (
     <section>
-      <div className="stage-heading"><span className="stage-number">03</span><div><p className="eyebrow">CONDUCT THE SHOW</p><h2>Performance</h2></div><span className="stage-badge">{transport.status}</span></div>
-      <p className="muted">Prepare the music, check the ready count, then start the show. Every phone follows the same playhead.</p>
+      <div className="stage-heading"><span className="stage-number">03</span><h2>Performance</h2><span className="stage-badge">{transport.status}</span></div>
+      <p className="muted">Prepare a cue, check readiness, then start.</p>
       {error && <p role="alert" className="error">Error: {error}</p>}
       {status && <p className="status">{status}</p>}
       {preparation && <p>Prepared cue: {preparation.readyIds.length}/{preparation.expectedIds.length} acknowledged. {preparation.excluded.length} excluded; {preparation.expectedIds.length - preparation.readyIds.length - preparation.excluded.length} awaiting response.</p>}
@@ -77,7 +77,7 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
         <button className="primary large" onClick={() => send("play")} disabled={!clockReady() || !preparation?.readyIds.length || transport.status === "playing"}>▶ Start show</button>
         <button onClick={() => send("pause")} disabled={transport.status === "stopped"}>Ⅱ Pause</button>
         <button onClick={() => send("stop")}>■ Stop</button>
-        <span className="muted">Status: {transport.status}. Position: {(position / 1000).toFixed(1)}s / {(widthMs / 1000).toFixed(1)}s</span>
+        <span className="muted" aria-label="Playback position">{(position / 1000).toFixed(1)}s / {(widthMs / 1000).toFixed(1)}s</span>
       </div>
 
       <div className="timeline">

@@ -36,13 +36,13 @@ export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData;
   const budgetMb = DECODED_AUDIO_BUDGET_BYTES / 1024 / 1024;
   const sectionChannels = sectionChannelsFor(draft);
   return <details id="show-configuration" open={snapshot.show.clips.length === 0}><summary>Prepare show and stems</summary>
-    <p>Align stems to the same musical origin. Add audio per channel, then save while stopped. Phones preload the saved show.</p>
+    <p className="muted">Align stems to the same start. Save while stopped to preload phones.</p>
     {!editable && <p>Stop transport and wait for pending changes before editing.</p>}
     {error && <p role="alert" className="error">{error}</p>}
     <fieldset disabled={!editable || busy}>
       <label>Show name <input value={draft.label} onChange={e => edit({ ...draft, label: e.target.value })} /></label>
       <h3>Audience section presets</h3>
-      <p>Choose the music for each automatic quarter before calibration. Multiple sections can play the same lane. Save to apply these presets to the current audience too.</p>
+      <p className="muted">Choose each section’s music. Save to apply to the current audience.</p>
       <div className="audience-section-grid">{AUDIENCE_SECTIONS.map(section => <label key={section.id}>{section.label}
         <select aria-label={`${section.label} music`} value={sectionChannels[section.id] ?? ""} onChange={event => edit({ ...draft,
           sectionChannels: { ...sectionChannels, [section.id]: event.target.value || null } })}>
@@ -51,7 +51,7 @@ export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData;
       </label>)}</div>
       {draft.clips.length === 0 && <button onClick={() => edit({ showId: crypto.randomUUID(), showRevision: snapshot.show.showRevision, label: "Concerto", tracks: [], clips: [],
         channels: DEFAULT_SHOW_CHANNELS.map(channel => ({ ...channel, gain: 0.5, mute: false, solo: false })) })}>Set up three channels</button>}
-      {draft.channels.map(channel => <div key={channel.channelId}><h3 style={{ color: channel.color }}>{channel.label}</h3>
+      {draft.channels.map(channel => <div key={channel.channelId}><h3><span className="swatch" style={{ background: channel.color }} aria-hidden="true" />{channel.label}</h3>
         <label>Add prepared audio <input type="file" accept="audio/*" aria-label={`Upload ${channel.label} audio`} onChange={e => void upload(e.target.files?.[0], channel.channelId)} /></label>
         {draft.clips.filter(clip => clip.channelId === channel.channelId).map(clip => <div key={clip.clipId} className="clip-editor">
           <strong>{draft.tracks.find(track => track.trackId === clip.trackId)?.label}</strong>

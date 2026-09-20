@@ -93,14 +93,20 @@ small,.muted { color: var(--muted); font-size: 12px; }
 .present-stats strong { font-size: clamp(36px, 3.7vw, 66px); font-weight: 400; line-height: 1; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
 .present-stats span { font-size: 13px; color: var(--muted); }
 .present-stats p { font-size: clamp(16px, 1.7vw, 26px); color: #3e444c; margin: 0; text-align: right; text-wrap: balance; }
-.upload-shell .eyebrow { margin-top: 55px; }
-.upload-shell h1 { font-size: 46px; }
-.upload-card { background: #ffffff28; border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin: 26px 0; box-shadow: inset 0 1px #fff9; }
+.upload-shell { display: flex; flex-direction: column; }
+.upload-heading { margin: 48px 0 0; text-align: center; }
+.upload-heading .concerto-orb { width: 112px; height: 112px; padding: 5px; margin: 10px auto 32px; }
+.upload-heading .orb-bezel { padding: 4px; }
+.upload-heading .orb-screen canvas { transform: scale(1.1); }
+.upload-shell h1 { font-size: 38px; }
+.upload-heading .audience-instruction { margin-bottom: 0; }
+.upload-shell .audience-footer { margin-top: auto; }
+.upload-card { background: #ffffff30; border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin: 26px 0; box-shadow: inset 0 1px #fff9, 0 12px 24px -22px #0008; }
 .upload-card .primary { width: 100%; margin-top: 16px; }
 .upload-card small { display: block; margin-top: 14px; }
 .upload-card fieldset { padding: 0; border: 0; margin-top: 28px; min-width: 0; }
 .upload-card legend { font-size: 12px; color: var(--muted); }
-.upload-state { font-size: 12px; display: flex; align-items: center; gap: 10px; }
+.upload-state { font-size: 12px; display: flex; align-items: center; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid #b1b4b8; }
 .file-drop { position: relative; border: 1px dashed #93979d; background: #ffffff40; border-radius: 12px; padding: 24px 14px; text-align: center; margin: 20px 0; overflow: hidden; }
 .file-drop>span { font-size: 32px; display: block; color: var(--ink); }
 .file-drop strong { display: block; overflow-wrap: anywhere; }
