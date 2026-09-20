@@ -2,7 +2,7 @@
 
 Owner: integration captain. All fixtures in this directory are synthetic and contain no audience recording or copied song.
 
-- `admin-snapshot.json` / `participant-snapshot.json`: 30 IDs, Melody/Vocals/Percussion channel definitions, stopped transport, 27 localized examples plus coarse/ambiguous/unseen cases. Audio readiness is false.
+- `admin-snapshot.json` / `participant-snapshot.json`: 30 IDs, Melody/Vocals/Percussion/Percussion 2 channel definitions, stopped transport, 27 localized examples plus coarse/ambiguous/unseen cases. Audio readiness is false.
 - `show.json` / `media/tone-*.wav`: original low-amplitude 8-second PCM16 test tones with actual SHA-256 hashes and format metadata. These are not the musical arrangement.
 - `client-message.json` / `server-messages.json`: clock probe, snapshot, calibration prepare/arm wire examples.
 - `otc/clean-30/manifest.json` / `result.json`: shared worker boundary. The observations are hand-authored synthetic data, including a rejected duplicate/reflection. Video paths/hashes are placeholders: **there are no MP4 recordings in this fixture**. Validate or explicitly replay it; do not claim to have decoded video.

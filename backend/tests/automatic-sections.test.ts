@@ -41,11 +41,12 @@ test("committing calibration automatically assigns count quartiles to the saved 
 test("saving presets reroutes existing groups without another calibration, and rejects unknown channels", () => {
   const { state } = setup(); commit(state);
   const previousMap = state.audienceMap;
-  const show = { ...state.show, sectionChannels: { left: "channel-1", "center-left": null, "center-right": "channel-2", right: "channel-0" } };
+  const show = { ...state.show, sectionChannels: { left: "channel-1", "center-left": null, "center-right": "channel-3", right: "channel-0" } };
   expect(validateShow(show)).toBeNull();
   state.saveShow(show);
   expect(state.channelMembers("channel-1")).toEqual([0, 1]);
-  expect(state.channelMembers("channel-2")).toEqual([4, 5]);
+  expect(state.channelMembers("channel-3")).toEqual([4, 5]);
+  expect(state.participantSnapshot(4, clock)?.assignment.channelId).toBe("channel-3");
   expect(state.audienceMap).toEqual(previousMap);
   expect(validateShow({ ...show, sectionChannels: { ...show.sectionChannels, right: "missing" } })).toContain("unknown musical channel");
 });

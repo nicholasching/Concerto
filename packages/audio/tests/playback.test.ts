@@ -111,13 +111,13 @@ describe("engine", () => {
     expect(startOf(started()[0])).toEqual([audio(T0 + REJOIN_LEAD_MS), (2500 + REJOIN_LEAD_MS) / 1000, (8000 - 3500) / 1000]);
   });
 
-  test("a channel switch starts the new channel at the playhead with a crossfade at the switch time", () => {
+  test.each(["channel-2", "channel-3"])("a switch to %s starts at the playhead with a crossfade at the switch time", channelId => {
     engine.load(show, stopped(0), "channel-0", mix);
     engine.setTransport(playing(1, T0 + 1000), T0 + 1000);
     clock.advance(2000); // now T0 + 2000, first segment playing
-    engine.setChannel("channel-2", T0 + 4000);
+    engine.setChannel(channelId, T0 + 4000);
     const [first, second] = started();
-    expect((second.buffer as { id: string }).id).toBe("tone-2");
+    expect((second.buffer as { id: string }).id).toBe(channelId === "channel-3" ? "tone-3" : "tone-2");
     expect(startOf(second)).toEqual([audio(T0 + 4000), 3, 5]);
     expect(first.stopped).toBe(0); // the old part keeps sounding until the switch
     expect(segmentGainOf(first).at(audio(T0 + 4000) - 0.001)).toBe(1);

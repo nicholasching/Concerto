@@ -1,7 +1,7 @@
 {
   "showId": "foundation-show",
   "showRevision": 1,
-  "label": "Synthetic three-channel fixture",
+  "label": "Synthetic four-channel fixture",
   "tracks": [
     {
       "trackId": "tone-0",
@@ -32,6 +32,16 @@
       "durationMs": 8000,
       "sampleRateHz": 16000,
       "channels": 1
+    },
+    {
+      "trackId": "tone-3",
+      "label": "Percussion 2 test tone",
+      "url": "/api/assets/tone-3",
+      "sha256": "946d5720435a611ccc098f01af83cb242b16718493e4707eabde4b6e6bbfa852",
+      "byteSize": 256044,
+      "durationMs": 8000,
+      "sampleRateHz": 16000,
+      "channels": 1
     }
   ],
   "channels": [
@@ -55,6 +65,14 @@
       "channelId": "channel-2",
       "label": "Percussion",
       "color": "#f59e0b",
+      "gain": 0.3,
+      "mute": false,
+      "solo": false
+    },
+    {
+      "channelId": "channel-3",
+      "label": "Percussion 2",
+      "color": "#f472b6",
       "gain": 0.3,
       "mute": false,
       "solo": false
@@ -83,6 +101,15 @@
       "clipId": "clip-2",
       "channelId": "channel-2",
       "trackId": "tone-2",
+      "timelineStartMs": 0,
+      "sourceOffsetMs": 0,
+      "durationMs": 8000,
+      "gain": 1
+    },
+    {
+      "clipId": "clip-3",
+      "channelId": "channel-3",
+      "trackId": "tone-3",
       "timelineStartMs": 0,
       "sourceOffsetMs": 0,
       "durationMs": 8000,

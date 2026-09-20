@@ -17,11 +17,11 @@ for (const source of show.tracks) {
   if (!response.ok) throw new Error(await response.text());
   tracks.push(Track.parse(await response.json()));
 }
-const registered = { ...show, showId: crypto.randomUUID(), label: "Original three-channel sound check", tracks,
+const registered = { ...show, showId: crypto.randomUUID(), label: "Original four-channel sound check", tracks,
   clips: show.clips.map(clip => ({ ...clip, trackId: tracks[show.tracks.findIndex(track => track.trackId === clip.trackId)].trackId })) };
 const response = await fetch(`${baseUrl}/api/show`, { method: "PUT", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify({
   protocolVersion: 1, sessionId, serverEpoch: snapshot.serverEpoch, commandId: crypto.randomUUID(), expectedRevision: snapshot.show.showRevision, show: registered,
 }) });
 if (!response.ok) throw new Error(await response.text());
 CommandAccepted.parse(await response.json());
-console.log("Uploaded three original 8-second tones for Melody, Vocals and Percussion and saved the real show. Join phones, enable sound, choose columns, assign channels, prepare, then play.");
+console.log("Uploaded four original 8-second tones for Melody, Vocals, Percussion and Percussion 2 and saved the real show. Join phones, enable sound, choose sections, assign channels, prepare, then play.");

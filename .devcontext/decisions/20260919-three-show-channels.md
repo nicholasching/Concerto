@@ -1,7 +1,7 @@
 # Three musical channels
 
 Date / author / team: 2026-09-19 / integration captain.
-Status: accepted, explicit user request.
+Status: superseded by [four musical tracks](20260920-four-musical-tracks.md), 2026-09-20. Originally accepted by explicit user request.
 Affected teams: sync/control, audio/client, admin/console, captain fixtures.
 
 ## Decision

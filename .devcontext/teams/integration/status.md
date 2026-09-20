@@ -1,5 +1,7 @@
 # Integration status
 
+Latest (2026-09-20): **Percussion 2** is the fourth musical lane, after Melody, Vocals and Percussion. Existing shows can append it using **Add Percussion 2**; the live local show has already been saved at revision 6 with its three audio clips and section presets preserved. Upload the fourth stem and choose its audience section in the editor. See [checks and handoff](journal/20260920-four-tracks.md).
+
 OTC v2 is active in the local/public app following a verified coordinated restart on 2026-09-20 at 03:50:58. Latest physical v1 replay improves 4/6 to 6/6 with clean identity bits; wider detector regressions and runtime state checks are in the [OTC journal](../otc-localization/journal/20260920-tolerant-detection.md). Fresh physical v2 capture is the next acceptance step.
 
 Manual-routing follow-up: **a29625e** committed/pushed before implementation. Manual section choices now assign a matching musical channel and ready late phones can join current playback. See the [current journal](journal/20260920-manual-section-routing.md) for verification and runtime status.

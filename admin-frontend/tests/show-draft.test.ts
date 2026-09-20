@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
-import { type ShowData } from "@orchestra/contracts";
-import { forgetShowDraft, recoverShowDraft, rememberShowDraft } from "../src/lib/show-draft";
+import { DEFAULT_SHOW_CHANNELS, Show, type ShowData } from "@orchestra/contracts";
+import { addPercussion2, forgetShowDraft, recoverShowDraft, rememberShowDraft } from "../src/lib/show-draft";
+import fixture from "../../fixtures/show.json";
 
 function memoryStorage() {
   const data = new Map<string, string>();
@@ -10,6 +11,30 @@ function memoryStorage() {
 }
 const saved: ShowData = { showId: "show", showRevision: 3, label: "Sound check", tracks: [], clips: [],
   channels: [{ channelId: "percussion", label: "Percussion", color: "#abcdef", gain: 1, mute: false, solo: false }] };
+
+test("adding Percussion 2 preserves an existing three-lane show and its recoverable draft", () => {
+  const existing: ShowData = { ...Show.parse(fixture), channels: DEFAULT_SHOW_CHANNELS.slice(0, 3).map(channel => ({ ...channel, gain: 0.7, mute: false, solo: false })),
+    clips: fixture.clips.filter(clip => clip.channelId !== "channel-3"), tracks: fixture.tracks.filter(track => track.trackId !== "tone-3"),
+    sectionChannels: { left: "channel-0", "center-left": "channel-1", "center-right": null, right: "channel-2" },
+    cueMarkers: [{ cueId: "cue", label: "Opening", positionMs: 2500 }] };
+  const before = structuredClone(existing);
+  const draft = addPercussion2(existing);
+  expect(Show.parse(draft).channels.map(channel => channel.label)).toEqual(["Melody", "Vocals", "Percussion", "Percussion 2"]);
+  expect({ ...draft, channels: draft.channels.slice(0, 3) }).toEqual(before);
+  expect(existing).toEqual(before);
+  expect(addPercussion2(draft)).toBe(draft);
+  const storage = memoryStorage();
+  rememberShowDraft("session", existing, draft, storage);
+  expect(recoverShowDraft("session", existing, storage)).toEqual(draft);
+});
+
+test("Percussion 2 addition avoids existing IDs and recognizes an already renamed lane", () => {
+  const existing = { ...saved, channels: [{ ...saved.channels[0], channelId: "channel-3" }] };
+  const draft = addPercussion2(existing);
+  expect(draft.channels[1].channelId).not.toBe("channel-3");
+  expect(Show.safeParse(draft).success).toBe(true);
+  expect(addPercussion2({ ...saved, channels: [{ ...saved.channels[0], label: " Percussion 2 " }] }).channels).toHaveLength(1);
+});
 
 test("unsaved music presets recover after an editor remount and clear only after save", () => {
   const storage = memoryStorage();

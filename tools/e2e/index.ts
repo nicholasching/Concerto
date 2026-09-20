@@ -159,8 +159,8 @@ try {
   await request("/api/transport", { expectedRevision: current.transport.transportRevision, action: "play", showRevision: current.show.showRevision, positionMs: 0, effectiveServerMs: current.serverMs + 2000 });
   await until(snapshot, s => s.transport.status === "playing");
   await until(() => phones.every(phone => phone.calls.some(call => call.startsWith("transport:playing:"))), Boolean);
-  assert.deepEqual(show.channels.map(channel => channel.label), ["Melody", "Vocals", "Percussion"]);
-  check("decoded map selections route four intended phones across Melody, Vocals and Percussion and schedule a prepared common cue");
+  assert.deepEqual(show.channels.map(channel => channel.label), ["Melody", "Vocals", "Percussion", "Percussion 2"]);
+  check("decoded map selections route four intended phones across Melody, Vocals, Percussion and Percussion 2 and schedule a prepared common cue");
   const latePhone = new Phone(); latePhone.audioReady = false; phones.push(latePhone);
   await latePhone.connect();
   assert.equal(latePhone.snapshot!.transport.status, "stopped");

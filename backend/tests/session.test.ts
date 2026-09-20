@@ -136,7 +136,7 @@ describe("role-filtered snapshots", () => {
     expect(parsed.role).toBe("admin");
     expect(parsed.devices.map(device => device.deviceId)).toEqual([0, 1]);
     expect(parsed.audienceMap.locations).toHaveLength(2);
-    expect(parsed.show.channels.map(channel => channel.label)).toEqual(["Melody", "Vocals", "Percussion"]);
+    expect(parsed.show.channels.map(channel => channel.label)).toEqual(["Melody", "Vocals", "Percussion", "Percussion 2"]);
   });
 
   test("a participant token cannot obtain the operator view", async () => {

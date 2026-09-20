@@ -1,4 +1,11 @@
-import { Show, type ShowData } from "@orchestra/contracts";
+import { DEFAULT_SHOW_CHANNELS, Show, type ShowData } from "@orchestra/contracts";
+
+export function addPercussion2(show: ShowData): ShowData {
+  const channel = DEFAULT_SHOW_CHANNELS[3];
+  if (show.channels.some(item => item.label.trim().toLowerCase() === channel.label.toLowerCase())) return show;
+  const channelId = show.channels.some(item => item.channelId === channel.channelId) ? crypto.randomUUID() : channel.channelId;
+  return { ...show, channels: [...show.channels, { ...channel, channelId, gain: 0.5, mute: false, solo: false }] };
+}
 
 type DraftStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 const key = (sessionId: string) => `orchestra.show-draft.v1.${sessionId}`;

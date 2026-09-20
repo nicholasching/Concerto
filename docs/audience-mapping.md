@@ -16,7 +16,7 @@ The map has the stage at the top, audience-left at the left, and the back of the
 
 ## Automatic sections and music presets
 
-Set each section's music in **Performance → Prepare show and stems → Audience section presets**. Left, Center left, Center right and Right can each play Melody, Vocals, Percussion or Silent. Several sections can use the same lane. Upload the desired tracks to their lanes and save the show while stopped; saving also updates already assigned phones.
+Set each section's music in **Performance → Prepare show and stems → Audience section presets**. Left, Center left, Center right and Right can each play Melody, Vocals, Percussion, Percussion 2 or Silent. Several sections can use the same lane. Upload the desired tracks to their lanes and save the show while stopped; saving also updates already assigned phones.
 
 Committing calibration automatically sorts all localized phones from audience-left to audience-right and divides them into four groups of equal size. When the total is not divisible by four, remainder phones go left-to-right, so group sizes differ by at most one. Tied horizontal coordinates use depth, then device ID, for stable membership. Recalibration recomputes the groups from the new distribution.
 

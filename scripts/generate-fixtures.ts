@@ -27,12 +27,12 @@ function tone(frequency: number) {
   return wav;
 }
 const tracks = DEFAULT_SHOW_CHANNELS.map(({ label }, index) => {
-  const wav = tone([220, 330, 440][index]);
+  const wav = tone([220, 330, 440, 550][index]);
   output(`fixtures/media/tone-${index}.wav`, wav);
   return { trackId: `tone-${index}`, label: `${label} test tone`, url: `/api/assets/tone-${index}`, sha256: createHash("sha256").update(wav).digest("hex"), byteSize: wav.length, durationMs: 8000, sampleRateHz: 16000, channels: 1 };
 });
 const show = Show.parse({
-  showId: "foundation-show", showRevision: 1, label: "Synthetic three-channel fixture",
+  showId: "foundation-show", showRevision: 1, label: "Synthetic four-channel fixture",
   tracks, channels: DEFAULT_SHOW_CHANNELS.map(channel => ({ ...channel, gain: 0.3, mute: false, solo: false })),
   clips: tracks.map((track, i) => ({ clipId: `clip-${i}`, channelId: `channel-${i}`, trackId: track.trackId, timelineStartMs: 0, sourceOffsetMs: 0, durationMs: 8000, gain: 1 })),
 });

@@ -13,7 +13,7 @@ Locally use `http://localhost:3000`; the configured public origin is `https://ht
 
 ## Before the audience arrives
 
-1. Open `/admin`. In **Performance → Prepare show and stems**, upload the desired Melody, Vocals and Percussion clips and choose music for Left, Center left, Center right and Right. Each section can use any lane or remain Silent. Save while stopped and wait for phone asset verification after changes.
+1. Open `/admin`. In **Performance → Prepare show and stems**, upload the desired Melody, Vocals, Percussion and Percussion 2 clips and choose music for Left, Center left, Center right and Right. Each section can use any lane or remain Silent. For an existing three-lane show, use **Add Percussion 2** to append the empty fourth lane. Save while stopped and wait for phone asset verification after changes.
 2. Open `/present` in the projector browser and enter browser full screen. The QR uses `NEXT_PUBLIC_PARTICIPANT_URL` when configured, otherwise the page's own origin. Configure this before starting Next or building production. Counts show connected phones, usable clocks and verified music; they are aggregate data without audience identities.
 3. To start a fresh audience, choose **Reset**, then **Disconnect and reset**. This stops sound, cancels pending work, clears identities/positions/assignments/calibration, invalidates credentials and rotates the clock epoch. Saved show and audio remain. Existing audience pages stay disconnected until refreshed; old resume tokens cannot restore old devices. Calibration counters keep increasing for server-side ordering; the new optical packet does not identify its recording run.
 
