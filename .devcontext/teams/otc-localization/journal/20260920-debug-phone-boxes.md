@@ -110,3 +110,24 @@ changing the production detector or identity policy.
   track and visible green qualified boxes. `.venv\\Scripts\\python.exe -m
   ruff check workers/otc` also passed. The local debug server remains listening
   on `127.0.0.1:3002`; no full gate was run.
+
+## Palette-evidence ownership follow-up
+
+- User-provided output showed a small correct phone box plus a large false green
+  box around an enclosing doorway/wall candidate. Cause: the prior renderer
+  gave red/blue evidence to every stable track whose rectangle contained the
+  true phone's coloured pixels.
+- Each red or blue connected component is now assigned exclusively to its
+  strongest geometric screen-track match. A component must cover at least 10%
+  of the candidate box and at least 65% of the component must overlap that
+  candidate. A large enclosing box therefore cannot inherit a small phone's
+  colours. Tracks with no assigned component receive neutral qualification
+  colour, so their generic screen colour cannot bypass this rule.
+- Added a focused regression with an exact phone track, a nearby overlapping
+  fragment, and a large enclosing ghost. Only the exact phone can receive the
+  red evidence.
+- Checks: `pytest workers/otc/tests/test_boxing.py -q` passed (3 tests) and
+  worker Ruff passed. After restarting the local server, an amber/blue upload
+  completed with zero expected red/blue boxes, and a generated true red/blue
+  upload completed through the HTTP API with 405 frames, 3 qualified tracks,
+  909 green-box frames, and an HTTP 200 result video. No full gate was run.
