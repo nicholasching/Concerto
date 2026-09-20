@@ -4,6 +4,8 @@ const backend = (process.env.BACKEND_INTERNAL_URL ?? "http://127.0.0.1:8080").re
 const admin = (process.env.ADMIN_INTERNAL_URL ?? "http://127.0.0.1:3001").replace(/\/$/, "");
 const development = process.env.NODE_ENV === "development";
 const config: NextConfig = {
+  // Match the encoded-audio ceiling enforced by the editor and backend.
+  experimental: { proxyClientMaxBodySize: 128 * 1024 * 1024 },
   transpilePackages: ["@orchestra/audio", "@orchestra/contracts", "@orchestra/sync"],
   devIndicators: false,
   allowedDevOrigins: ["*.trycloudflare.com", "htn.nicholasching.ca", ...(process.env.DEV_ALLOWED_ORIGINS ?? "").split(",").map(value => value.trim()).filter(Boolean)],
