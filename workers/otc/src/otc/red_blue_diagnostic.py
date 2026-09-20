@@ -1,11 +1,9 @@
-"""Red/blue diagnostic qualification ported from the fix-detection monitor."""
+"""Red/blue diagnostic qualification for the local flash-boxing monitor."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
-
-from .tracking import Track
 
 
 @dataclass(frozen=True)
@@ -29,8 +27,84 @@ class FlashSettings:
 
 DEFAULT_PALETTE_SETTINGS = PaletteSettings()
 DEFAULT_FLASH_SETTINGS = FlashSettings()
-MIN_PALETTE_SAMPLES_PER_COLOR = 2
 SELECTED_TRACK_MAX_AGE_MS = 350
+PHASE_MIN_SAMPLES = 2
+PHASE_MIN_DURATION_MS = 50
+PHASE_MAX_GAP_MS = 100
+REQUIRED_FLASH_SEQUENCE = ("red", "blue", "red", "blue")
+
+
+@dataclass
+class ColorPhase:
+    """One contiguous run of exclusively owned palette evidence."""
+
+    color: str
+    started_ms: float
+    last_seen_ms: float
+    samples: int = 1
+
+    @property
+    def valid(self):
+        return (self.samples >= PHASE_MIN_SAMPLES and
+                self.last_seen_ms - self.started_ms >= PHASE_MIN_DURATION_MS)
+
+
+@dataclass
+class FlashSequence:
+    """Confirm red -> blue -> red -> blue, never colour presence alone."""
+
+    completed: list[ColorPhase] = field(default_factory=list)
+    current: ColorPhase | None = None
+    confirmed: bool = False
+
+    def _reset_pending(self):
+        self.completed.clear()
+        self.current = None
+
+    def _matches_required_sequence(self):
+        if self.current is None or not self.current.valid:
+            return False
+        colors = [phase.color for phase in self.completed[-3:]] + [self.current.color]
+        return tuple(colors) == REQUIRED_FLASH_SEQUENCE
+
+    def observe(self, color: str, pts_ms: float) -> bool:
+        """Record one frame's evidence and return the latched qualification state.
+
+        ``mixed`` means red and blue independently matched the same screen in
+        one frame. It is deliberately not treated as a transition: a static
+        split-colour display must not look like a flashing phone.
+        """
+        if self.confirmed:
+            return True
+        if color not in {"red", "blue", "none", "mixed"}:
+            raise ValueError("Palette evidence must be red, blue, none, or mixed")
+        if color == "mixed":
+            self._reset_pending()
+            return False
+        if color == "none":
+            if self.current and pts_ms - self.current.last_seen_ms > PHASE_MAX_GAP_MS:
+                self._reset_pending()
+            return False
+        if self.current is None:
+            self.current = ColorPhase(color, pts_ms, pts_ms)
+        elif color == self.current.color:
+            if pts_ms - self.current.last_seen_ms > PHASE_MAX_GAP_MS:
+                self._reset_pending()
+                self.current = ColorPhase(color, pts_ms, pts_ms)
+            else:
+                self.current.last_seen_ms = pts_ms
+                self.current.samples += 1
+        elif pts_ms - self.current.last_seen_ms > PHASE_MAX_GAP_MS:
+            self._reset_pending()
+            self.current = ColorPhase(color, pts_ms, pts_ms)
+        elif self.current.valid:
+            self.completed = (self.completed + [self.current])[-3:]
+            self.current = ColorPhase(color, pts_ms, pts_ms)
+        else:
+            self._reset_pending()
+            self.current = ColorPhase(color, pts_ms, pts_ms)
+        self.confirmed = self._matches_required_sequence()
+        return self.confirmed
 
 
 def _hue_band(hsv, center, tolerance, saturation, value):
@@ -70,28 +144,6 @@ def flash_seed_mask(rgb, previous_value, settings=DEFAULT_FLASH_SETTINGS):
         (rise >= settings.minimum_rise), 255, 0,
     ).astype(np.uint8)
     return mask, value
-
-
-def track_has_both_palette_colors(track: Track, settings=DEFAULT_PALETTE_SETTINGS, now_ms=None) -> bool:
-    """Latch after two red and two blue samples while the same track stays visible."""
-    now_ms = track.samples[-1].pts_ms if now_ms is None else now_ms
-    if now_ms - track.samples[-1].pts_ms > SELECTED_TRACK_MAX_AGE_MS:
-        return False
-    colors = np.asarray([sample.rgb for sample in track.samples], dtype=np.uint8)
-    if len(colors) < MIN_PALETTE_SAMPLES_PER_COLOR * 2:
-        return False
-    hsv = cv2.cvtColor(colors.reshape(-1, 1, 3), cv2.COLOR_RGB2HSV).reshape(-1, 3)
-
-    def matches(center, tolerance):
-        hue = hsv[:, 0].astype(np.int16)
-        distance = np.minimum((hue - center) % 180, (center - hue) % 180)
-        return ((distance <= tolerance) & (hsv[:, 1] >= settings.saturation) &
-                (hsv[:, 2] >= settings.value))
-
-    return (np.count_nonzero(matches(settings.red_hue, settings.red_hue_tolerance)) >=
-            MIN_PALETTE_SAMPLES_PER_COLOR and
-            np.count_nonzero(matches(settings.blue_hue, settings.blue_hue_tolerance)) >=
-            MIN_PALETTE_SAMPLES_PER_COLOR)
 
 
 def carry_qualification_to_current_fragment(tracks, qualified_track_ids, now_ms):

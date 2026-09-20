@@ -37,7 +37,7 @@ form.addEventListener("submit", async event => {
     output.src = videoUrl;
     download.href = videoUrl;
     const details = job.summary ?? {};
-    summary.textContent = `${details.qualifiedTrackCount ?? 0} red/blue-qualified tracks, ${details.boxesDrawn ?? 0} green boxes across ${details.frameCount ?? 0} frames.`;
+    summary.textContent = `${details.qualifiedTrackCount ?? 0} flash-sequence-qualified tracks, ${details.boxesDrawn ?? 0} green boxes across ${details.frameCount ?? 0} frames.`;
     result.hidden = false;
     showStatus("Boxed video ready.");
   } catch (error) {

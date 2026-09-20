@@ -9,11 +9,11 @@ import av
 import cv2
 
 from .red_blue_diagnostic import (
+    FlashSequence,
     SELECTED_TRACK_MAX_AGE_MS,
     carry_qualification_to_current_fragment,
     flash_seed_mask,
     palette_masks,
-    track_has_both_palette_colors,
 )
 from .tracking import Sample, Track, _screen_components, scan_camera
 from .video import read_frames
@@ -57,15 +57,17 @@ def _overlap_area(first, second):
     return width * height
 
 
-def _palette_evidence_by_track(rgb, pts_ms, red, blue, screen_tracks):
-    """Assign each palette component to one compatible screen footprint.
+def _palette_phase_by_track(rgb, pts_ms, red, blue, screen_tracks):
+    """Assign palette components exclusively, then classify each screen frame.
 
     Colour inside a broad candidate is not enough: the coloured component must
     cover a material part of the screen box and mostly lie within it. This
     prevents a large wall/door track from inheriting a small phone's colours.
+    Red and blue assigned to one track in the same frame are ``mixed`` rather
+    than a transition, so a static split-colour screen cannot qualify.
     """
     best_by_track = {}
-    for palette_mask in (red, blue):
+    for color, palette_mask in (("red", red), ("blue", blue)):
         for component, _bounds, _mask in _screen_components(rgb, pts_ms, palette_mask):
             component_area = component.width * component.height
             choices = []
@@ -83,21 +85,23 @@ def _palette_evidence_by_track(rgb, pts_ms, red, blue, screen_tracks):
                 continue
             # The strongest geometric match owns this coloured blob. It cannot
             # also supply red/blue evidence to a containing ghost track.
-            score, coverage, track_id, screen = max(choices)
-            previous = best_by_track.get(track_id)
-            if previous is None or (score, coverage) > previous[:2]:
-                best_by_track[track_id] = (score, coverage, Sample(
-                    pts_ms, screen.x, screen.y, screen.width, screen.height, component.rgb
-                ))
-    return {track_id: evidence[-1] for track_id, evidence in best_by_track.items()}
+            score, coverage, track_id, _screen = max(choices, key=lambda choice: choice[:2])
+            per_color = best_by_track.setdefault(track_id, {})
+            previous = per_color.get(color)
+            if previous is None or (score, coverage) > previous:
+                per_color[color] = (score, coverage)
+    return {
+        track_id: "mixed" if len(colors) > 1 else next(iter(colors))
+        for track_id, colors in best_by_track.items()
+    }
 
 
 def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
     """Render the approved red/blue diagnostic monitor behavior for an uploaded clip.
 
-    Cyan dots are current visual tracks. A green `red + blue` rectangle needs
-    two samples of each colour and persists while that track remains visible.
-    Neither result is an accepted device identity or a map location.
+    Cyan dots are current visual tracks. A green rectangle requires a true
+    red -> blue -> red -> blue sequence and persists while tracked. Neither
+    result is an accepted device identity or a map location.
     """
     input_path = Path(input_path).resolve()
     output_path = Path(output_path).resolve()
@@ -122,7 +126,8 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     frames_written = boxes_drawn = 0
-    qualification_tracks, qualified_track_ids, seen_qualified_track_ids = {}, set(), set()
+    qualification_tracks, phase_by_track = {}, {}
+    qualified_track_ids, seen_qualified_track_ids = set(), set()
     previous_value = None
     try:
         with tempfile.NamedTemporaryFile(dir=output_path.parent, suffix=".mp4", delete=False) as target:
@@ -142,30 +147,25 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
                 for sample in _masked_screens(rgb, pts_ms, flash):
                     _rectangle(annotated, sample, MAGENTA)
                 frame_tracks = boxes_by_frame.get(key, [])
-                palette_evidence = _palette_evidence_by_track(
+                palette_phases = _palette_phase_by_track(
                     rgb, pts_ms, red, blue, frame_tracks
                 )
                 for track_id, sample in frame_tracks:
                     cv2.circle(annotated, (round(sample.x), round(sample.y)), 3, CYAN, -1)
-                    evidence = palette_evidence.get(track_id)
-                    # Qualification receives colour only from an exclusively
-                    # owned, scale-compatible palette component. Generic track
-                    # colour cannot turn a broad enclosing candidate green.
-                    color = evidence.rgb if evidence else (0.0, 0.0, 0.0)
                     qualification_tracks.setdefault(track_id, Track(track_id)).samples.append(
-                        Sample(sample.pts_ms, sample.x, sample.y, sample.width, sample.height, color)
+                        Sample(sample.pts_ms, sample.x, sample.y, sample.width, sample.height, (0, 0, 0))
                     )
+                    sequence = phase_by_track.setdefault(track_id, FlashSequence())
+                    if sequence.observe(palette_phases.get(track_id, "none"), pts_ms):
+                        qualified_track_ids.add(track_id)
                 current_tracks = list(qualification_tracks.values())
-                for track in current_tracks:
-                    if track_has_both_palette_colors(track, now_ms=pts_ms):
-                        qualified_track_ids.add(track.track_id)
                 carry_qualification_to_current_fragment(current_tracks, qualified_track_ids, pts_ms)
                 for track in current_tracks:
                     if (track.track_id not in qualified_track_ids or
                             pts_ms - track.samples[-1].pts_ms > SELECTED_TRACK_MAX_AGE_MS):
                         continue
                     track_id, sample = track.track_id, track.samples[-1]
-                    _rectangle(annotated, sample, GREEN, "red + blue")
+                    _rectangle(annotated, sample, GREEN, "flash sequence")
                     qualified_track_ids.add(track_id)
                     seen_qualified_track_ids.add(track_id)
                     boxes_drawn += 1

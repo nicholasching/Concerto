@@ -131,3 +131,30 @@ changing the production detector or identity policy.
   completed with zero expected red/blue boxes, and a generated true red/blue
   upload completed through the HTTP API with 405 frames, 3 qualified tracks,
   909 green-box frames, and an HTTP 200 result video. No full gate was run.
+
+## Temporal flash-sequence qualification
+
+- Approved scope: retain the local diagnostic's full-screen tracking and
+  exclusive palette-component ownership, but replace the weak "two red and two
+  blue samples" test. A green box now requires four distinct phases in order:
+  red, blue, red, blue.
+- A phase needs at least two observations spanning 50 ms. The state permits at
+  most a 100 ms gap, so isolated colour noise and a lost fragment cannot build
+  a sequence. If red and blue both match the same screen in one frame, that
+  sample is `mixed` and clears pending qualification; a static split-colour
+  display cannot look like a flashing phone.
+- Confirmation latches while the normal screen track remains visible, including
+  the debug phone's post-packet held colour. Pending phase state is intentionally
+  not transferred to another track; the existing conservative handoff remains
+  only for an already-confirmed box.
+- The inspection behind the plan confirmed that `detect_screens()` can start
+  independent bright or dim candidates, so blue-core is a preferred seed, not
+  a required discovery gate. No production tracker thresholds changed.
+- Focused check: `pytest workers/otc/tests/test_boxing.py -q` passed (6 tests),
+  and worker Ruff passed. Coverage includes a generated valid packet, static
+  split colours, a single colour change, one-frame noise, long gaps, ownership
+  ghosts, and a dim red-first candidate.
+- Restarted-server HTTP check: a retained true red/blue 405-frame clip was
+  submitted through the local boxing endpoint. It completed with 3 qualified
+  tracks, 780 green-box frames, and an HTTP 200 MP4 result. No full gate was
+  run.
