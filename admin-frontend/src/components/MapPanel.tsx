@@ -162,7 +162,7 @@ export function MapPanel({ map, assignments, channels, drawable, selection, onSe
         role="img" aria-label="Audience map"
       />
       {selection && <p className="muted">Selected: {selection.deviceIds.length} phones</p>}
-      {reviewed.some(location => location.status === "coarse") && <div><h3>Column-only devices — row positions unavailable</h3>
+      {reviewed.some(location => location.status === "coarse") && <div><h3>Column-only devices, row positions unavailable</h3>
         <div className="controls">{(["left", "center", "right"] as const).map(column => {
           const devices = reviewed.filter(location => location.status === "coarse" && location.column === column);
           return <div key={column}><strong>{column}: {devices.length}</strong><p>{devices.slice(0, 80).map(location => drawable
@@ -170,7 +170,7 @@ export function MapPanel({ map, assignments, channels, drawable, selection, onSe
             : <span key={location.deviceId}> Device {location.deviceId} </span>)}</p></div>;
         })}</div>
       </div>}
-      {!drawable && <details><summary>{reviewed.length} matching phones — inspect evidence</summary>
+      {!drawable && <details><summary>{reviewed.length} matching phones, inspect evidence</summary>
         {reviewed.slice(0, 100).map(loc => <p key={loc.deviceId}>Device {loc.deviceId}: {loc.status}, {loc.column ?? "unknown column"}; {loc.mappingMode}; cameras {loc.sourceCameraIds.join(", ") || "none"}.</p>)}
         {reviewed.length > 100 && <p>Showing the first 100 matches. Enter a device ID to inspect another phone.</p>}
       </details>}

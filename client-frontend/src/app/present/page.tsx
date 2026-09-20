@@ -2,33 +2,72 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { participantLink } from "../../lib/participant-link";
+import { Star } from "../star";
 
 type Counts = { sessionId: string; connected: number; synced: number; soundReady: number; assetsReady: number; mapped: number; stage: string };
+
 export default function PresentPage() {
   const [counts, setCounts] = useState<Counts | null>(null);
   const [offline, setOffline] = useState(false);
   const [qr, setQr] = useState("");
-  const [joinUrl, setJoinUrl] = useState("");
+
   useEffect(() => {
     let stopped = false;
-    const read = async () => { try { const response = await fetch("/api/presentation", { cache: "no-store" }); if (!response.ok) throw new Error(); const data = await response.json(); if (!stopped) { setCounts(data); setOffline(false); } } catch { if (!stopped) setOffline(true); } };
-    void read(); const timer = setInterval(read, 2000);
+    const read = async () => {
+      try {
+        const response = await fetch("/api/presentation", { cache: "no-store" });
+        if (!response.ok) throw new Error();
+        const data = await response.json();
+        if (!stopped) { setCounts(data); setOffline(false); }
+      } catch { if (!stopped) setOffline(true); }
+    };
+    void read();
+    const timer = setInterval(read, 2000);
     return () => { stopped = true; clearInterval(timer); };
   }, []);
+
   useEffect(() => {
     if (!counts?.sessionId) return;
     let current = true;
     let url: string;
     try { url = participantLink(process.env.NEXT_PUBLIC_PARTICIPANT_URL ?? window.location.origin, counts.sessionId); }
     catch { url = participantLink(window.location.origin, counts.sessionId); }
-    setJoinUrl(url);
-    void QRCode.toDataURL(url, { width: 1000, margin: 3, errorCorrectionLevel: "M", color: { dark: "#09130e", light: "#ffffff" } }).then(value => { if (current) setQr(value); });
+    void QRCode.toDataURL(url, { width: 1000, margin: 1, errorCorrectionLevel: "M", color: { dark: "#0b0b0b", light: "#ffffff" } })
+      .then(value => { if (current) setQr(value); });
     return () => { current = false; };
   }, [counts?.sessionId]);
-  return <main className="present-shell">
-    <header className="present-header"><div className="audience-brand"><span className="brand-mark">◒</span><span>AUDIENCE ORCHESTRA</span></div><span className="live-pill"><i />{offline ? "RECONNECTING" : "LIVE FROM THE AUDIENCE"}</span></header>
-    <div className="present-hero"><div><p className="eyebrow">YOUR PHONE IS AN INSTRUMENT</p><h1>One crowd.<br /><em>One orchestra.</em></h1><p className="present-instruction">Scan to join. Turn your volume up.<br />Keep your screen open.</p><div className="join-address">{joinUrl ? new URL(joinUrl).host : "Connecting to the show…"}<span aria-hidden="true">↗</span></div></div>
-      <div className="projector-qr">{qr ? <img src={qr} alt="Scan to join the audience orchestra" /> : <div className="qr-loading">Preparing join code…</div>}<strong>SCAN TO JOIN THE SHOW</strong></div></div>
-    <div className="present-stats" aria-live="polite">{[["CONNECTED", counts?.connected], ["IN SYNC", counts?.synced], ["MUSIC READY", counts?.assetsReady]].map(([label, value]) => <div key={label}><strong>{offline ? "—" : value ?? "—"}</strong><span>{label}</span></div>)}<p>{counts?.stage === "performing" ? "The show is live. Enjoy your part." : counts?.stage === "calibrating" ? "Raise your phones toward the stage." : "Stay on the page. We’ll take it from here."}</p></div>
+
+  const calibrating = counts?.stage === "calibrating";
+
+  // Real session counts only. When the feed is down we blank the numbers rather than leave a
+  // stale figure sitting under a label that claims it is live.
+  const tallies = [
+    { label: "Connected", value: counts?.connected },
+    { label: "In sync", value: counts?.synced },
+    { label: "Music ready", value: counts?.assetsReady },
+  ];
+
+  return <main className="stage">
+    <p className="stage-name"><Star />Concerto</p>
+
+    <div className="stage-body">
+      <div className="stage-lead">
+        <p className="stage-say">{calibrating ? "Hold your phones up." : "Scan to join."}</p>
+        <p className="stage-cue" aria-live="polite">
+          {offline ? "Reconnecting\u2026" : calibrating ? "Screen facing the stage." : "Point your camera here."}
+        </p>
+      </div>
+
+      <div className="qr">
+        {qr ? <img src={qr} alt="Scan this code to join" /> : <div className="qr-wait">Loading…</div>}
+      </div>
+    </div>
+
+    <div className="tallies">
+      {tallies.map(tally => <div className="tally" key={tally.label}>
+        <b>{offline || tally.value === undefined ? "" : tally.value}</b>
+        <span>{tally.label}</span>
+      </div>)}
+    </div>
   </main>;
 }

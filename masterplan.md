@@ -1,4 +1,4 @@
-# Audience Orchestra: master implementation plan
+# Concerto: master implementation plan
 
 Handoff baseline: 2026-09-19, Git tag `foundation-v1`. The repository foundation is implemented and verified. Concert features and the performance targets below remain assigned implementation work; passing scaffold checks does not establish physical audio or camera performance.
 

@@ -38,7 +38,7 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(msg.includes("STALE_MAP") ? "The map changed during selection. The snapshot has been refreshed — redraw and try again." : msg);
+      setError(msg.includes("STALE_MAP") ? "The map changed during selection. The snapshot has been refreshed. Redraw and try again." : msg);
       await refresh();
       return false;
     }
@@ -57,7 +57,7 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
 
   return (
     <section>
-      <div className="stage-heading"><span className="stage-number">02</span><div><p className="eyebrow">GIVE EVERY PHONE A PART</p><h2>Assign the audience</h2></div><span className="stage-badge">{snapshot.assignments.filter(item => item.channelId).length} assigned</span></div>
+      <div className="stage-heading"><span className="stage-number">02</span><h2>Assign the audience</h2><span className="stage-badge">{snapshot.assignments.filter(item => item.channelId).length} assigned</span></div>
       <p className="muted">Draw a group on the map, choose its musical part, then assign. White outlines show your selection.</p>
       {error && <p role="alert" className="error">Error: {error}</p>}
       {status && <p className="status">{status}</p>}
@@ -76,7 +76,7 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
           deviceIds: e.target.checked ? [...new Set([...(selected?.deviceIds ?? []), location.deviceId])] : (selected?.deviceIds ?? []).filter(id => id !== location.deviceId) })} />
         Device {location.deviceId}: {location.column ?? "unknown column"} · {location.status} · {location.mappingMode}
       </label>)}</details>
-      <p>Selection: {selected?.deviceIds.length ?? 0} phones, map revision {selected?.mapRevision ?? "—"}. {selected && selected.mapRevision !== snapshot.audienceMap.mapRevision && "Map changed: select again."}</p>
+      <p>Selection: {selected?.deviceIds.length ?? 0} phones, map revision {selected?.mapRevision ?? "none"}. {selected && selected.mapRevision !== snapshot.audienceMap.mapRevision && "Map changed: select again."}</p>
       <div className="actions">
         <div className="channel-picker" role="group" aria-label="Musical part">{snapshot.show.channels.map(ch => <button key={ch.channelId} aria-pressed={ch.channelId === channelId} className={ch.channelId === channelId ? "chosen" : ""} style={{ borderColor: ch.channelId === channelId ? channelColor : undefined }} onClick={() => setChannelId(ch.channelId)}><span className="swatch" style={{ background: ch.color }} />{ch.label}</button>)}</div>
         <label>Apply in

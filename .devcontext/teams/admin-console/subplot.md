@@ -1,7 +1,7 @@
 # Subplot: build the admin console (plain-language spec)
 
 This is the plan for building the **admin console** — the screen one operator uses to run the
-"Audience Orchestra" concert. It is written in plain words on purpose. The big-picture plan is
+"Concerto" concert. It is written in plain words on purpose. The big-picture plan is
 `masterplan.md`; this file is just our focused spec for the admin part.
 
 > **Revision note (2026-09-19):** The fake-input harness described in section 2 was built, then

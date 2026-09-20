@@ -51,7 +51,7 @@ export function CameraGeometry({ file, preview, value, disabled, onChange }: {
   useEffect(paint, [value, url, preview?.url]);
   const geometryError = anchorsError(value.anchors, dimensions.width || undefined, dimensions.height || undefined);
   const hasImage = !!url || !!preview?.url;
-  return <details><summary>Camera layout — {value.anchors?.length === 4 ? "seating corners" : "automatic approximate positions"}</summary>
+  return <details><summary>Camera layout: {value.anchors?.length === 4 ? "seating corners" : "automatic approximate positions"}</summary>
     <fieldset disabled={disabled}>
     <p>Each camera maps its audience column independently. One or two recordings work without the missing views.</p>
     <label>Camera faces <select value={value.frameLayout ?? "from-stage"} onChange={e => onChange({ ...value, frameLayout: e.target.value as CameraView, anchors: null })}>

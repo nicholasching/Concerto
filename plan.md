@@ -1,7 +1,7 @@
 # Plan: build the admin console
 
 This is the working plan for building the **admin console** — the operator screen that runs the
-"Audience Orchestra" concert. It is written in plain language. The source of truth for the big
+"Concerto" concert. It is written in plain language. The source of truth for the big
 picture is `masterplan.md`; this file is just our focused, plain-language plan for one part of it.
 
 ## What the admin console does

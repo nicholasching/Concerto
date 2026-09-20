@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { CameraRequestError, cameraRequest, sendVideo, type UploadSession } from "../../lib/camera-upload";
+import { Star } from "../star";
 type CameraRun = { runId: string; status: string; canUpload: boolean; uploads: { column: string; label: string; byteSize: number }[] };
 
 export default function UploadPage() {
@@ -47,22 +48,70 @@ export default function UploadPage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Upload interrupted. Keep this page open and retry."); } finally { setBusy(false); }
   }
   const taken = run?.uploads.some(upload => upload.column === column);
-  return <main className="upload-shell"><header className="audience-brand"><span className="brand-mark">◒</span><span>AUDIENCE ORCHESTRA</span><span className="device-number">CAMERA CREW</span></header>
-    <p className="eyebrow">FROM CAMERA TO CONCERT</p><h1>Send your<br />camera view.</h1><p className="audience-instruction">Upload the original recording. The stage team will handle calibration.</p>
-    {!token ? <form className="upload-card" onSubmit={event => { event.preventDefault(); void login(); }}><label>Upload password<input type="password" value={password} autoComplete="current-password" onChange={event => setPassword(event.target.value)} /></label><button className="primary" disabled={busy || !password}>{busy ? "Connecting…" : "Connect camera"}</button></form>
-      : <section className="upload-card"><div className="upload-state"><i className={`status-dot ${run?.canUpload ? "ok" : ""}`} />{run?.canUpload ? "Ready for your recording" : run ? "Wait for the phone pattern to finish" : "Waiting for the stage team to start calibration"}</div>
-        <fieldset disabled={busy || done}><legend>Audience section · facing the stage</legend><div className="section-picker">{["left", "center", "right"].map(value => <button type="button" aria-pressed={column === value} className={column === value ? "chosen" : ""} key={value} onClick={() => setColumn(value)}>{value}</button>)}</div>
-          <label className="file-drop"><span aria-hidden="true">↑</span><strong>{file?.name ?? "Choose your recording"}</strong><small>{file ? `${(file.size / 1024 / 1024).toFixed(1)} MiB` : "Original video · up to 1 GiB"}</small><input type="file" accept="video/*" aria-label="Camera recording" onChange={event => setFile(event.target.files?.[0] ?? null)} /></label>
-          <p className="muted">Record from the stage facing the audience. Screen positions are mapped automatically; the stage team can refine the seating layout.</p>
-          <details><summary>Camera orientation</summary><label>Rotate clockwise<select value={rotation} onChange={event => setRotation(Number(event.target.value))}>{[0, 90, 180, 270].map(value => <option key={value} value={value}>{value}°</option>)}</select></label></details>
-        </fieldset>
-        {taken && !done && <p className="notice">This section’s recording is already with the stage team.</p>}
-        {busy && <div className="upload-progress"><progress value={progress} max={1} /><p>{progress === 1 ? "Verifying the recording…" : `Uploading · ${Math.round(progress * 100)}%`}</p></div>}
-        {done ? <div className="upload-success"><strong>✓ Recording delivered</strong><p>You’re done. The stage team can now process the {column} camera.</p></div> : <button className="primary" onClick={() => void upload()} disabled={busy || !file || !run?.canUpload || taken}>{busy ? "Sending recording…" : transfer ? "Retry upload" : "Upload recording"}</button>}
-        <small>Keep this page open until delivery is confirmed. If the connection drops, Retry continues the same upload.</small>
-      </section>}
-    {error && <p role="alert" className="notice">{error}</p>}
-    {offline && <p role="status" className="notice">Connection interrupted. Keep this page open; your uploaded progress is saved.</p>}
-    {run?.uploads.length ? <div className="received-cameras"><p className="eyebrow">RECEIVED BY THE STAGE</p>{run.uploads.map(upload => <p key={upload.column}><strong>{upload.column}</strong><span>✓ Received</span></p>)}</div> : null}
+  const pct = Math.round(progress * 100);
+
+  // Same rule as the audience view: the biggest line says what this operator does next.
+  const say: { title: string; sub: string | null } =
+    !token ? { title: "Sign in.", sub: "Use the upload password from the stage team." }
+    : done ? { title: "Recording sent.", sub: `The stage team has the ${column} camera.` }
+    : busy ? { title: progress === 1 ? "Checking the file." : `Sending. ${pct}%`, sub: "Keep this page open." }
+    : !run ? { title: "Waiting for the stage team.", sub: "Calibration has not started." }
+    : !run.canUpload ? { title: "Keep filming.", sub: "Wait for the phones to finish flashing." }
+    : taken ? { title: "Already sent.", sub: "Pick another section if you filmed one." }
+    : !file ? { title: "Choose your recording.", sub: "The original video, up to 1 GiB." }
+    : { title: "Send your recording.", sub: null };
+
+  return <main className="screen">
+    <header className="screen-top">
+      <b><Star />Concerto</b>
+      <span>Camera crew</span>
+    </header>
+
+    <div className="screen-main">
+      <h1 className="say">{say.title}</h1>
+      {say.sub && <p className="sub">{say.sub}</p>}
+
+      {!token
+        ? <form className="field" onSubmit={event => { event.preventDefault(); void login(); }}>
+            <label htmlFor="camera-password">Upload password</label>
+            <input id="camera-password" type="password" value={password} autoComplete="current-password" onChange={event => setPassword(event.target.value)} />
+            <div className="field"><button className="primary" disabled={busy || !password}>{busy ? "Signing in…" : "Sign in"}</button></div>
+          </form>
+        : <>
+            <fieldset className="field" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} disabled={busy || done}>
+              <legend style={{ padding: 0 }}><span className="sub">Your section, facing the stage</span></legend>
+              <div className="act-row field">{["left", "center", "right"].map(value =>
+                <button type="button" key={value} aria-pressed={column === value}
+                  style={column === value ? { background: "#f2f2f0", color: "#0b0b0b", fontWeight: 700 } : undefined}
+                  onClick={() => setColumn(value)}>{value}</button>)}</div>
+
+              <label className="pick field">
+                <strong>{file?.name ?? "Choose your recording"}</strong>
+                <span>{file ? `${(file.size / 1024 / 1024).toFixed(1)} MiB` : "Original video, up to 1 GiB"}</span>
+                <input type="file" accept="video/*" aria-label="Camera recording" onChange={event => setFile(event.target.files?.[0] ?? null)} />
+              </label>
+
+              <details>
+                <summary>Camera rotation</summary>
+                <label htmlFor="rotation">Rotate clockwise</label>
+                <select id="rotation" value={rotation} onChange={event => setRotation(Number(event.target.value))}>
+                  {[0, 90, 180, 270].map(value => <option key={value} value={value}>{value}°</option>)}
+                </select>
+              </details>
+            </fieldset>
+
+            {busy && <div className="field"><div className="bar"><i style={{ width: `${pct}%` }} /></div></div>}
+
+            {!done && <div className="field"><button className="primary" onClick={() => void upload()} disabled={busy || !file || !run?.canUpload || taken}>
+              {busy ? "Sending…" : transfer ? "Send the rest" : "Send recording"}</button></div>}
+          </>}
+
+      {error && <p role="alert" className="warn">{error}</p>}
+      {offline && <p role="status" className="warn">Connection dropped. Your sent chunks are saved.</p>}
+    </div>
+
+    {run?.uploads.length ? <footer className="rows">
+      {run.uploads.map(upload => <div key={upload.column}><span>{upload.column}</span><span>Received</span></div>)}
+    </footer> : <footer className="screen-foot" />}
   </main>;
 }

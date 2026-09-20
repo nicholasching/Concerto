@@ -1,4 +1,4 @@
-# Audience Orchestra development context
+# Concerto development context
 
 Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage/status/handoff and relevant decisions before coding.
 

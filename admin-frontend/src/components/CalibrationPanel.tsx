@@ -121,17 +121,17 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   const now = tick >= 0 && clockReady() ? nowServerMs() : null;
   const finishedCapture = run?.startServerMs !== null && run?.startServerMs !== undefined && now !== null && now >= run.startServerMs + 11000;
   return <section>
-    <div className="stage-heading"><span className="stage-number">01</span><div><p className="eyebrow">FIND THE AUDIENCE</p><h2>Calibration</h2></div><span className="stage-badge">{run ? run.status : "Ready to begin"}</span></div>
-    <p className="muted">Start your cameras, prepare the phones, then run the 11-second pattern. Upload one, two or three views from this console or <a href="/upload" target="_blank" rel="noreferrer">a camera phone ↗</a>.</p>
+    <div className="stage-heading"><span className="stage-number">01</span><h2>Calibration</h2><span className="stage-badge">{run ? run.status : "Ready to begin"}</span></div>
+    <p className="muted">Start your cameras, prepare the phones, then run the 11-second pattern. Upload one, two or three views from this console or <a href="/upload" target="_blank" rel="noreferrer">a camera phone</a>.</p>
     {error && <p role="alert" className="error">{error}</p>}
-    {!run && <><button className="primary large" disabled={busy || !snapshot} onClick={() => void act(prepare)}>Prepare calibration <span aria-hidden="true">→</span></button><details><summary>Choose specific phones</summary><label>Target device IDs <input value={targetIds} placeholder="All ready phones" onChange={event => setTargetIds(event.target.value)} /></label></details></>}
+    {!run && <><button className="primary large" disabled={busy || !snapshot} onClick={() => void act(prepare)}>Prepare calibration</button><details><summary>Choose specific phones</summary><label>Target device IDs <input value={targetIds} placeholder="All ready phones" onChange={event => setTargetIds(event.target.value)} /></label></details></>}
     {run && <>
       <p>Run tag {run.plan.runTag} · {run.status} · {run.plan.participantIds.length} participating phones</p>
       {run.reports.length > 0 && <p>{run.reports.filter(report => report.completed).length} phones finished; {run.reports.filter(report => !report.completed).length} interrupted.</p>}
       {run.reports.filter(report => !report.completed).map(report => <p key={report.deviceId}>Device {report.deviceId}: {report.reason ?? "pattern interrupted"}</p>)}
       {barrier && <p>{barrier.readyIds.length}/{barrier.expectedIds.length} ready; {barrier.excluded.length} excluded; {barrier.expectedIds.length - barrier.readyIds.length - barrier.excluded.length} pending.</p>}
       {barrier?.excluded.map(item => <p key={item.deviceId}>Device {item.deviceId}: {item.reason}</p>)}
-      {run.status === "created" && <button className="primary large" disabled={busy || !barrier?.readyIds.length || !clockReady()} onClick={() => void act(() => adapter.armCalibration(run.plan.runId, run.preparationId, futureServerMs(4)))}>Cameras recording — start pattern</button>}
+      {run.status === "created" && <button className="primary large" disabled={busy || !barrier?.readyIds.length || !clockReady()} onClick={() => void act(() => adapter.armCalibration(run.plan.runId, run.preparationId, futureServerMs(4)))}>Cameras recording, start pattern</button>}
       {run.startServerMs !== null && now !== null && <p role="status">{now < run.startServerMs ? `Starts in ${((run.startServerMs - now) / 1000).toFixed(1)} s` : !finishedCapture ? `Pattern running · ${Math.max(0, (run.startServerMs + 11000 - now) / 1000).toFixed(1)} s remaining` : "Pattern finished. Stop recordings after the trailing margin, then upload."}</p>}
       <button disabled={busy || !!activeJob} onClick={() => void act(() => adapter.discardCalibration(run.plan.runId))}>Discard run and retry</button>
       <div className="slots">{slots.map((_, index) => {
@@ -155,7 +155,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
             await adapter.updateCamera(run.plan.runId, uploaded.uploadId, slot.column, slot.geometry);
             setCandidate(null); setChecked(false); setJobId(null); setProgress(null);
             sessionStorage.removeItem(`orchestra:job:${run.plan.runId}`);
-          })}>Save corrected geometry — process again</button>}
+          })}>Save corrected geometry and process again</button>}
           {slot.error && <p role="alert">{slot.error}</p>}
         </div>;
       })}</div>
@@ -165,7 +165,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
       {progress && <p role="status">{progress.stage} · {Math.round(progress.progress * 100)}% · {progress.message}</p>}
       {progress?.stage === "failed" && diagnostics.length > 0 && <details><summary>Processing diagnostics</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{diagnostics.join("\n")}</pre></details>}
       {activeJob && jobId && <button onClick={() => void act(() => adapter.cancelJob(jobId))}>Cancel processing</button>}
-      {candidate && snapshot && <div><h3>Candidate map — awaiting your review</h3>
+      {candidate && snapshot && <div><h3>Candidate map, awaiting your review</h3>
         {geometryDirty && <p role="alert">Camera geometry has changed. Process the recordings again before committing this map.</p>}
         <p>Evidence: {candidate.evidence}. {decodedCount} devices accepted; {candidate.locations.filter(location => location.status === "localized").length} with map positions; {candidate.locations.filter(location => location.status === "coarse").length} with column only. {candidate.locations.length} eligible phones. Processing {(candidate.processingMs / 1000).toFixed(1)} s.</p>
         {(candidate.locations.some(location => location.mappingMode === "frame-layout") || candidate.cameras.some(camera => usesFrameAnchors(run.uploads.find(upload => upload.cameraId === camera.cameraId)?.anchors ?? null, camera.frameWidth, camera.frameHeight))) && <p role="status">Approximate frame layout: dots follow the recorded screens. A raised phone can appear farther back. Mark the actual seating corners and hold phones at a consistent height for better row placement.</p>}

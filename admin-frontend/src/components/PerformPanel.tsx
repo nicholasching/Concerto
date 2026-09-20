@@ -37,7 +37,7 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
     try {
       const pos = action === "stop" ? 0 : (positionMsArg ?? (action === "play" ? cuePosition : null) ?? showPositionMs(transport));
       await adapter.sendTransport({ action, showRevision: show.showRevision, positionMs: pos, effectiveServerMs: futureMs(2) });
-      setStatus(`${action} sent — pending.`);
+      setStatus(`${action} sent. Pending.`);
       refresh();
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
@@ -64,7 +64,7 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
 
   return (
     <section>
-      <div className="stage-heading"><span className="stage-number">03</span><div><p className="eyebrow">CONDUCT THE SHOW</p><h2>Performance</h2></div><span className="stage-badge">{transport.status}</span></div>
+      <div className="stage-heading"><span className="stage-number">03</span><h2>Performance</h2><span className="stage-badge">{transport.status}</span></div>
       <p className="muted">Prepare the music, check the ready count, then start the show. Every phone follows the same playhead.</p>
       {error && <p role="alert" className="error">Error: {error}</p>}
       {status && <p className="status">{status}</p>}
@@ -76,7 +76,7 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
         <button onClick={() => send("prepare")} disabled={!clockReady() || !show.clips.length}>Prepare cue</button>
         <button className="primary large" onClick={() => send("play")} disabled={!clockReady() || !preparation?.readyIds.length || transport.status === "playing"}>▶ Start show</button>
         <button onClick={() => send("pause")} disabled={transport.status === "stopped"}>Ⅱ Pause</button>
-        <button onClick={() => send("stop")}>■ Stop</button>
+        <button onClick={() => send("stop")}>Stop</button>
         <span className="muted">Status: {transport.status}. Position: {(position / 1000).toFixed(1)}s / {(widthMs / 1000).toFixed(1)}s</span>
       </div>
 

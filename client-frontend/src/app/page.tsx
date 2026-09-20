@@ -12,25 +12,14 @@ import { buildReadiness, statusMessage, StatusReporter } from "../lib/readiness"
 import { ShowControl } from "../lib/show-control";
 import { participantEndpoints } from "../lib/endpoints";
 import { CalibrationOverlay } from "./calibration-overlay";
+import { Star } from "./star";
+import { Checks, type CheckState } from "./checks";
 
 const { api, wsUrl } = participantEndpoints(typeof window === "undefined" ? "http://localhost:3000" : window.location.origin,
   { api: process.env.NEXT_PUBLIC_API_URL, ws: process.env.NEXT_PUBLIC_WS_URL });
 const mock = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCKS === "1";
 const clockProfile = process.env.NEXT_PUBLIC_CLOCK_PROFILE === "strict" ? "strict" : "internet";
 const timers = { setTimeout: (callback: () => void, ms: number) => window.setTimeout(callback, ms), clearTimeout: (handle: unknown) => window.clearTimeout(handle as number) };
-
-function connectionLabel(state: ConnectionState): string {
-  const { status } = state;
-  switch (status.kind) {
-    case "joining": return status.attempt ? `Joining (attempt ${status.attempt + 1})...` : "Joining...";
-    case "connected": return "Connected";
-    case "reconnecting": return `Reconnecting (attempt ${status.attempt})...`;
-    case "gave-up": return "Can't reach the server";
-    case "replaced": return "Opened in another tab";
-    case "full": return "Session full";
-    case "reset": return "The audience has been reset";
-  }
-}
 
 export default function Page() {
   const connection = useRef<ParticipantConnection | null>(null);
@@ -47,6 +36,7 @@ export default function Page() {
   const [foreground, setForeground] = useState(true);
   const [audioState, setAudioState] = useState<string | null>(null);
   const [outputReady, setOutputReady] = useState(false);
+  const [forceSound, setForceSound] = useState(false);
   const [verifiedHashes, setVerifiedHashes] = useState<Record<string, string>>({});
   const [assetNote, setAssetNote] = useState<string | null>(null);
   const [audioNote, setAudioNote] = useState<string | null>(null);
@@ -239,6 +229,14 @@ export default function Page() {
     setAudioState(host.current?.state ?? null);
   }
 
+  // Dev-only preview flag. `?forceSound=1` pins the sound prompt open so that state can be
+  // styled without fighting the browser's autoplay policy. Read in an effect, not during render,
+  // so the server and client markup still match. Stripped from any production build.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    setForceSound(new URLSearchParams(window.location.search).get("forceSound") === "1");
+  }, []);
+
   useEffect(() => {
     void enableSound(true);
     const gesture = () => { if (host.current?.state !== "running") void enableSound(true); };
@@ -261,37 +259,73 @@ export default function Page() {
   const playing = conn.snapshot?.transport.status === "playing";
   const channel = show?.channels.find(value => value.channelId === conn.snapshot?.assignment.channelId);
   const reset = conn.status.kind === "reset";
-  const checks = [
-    { label: "Connection", value: connected ? "Connected" : connectionLabel(conn), ok: connected },
-    { label: "Show clock", value: clockQuality.ready ? "In sync" : "Syncing…", ok: clockQuality.ready },
-    { label: "Music", value: assetsVerified ? "Verified" : tracks.length ? "Loading…" : "Waiting for show", ok: assetsVerified },
-    { label: "Sound", value: outputReady ? "Ready" : audioState === "running" ? "Warming up…" : "Tap to enable", ok: outputReady },
+  const soundOff = forceSound || (connected && audioState !== "running");
+  const soundReady = outputReady && !forceSound;
+
+  // The biggest line on the screen is always this person's status, or the thing they must do
+  // next. First match wins, most urgent first. `color` is the single accent and only ever
+  // carries the channel colour.
+  const say: { title: string; sub: string | null } =
+    reset ? { title: "This session ended.", sub: "Refresh the page to join again." }
+    : conn.status.kind === "replaced" ? { title: "Open in another tab.", sub: "Close the other tab to use this one." }
+    : conn.status.kind === "full" ? { title: "This session is full.", sub: "Ask the stage team." }
+    : conn.status.kind === "gave-up" ? { title: "Lost connection.", sub: null }
+    : !connected ? { title: "Connecting.", sub: null }
+    : holding ? { title: "Hold your phone up.", sub: "Screen facing the stage." }
+    : awaitingMap ? { title: "Finding your seat.", sub: "You can lower your phone." }
+    : needsSection ? { title: "Where are you sitting?", sub: "Facing the stage." }
+    : soundOff ? { title: "Turn on sound.", sub: null }
+    : !assetsVerified ? { title: "Getting your music.", sub: "Stay on this page." }
+    : channel ? { title: channel.label, sub: playing ? "Volume up." : "Wait for the music to start." }
+    : mapped || manual ? { title: section ? `${section} section.` : "You're in place.", sub: "Waiting for your part." }
+    : { title: "You're ready.", sub: "Turn your volume up." };
+
+  // Four independent facts, reported separately because they fail separately. A cross means
+  // this phone needs something from its owner or the stage team; a spinner means it is still
+  // working on its own and no one needs to act.
+  const musicFailed = assetNote?.startsWith("Failed:") ?? false;
+  const checks: { label: string; state: CheckState }[] = [
+    { label: "Connection", state: connected ? "ok" : ["gave-up", "full", "replaced", "reset"].includes(conn.status.kind) ? "fail" : "wait" },
+    { label: "Clock", state: clockQuality.ready ? "ok" : "wait" },
+    { label: "Music", state: assetsVerified ? "ok" : musicFailed ? "fail" : "wait" },
+    { label: "Sound", state: soundReady ? "ok" : soundOff ? "fail" : "wait" },
   ];
+
   function chooseSection(column: "left" | "center" | "right") {
     const snapshot = connection.current?.current.snapshot;
     if (snapshot) connection.current?.send(ClientMessage.parse({ protocolVersion: 1, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch,
       messageId: crypto.randomUUID(), type: "participant.column", payload: { column } }));
   }
 
-  return <main className="audience-shell">
-    <header className="audience-brand"><span className="brand-mark" aria-hidden="true">◒</span><span>AUDIENCE<br />ORCHESTRA</span>
-      <span className="device-number">{identity ? `PHONE ${String(identity.deviceId).padStart(3, "0")}` : "LIVE EXPERIENCE"}</span></header>
-    {mock && <p className="notice">Test session</p>}
-    <div className={`audience-orbit ${connected ? "ready" : ""}`} aria-hidden="true"><span>♪</span></div>
-    <p className="eyebrow">{reset ? "SESSION RESET" : playing ? "THE SHOW IS LIVE" : holding ? "CALIBRATION" : mapped || manual ? "YOU’RE IN POSITION" : "YOUR PHONE. PART OF THE ORCHESTRA."}</p>
-    <h1>{reset ? "Ready for a fresh start." : holding ? "Raise your phone." : needsSection ? "Where are you sitting?" : mapped || manual ? `${section?.toUpperCase()} SECTION` : awaitingMap ? "Finding your place." : "You’re part of the show."}</h1>
-    <p className="audience-instruction">{reset ? "Refresh this page when you’re ready to join again." : holding ? "Face your screen toward the stage and hold it steady." : needsSection ? "We couldn’t locate your phone. Choose your section while facing the stage." : awaitingMap ? "You can lower your phone. We’re processing the camera recordings." : "Turn your volume all the way up. Keep this page open and wait for the stage team."}</p>
-    {!reset && <div className="audience-checks" aria-label="Phone readiness">{checks.map(check => <div key={check.label}><span className={check.ok ? "status-dot ok" : "status-dot"} /><span>{check.label}</span><strong>{check.value}</strong></div>)}</div>}
-    {!reset && audioState !== "running" && <div className="sound-prompt"><button className="primary" onClick={() => void enableSound()}>{isAudioContextPaused(audioState) ? "Tap to enable sound" : "Enable sound"}</button><small>Your browser needs one tap before it can play music.</small></div>}
-    {audioNote && <p role="alert" className="notice">{audioNote}</p>}
-    {assetNote?.startsWith("Failed:") && <p role="alert" className="notice">Music couldn’t finish loading. Keep this page open while the stage team checks the connection.</p>}
-    {needsSection && <div className="section-picker">{(["left", "center", "right"] as const).map(column => <button key={column} onClick={() => chooseSection(column)}>{column}</button>)}</div>}
-    {(mapped || manual) && !holding && channel && <p className="your-part"><span style={{ background: channel.color }} />Your part: <strong>{channel.label}</strong></p>}
-    {manual && !holding && !channel && <p className="your-part">{conn.snapshot?.pendingActions.some(action => action.domain === "assignment") ? "Joining your section’s music…" : "Waiting for the stage team to assign music to this section."}</p>}
-    {conn.status.kind === "gave-up" && <button onClick={() => connection.current?.retry()}>Reconnect</button>}
-    {conn.status.kind === "replaced" && <p className="notice">This phone is open in another tab. Keep just one tab open.</p>}
-    {!foreground && !reset && <p className="notice">Return to this page to stay ready.</p>}
-    <footer className="audience-footer">ONE AUDIENCE. ONE ORCHESTRA.</footer>
+  return <main className="screen">
+    <header className="screen-top">
+      <b><Star />Concerto</b>
+      {identity && <span>[ {String(identity.deviceId).padStart(3, "0")} ]</span>}
+    </header>
+
+    <div className="screen-main">
+      <h1 className="say">{say.title}</h1>
+      {say.sub && <p className="sub">{say.sub}</p>}
+      {channel && !holding && <p className="part-mark"><i style={{ background: channel.color }} />Your part</p>}
+
+      {(needsSection || soundOff || conn.status.kind === "gave-up") && <div className="act">
+        {needsSection && <div className="act-row">{(["left", "center", "right"] as const).map(column =>
+          <button key={column} onClick={() => chooseSection(column)}>{column}</button>)}</div>}
+        {soundOff && !reset && <button className="primary" onClick={() => void enableSound()}>
+          {isAudioContextPaused(audioState) ? "Tap to turn on sound" : "Turn on sound"}</button>}
+        {conn.status.kind === "gave-up" && <button onClick={() => connection.current?.retry()}>Try again</button>}
+      </div>}
+
+      {audioNote && <p role="alert" className="warn">{audioNote}</p>}
+      {assetNote?.startsWith("Failed:") && <p role="alert" className="warn">Your music did not finish downloading. Stay on this page.</p>}
+      {!foreground && !reset && <p className="warn">Come back to this page to stay ready.</p>}
+    </div>
+
+    <footer className="screen-foot">
+      {!reset && <Checks items={checks} />}
+      {mock && <p className="mock-note">Test session</p>}
+    </footer>
+
     {phase.kind === "armed" && <CalibrationOverlay surface={surface} text={surfaceText} />}
   </main>;
 }
