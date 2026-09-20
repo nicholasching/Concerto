@@ -12,7 +12,7 @@
 | `POST /__mock__/drop` | Close every socket, keep identities |
 | `POST /__mock__/restart` | New `serverEpoch`, keep identities, close every socket |
 | `GET /__mock__/devices` | Last reported readiness per joined device |
-| `POST /__mock__/calibrate?leadMs=3000&readyWaitMs=1000` | Sends `calibration.prepare` (new run ID, next run tag, `amber-blue-v1`) to connected devices, then after `readyWaitMs` arms the ready ones to start `leadMs` later. 409 with nobody connected |
+| `POST /__mock__/calibrate?leadMs=3000&readyWaitMs=1000` | Sends `calibration.prepare` (new run ID, next run tag, `red-blue-v1`) to connected devices, then after `readyWaitMs` arms the ready ones to start `leadMs` later. 409 with nobody connected |
 | `GET /__mock__/calibration` | Each run's participants, ready/not-ready replies and `calibration.result`s |
 
 | `POST /__mock__/assign?deviceId=0&channelId=channel-1&leadMs=2000` | `assignment.prepare` to that device, then `assignment.commit` after `readyWaitMs` (default 500). `channelId=none` clears |

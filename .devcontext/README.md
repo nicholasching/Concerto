@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Red/blue calibration palette
+
+New runs use user-requested full red `#FF0000` and existing blue `#0066FF`. Decoder v1.7 selects pilot/phase checks from the saved palette and retains old amber/blue captures. Timing/codewords are unchanged. See the [decision](decisions/20260920-red-blue-calibration.md) and [checks/handoff](teams/otc-localization/journal/20260920-red-blue-palette.md).
+
 ### Manual section audio routing
 
 Playback fixes are committed/pushed as **a29625e**. The manual-section follow-up now schedules a matching audio assignment and admits ready manual phones to an ongoing show at its current playhead. User-confirmed defaults: left → Melody, center → Vocals, right → Percussion. See the [decision](decisions/20260920-manual-section-audio-routing.md) and [verification/handoff](teams/integration/journal/20260920-manual-section-routing.md).

@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
-import { ApiError, ClientMessage, JoinRequest, JoinResponse, ServerMessage, type ParticipantSnapshotData, type ServerMessageData } from "@orchestra/contracts";
+import { ApiError, ClientMessage, DEFAULT_CALIBRATION_PALETTE, JoinRequest, JoinResponse, ServerMessage, type ParticipantSnapshotData, type ServerMessageData } from "@orchestra/contracts";
 import { createDemoSnapshot, participantSnapshot } from "@orchestra/testkit";
 
 // SYNTHETIC Team 2 harness: join/resume, token-bound sockets and test controls.
@@ -15,7 +15,7 @@ type TransportData = ParticipantSnapshotData["transport"];
 interface ReadyRecord { type: string; deviceId: number; preparationId: string; ready: boolean; reason: string | null }
 const LEASE_EVERY_MS = 3000;
 const LEASE_LENGTH_MS = 10_000;
-const PALETTE = { paletteVersion: "amber-blue-v1", palette: { zero: "#FFB000", one: "#0066FF", neutral: "#111111" } };
+const PALETTE = DEFAULT_CALIBRATION_PALETTE;
 
 export function startClientDemoServer({ port = 18081, capacity = 30, log = console.log } = {}) {
   const snapshot = createDemoSnapshot(capacity);

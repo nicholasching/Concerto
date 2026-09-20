@@ -24,7 +24,16 @@ def prepare_samples(track):
     return times, colors
 
 
-def sample_packet(track, phase_ms, prepared=None):
+def zero_evidence(colors, zero_color):
+    r, g, b = colors[..., 0], colors[..., 1], colors[..., 2]
+    if zero_color == "#FF0000":
+        return (r-b >= 0.025) & (r-g >= 0.025)
+    if zero_color == "#FFB000":
+        return (r-b >= 0.025) & (g-b >= 0.025)
+    raise ValueError(f"Unsupported calibration zero color: {zero_color}")
+
+
+def sample_packet(track, phase_ms, prepared=None, *, zero_color="#FFB000"):
     times, colors = prepared if prepared is not None else prepare_samples(track)
     relative = (times - phase_ms) / SYMBOL_MS
     slots = np.floor(relative).astype(np.int32)
@@ -36,11 +45,10 @@ def sample_packet(track, phase_ms, prepared=None):
         if selected.sum() < 2:
             return None
         pilots.append(np.median(colors[selected], axis=0))
-    # The wire palette is amber then blue. Learn exposure/white balance from the
-    # pilots, but do not promote arbitrary two-colour lights or reversed pilots.
-    amber, blue = pilots
-    if not (amber[0] - amber[2] >= 0.025 and amber[1] - amber[2] >= 0.025 and
-            blue[2] - blue[0] >= 0.05):
+    # Learn exposure/white balance from the pilots, with the first-color check
+    # selected by this recording's manifest (new red or legacy amber).
+    zero, blue = pilots
+    if not (zero_evidence(zero, zero_color) and blue[2] - blue[0] >= 0.05):
         return None
     separation = float(np.linalg.norm(pilots[1] - pilots[0]))
     if separation < 0.18:
@@ -62,18 +70,18 @@ def sample_packet(track, phase_ms, prepared=None):
     return SampledPacket(phase_ms, symbols, counts.tolist(), [p.tolist() for p in pilots])
 
 
-def find_phase(track):
+def find_phase(track, *, zero_color="#FFB000"):
     if len(track.samples) < MIN_PHASE_SAMPLES:
         return None
     prepared = prepare_samples(track)
     times, colors = prepared
     cadence = float(np.median(np.diff(times)))
     # Leading dark guards break tracks before the first two color-zero pilots.
-    amber = (colors[:, 0]-colors[:, 2] >= 0.025) & (colors[:, 1]-colors[:, 2] >= 0.025)
-    starts = np.flatnonzero(amber & ~np.r_[False, amber[:-1]])
+    zero = zero_evidence(colors, zero_color)
+    starts = np.flatnonzero(zero & ~np.r_[False, zero[:-1]])
     # A status bar or background reflection can keep a candidate alive through
     # the dark guards. Its first sample is then not the first pilot. Try actual
-    # amber onsets as well, using only the header to choose the packet phase.
+    # first-color onsets as well, using only the header to choose the packet phase.
     estimates = [times[0]-2*SYMBOL_MS-cadence/2]
     estimates.extend(times[index]-2*SYMBOL_MS-cadence/2 for index in starts
                      if times[index]-times[0] > 100)
@@ -86,16 +94,20 @@ def find_phase(track):
             if phase < 0:
                 continue
             header = (times >= phase) & (times < phase + 13*SYMBOL_MS)
-            sampled = sample_packet(track, phase, (times[header], colors[header]))
+            sampled = sample_packet(track, phase, (times[header], colors[header]), zero_color=zero_color)
             if sampled and tuple(sampled.symbols[2:13]) == HEADER:
                 candidates.append(phase)
         if candidates:
-            return sample_packet(track, float(np.median(candidates)), prepared)
+            return sample_packet(track, float(np.median(candidates)), prepared, zero_color=zero_color)
     return None
 
 
 def decode_tracks(scan, manifest, camera_id):
-    fitted = {track.track_id: find_phase(track) for track in scan.tracks}
+    zero_color = manifest["palette"]["zero"].upper()
+    if zero_color not in ("#FF0000", "#FFB000") or manifest["palette"]["one"].upper() != "#0066FF":
+        raise ValueError("Unsupported calibration palette; expected red/blue or legacy amber/blue")
+    palette_label = "red/blue" if zero_color == "#FF0000" else "amber/blue"
+    fitted = {track.track_id: find_phase(track, zero_color=zero_color) for track in scan.tracks}
     phases = [packet.phase_ms for packet in fitted.values() if packet is not None]
     phase = None
     messages = []
@@ -111,7 +123,7 @@ def decode_tracks(scan, manifest, camera_id):
         messages.append("No complete pilot/preamble track; check visibility, colors or capture start")
     background = sum(packet is None for packet in fitted.values())
     if background:
-        messages.append(f"Ignored {background} candidates without a complete amber/blue preamble; "
+        messages.append(f"Ignored {background} candidates without a complete {palette_label} preamble; "
                         "not device tracks")
     observations, details = [], []
     participants = set(manifest["participantIds"])

@@ -27,9 +27,27 @@ def packet_track(*, phase=500, lead_in=False, colors=((255, 176, 0), (0, 102, 25
     return Track("phone", samples)
 
 
-def observations(tracks):
+def observations(tracks, *, zero="#FFB000"):
     return decode_tracks(CameraScan(tracks, 100, 100, 400, None, 0),
-                         {"participantIds": [31], "runTag": 13}, "camera")
+                         {"participantIds": [31], "runTag": 13,
+                          "palette": {"zero": zero, "one": "#0066FF", "neutral": "#111111"}}, "camera")
+
+
+@pytest.mark.parametrize("red,blue", [((255, 0, 0), (0, 102, 255)),
+                                      ((150, 12, 10), (0, 65, 160)),
+                                      ((255, 190, 185), (20, 130, 240))])
+def test_red_blue_manifest_decodes_pure_dim_and_washed_recorded_pilots(red, blue):
+    track = packet_track(colors=(red, blue), phase=3500, lead_in=True)
+    seen, _, _, _ = observations([track], zero="#FF0000")
+    assert [(o["deviceId"], o["status"]) for o in seen] == [(31, "accepted")]
+    assert seen[0]["correctedBits"] == seen[0]["erasedBits"] == 0
+
+
+@pytest.mark.parametrize("colors", [((255, 255, 255), (0, 102, 255)),
+                                    ((0, 255, 0), (0, 102, 255)),
+                                    ((0, 102, 255), (255, 0, 0))])
+def test_red_blue_does_not_promote_white_green_or_reversed_pilots(colors):
+    assert observations([packet_track(colors=colors)], zero="#FF0000")[0] == []
 
 
 def test_preamble_can_start_after_a_continuously_detected_status_screen():

@@ -75,7 +75,7 @@ def test_screen_hole_and_nested_island_keep_separate_colors_and_centers():
     assert detect_screens(rgb, 10, excluded) == []
 
 
-@pytest.mark.parametrize("color", [(255, 250, 214), (15, 220, 255)])
+@pytest.mark.parametrize("color", [(255, 250, 214), (15, 220, 255), (255, 0, 0), (255, 210, 210)])
 def test_emissive_core_stays_separate_from_dim_surroundings_and_thin_bloom(color):
     rgb = np.full((120, 160, 3), 9, dtype=np.uint8)
     rgb[15:95, 30:110] = (25, 60, 95)  # Saturated clothing joins the old mask.

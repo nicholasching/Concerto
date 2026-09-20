@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useAdapter } from "../lib/useSnapshot";
 import { clockReady, futureServerMs, nowServerMs } from "../lib/clock";
 import type { Column, Geometry } from "../lib/adapter";
-import type { AdminSnapshotData, OtcResultData } from "@orchestra/contracts";
+import { DEFAULT_CALIBRATION_PALETTE, type AdminSnapshotData, type OtcResultData } from "@orchestra/contracts";
 import { MapPanel } from "./MapPanel";
 import { CameraGeometry } from "./CameraGeometry";
 import { jobMessage } from "../lib/job-message";
@@ -79,7 +79,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
     if (requested.some(id => !Number.isInteger(id) || !readyIds.includes(id))) throw new Error("Each target ID must name a connected, visible phone with a synchronized clock.");
     const ids = requested;
     if (!ids.length) throw new Error("No connected, visible phones have synchronized yet.");
-    await adapter.createCalibration(ids, { zero: "#FFB000", one: "#0066FF", neutral: "#111111" }, "amber-blue-v1");
+    await adapter.createCalibration(ids, DEFAULT_CALIBRATION_PALETTE.palette, DEFAULT_CALIBRATION_PALETTE.paletteVersion);
   }
   async function upload(index: number) {
     if (!runId) return;

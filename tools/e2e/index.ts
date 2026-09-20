@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { strict as assert } from "node:assert";
-import { AdminSnapshot, ServerMessage, Track, type ParticipantSnapshotData, type ShowData } from "@orchestra/contracts";
+import { AdminSnapshot, DEFAULT_CALIBRATION_PALETTE, ServerMessage, Track, type ParticipantSnapshotData, type ShowData } from "@orchestra/contracts";
 import { ClockSync } from "../../packages/sync/src/index";
 import { selectRectangle } from "../../packages/selection/src/index";
 import { ShowControl, type Engine } from "../../client-frontend/src/lib/show-control";
@@ -106,7 +106,9 @@ try {
   let current = await until(snapshot, s => s.audienceMap.mapRevision === 1);
   assert.equal(current.audienceMap.locations[0].x, null); assert.equal(current.audienceMap.locations[0].mappingMode, "manual-column");
   check("manual column remains explicitly coarse with no fabricated coordinates");
-  const created = await request("/api/calibrations", { participantIds: phones.map(phone => phone.id), palette: { zero: "#FFB000", one: "#0066FF", neutral: "#111111" }, paletteVersion: "amber-blue-v1" });
+  const created = await request("/api/calibrations", { participantIds: phones.map(phone => phone.id), ...DEFAULT_CALIBRATION_PALETTE });
+  assert.deepEqual(created.plan.palette, { zero: "#FF0000", one: "#0066FF", neutral: "#111111" });
+  assert.equal(created.plan.paletteVersion, "red-blue-v1");
   await until(snapshot, s => s.preparations.find(p => p.domain === "calibration")?.readyIds.length === 4);
   current = await snapshot();
   const startServerMs = current.serverMs + 4000;
@@ -140,7 +142,7 @@ try {
   await request(`/api/calibrations/${runId}/commit-map`, { runId, jobId: job.jobId, expectedMapRevision: 1 });
   current = await snapshot();
   assert.equal(current.audienceMap.mapRevision, 2);
-  check("three actual MP4 uploads, real Python decode, annotated preview, stale geometry rejection and reviewed map commit");
+  check("three actual red/blue MP4 uploads, real Python decode, annotated preview, stale geometry rejection and reviewed map commit");
   for (let index = 0; index < 4; index++) {
     current = await snapshot();
     const location = current.audienceMap.locations.find(location => location.deviceId === phones[index].id)!;

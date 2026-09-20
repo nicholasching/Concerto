@@ -287,7 +287,7 @@ Encoder convention, frozen in the shared codebook:
 
 Additional checked golden examples: ID `1` -> `1101000100000011`; ID `1024` -> `1110000000000001`. An independent planning calculation enumerated the specified 2,048 codewords and confirmed uniqueness and minimum pairwise distance 4. This verifies the packet mathematics only, not screen/camera decoding.
 
-Use two camera-tested screen colors, represented by exact RGB values in the manifest; the user's blue/red idea is one candidate, not a hard-coded decoder assumption. Use pilot measurements to classify colors rather than ideal RGB thresholds. Prefer a palette without saturated red after testing. No per-device imagery, text, or animation may cover the calibration area.
+The user-selected palette for new runs is **red `#FF0000` and blue `#0066FF`**, with neutral `#111111`, version `red-blue-v1`. This explicit 2026-09-20 instruction supersedes the earlier preference to avoid saturated red. Freeze exact colors in the manifest and use measured pilots to classify recorded colors; the worker retains the legacy amber/blue profile for old recordings. See the [palette decision](.devcontext/decisions/20260920-red-blue-calibration.md) and its separate software/physical verification status. No per-device imagery, text, or animation may cover the calibration area.
 
 Initial symbol duration is **200 ms**. The complete packet is:
 

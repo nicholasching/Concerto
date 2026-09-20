@@ -55,11 +55,9 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
         packets[device_id] = ([None, None, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0]
                              + [int(bit) for bit in f"{tag:08b}"] + word
                              + [1-bit for bit in word] + [None, None])
-    colors = {
-        0: np.array([255, 176, 0], dtype=np.float64),
-        1: np.array([0, 102, 255], dtype=np.float64),
-        None: np.array([17, 17, 17], dtype=np.float64),
-    }
+    colors = {bit: np.array([int(manifest["palette"][key][i:i+2], 16) for i in (1, 3, 5)],
+                            dtype=np.float64)
+              for bit, key in ((0, "zero"), (1, "one"), (None, "neutral"))}
     times = []
     t = 0.0
     while t < 13500:
@@ -137,13 +135,19 @@ def generate_capture(output_dir, case="clean", count=30, fps=30, width=640, heig
                     color = colors[bit]
                     if case == "emissive-background" and bit is not None:
                         # Three independent exposure conditions, unrelated to
-                        # detector thresholds: washed amber/cyan over clothing,
+                        # detector thresholds: washed zero/cyan over clothing,
                         # unequal pilot brightness, and a uniformly dim phone.
                         palettes = (
                             ((255, 250, 214), (15, 220, 255)),
                             ((165, 110, 0), (0, 95, 235)),
                             ((125, 85, 0), (0, 50, 125)),
                         )
+                        if manifest["palette"]["zero"].upper() == "#FF0000":
+                            palettes = (
+                                ((255, 210, 210), (15, 220, 255)),
+                                ((165, 8, 5), (0, 95, 235)),
+                                ((125, 6, 5), (0, 50, 125)),
+                            )
                         color = np.array(palettes[index % 3][bit], dtype=np.float64)
                     if case == "degraded":
                         color = color * np.array([0.79, 0.91, 0.84])

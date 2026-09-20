@@ -1,15 +1,15 @@
 import { beforeEach, expect, test } from "bun:test";
-import { ClientMessage, type ClientMessageData } from "@orchestra/contracts";
+import { ClientMessage, DEFAULT_CALIBRATION_PALETTE, type ClientMessageData } from "@orchestra/contracts";
 import { calibrationPacket } from "@orchestra/contracts/otc";
 import goldens from "../../packages/contracts/generated/otc-golden-packets.json";
-import { CalibrationSession, slotAt, symbolColor, type ArmMessage, type CalibrationIdentity, type CalibrationPhase, type Eligibility, type PrepareMessage } from "../src/lib/calibration";
+import { CalibrationSession, slotAt, symbolColor, type ArmMessage, type CalibrationIdentity, type CalibrationPhase, type Eligibility, type Palette, type PrepareMessage } from "../src/lib/calibration";
 import { COUNTDOWN_HIDE_MS, FlashRenderer, type FrameScheduler } from "../src/lib/flash-renderer";
 
-const PALETTE = { zero: "#FFB000", one: "#0066FF", neutral: "#111111" };
+const PALETTE: Palette = { ...DEFAULT_CALIBRATION_PALETTE.palette };
 const me: CalibrationIdentity = { sessionId: "demo", serverEpoch: "epoch-1", deviceId: 7 };
 const plan = {
   protocolVersion: 1 as const, sessionId: "demo", serverEpoch: "epoch-1", runId: "run-1", runTag: 37, participantIds: [3, 7, 9],
-  packetVersion: "otc-v1" as const, codebookVersion: "hamming16-11-v1" as const, paletteVersion: "amber-blue-v1", palette: PALETTE, symbolMs: 200 as const,
+  packetVersion: "otc-v1" as const, codebookVersion: "hamming16-11-v1" as const, paletteVersion: DEFAULT_CALIBRATION_PALETTE.paletteVersion as string, palette: PALETTE, symbolMs: 200 as const,
 };
 const START = 100_000;
 const envelope = { protocolVersion: 1 as const, sessionId: "demo", serverEpoch: "epoch-1", messageId: "m" };
@@ -39,7 +39,18 @@ test("slotAt is negative before the start and derived from absolute time", () =>
 });
 
 test("symbolColor maps guards to neutral and bits to the plan palette", () => {
-  expect([null, 0, 1].map(symbol => symbolColor(symbol as null | 0 | 1, PALETTE))).toEqual(["#111111", "#FFB000", "#0066FF"]);
+  expect([null, 0, 1].map(symbol => symbolColor(symbol as null | 0 | 1, PALETTE))).toEqual(["#111111", "#FF0000", "#0066FF"]);
+});
+
+test("legacy runs keep amber and a palette cannot change between preparation and arm", () => {
+  const legacy = { paletteVersion: "amber-blue-v1", palette: { zero: "#FFB000", one: "#0066FF", neutral: "#111111" } };
+  session.onPrepare(prepare(legacy), eligible);
+  session.onArm(arm(), START - 3000);
+  expect(phases.at(-1)?.kind).toBe("prepared");
+  session.onArm(arm(legacy), START - 3000);
+  const armed = phases.at(-1);
+  expect(armed?.kind).toBe("armed");
+  if (armed?.kind === "armed") expect(symbolColor(0, armed.run.palette)).toBe("#FFB000");
 });
 
 test("a participant that is eligible says ready and arms for the matching run", () => {

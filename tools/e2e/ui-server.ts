@@ -1,7 +1,7 @@
 // Isolated browser verification: start built Next apps on 13010/13011, then use localhost:18090.
 // Uses production backend modules and bundles, but disposable test state and original test tones.
 import { resolve } from "node:path";
-import { Show } from "@orchestra/contracts";
+import { DEFAULT_CALIBRATION_PALETTE, Show } from "@orchestra/contracts";
 import { createApp } from "../../backend/src/app";
 import { AssetStore } from "../../backend/src/assets";
 import { CalibrationRuns } from "../../backend/src/calibration";
@@ -28,7 +28,7 @@ const testDevice = registry.join(undefined, clock.nowServerMs());
 if (!testDevice.ok) throw new Error("Could not seed test participant");
 state.register(testDevice.deviceId);
 const run = calibrations.create({ sessionId: clock.sessionId, serverEpoch: clock.serverEpoch, participantIds: [testDevice.deviceId],
-  palette: { zero: "#FFB000", one: "#0066FF", neutral: "#111111" }, paletteVersion: "amber-blue-v1" });
+  ...DEFAULT_CALIBRATION_PALETTE });
 if (!run.ok) throw new Error("Could not seed an isolated upload run");
 calibrations.arm(run.run.plan.runId, clock.nowServerMs() - 20000);
 const app = createApp({ clock, state, registry, connections, preparations, calibrations, assets,

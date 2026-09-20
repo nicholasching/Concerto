@@ -19,6 +19,8 @@ Locally use `http://localhost:3000`; the configured public origin is `https://ht
 
 ## Capture and map
 
+New calibrations flash full red `#FF0000` and blue `#0066FF`, with unchanged 200 ms symbols. Refresh `/admin` after updating the app and prepare a new run to use red. An already prepared or recorded run retains its original colors; older orange/blue clips can still be processed with their original run metadata.
+
 1. Audience phones open `/`, turn their volume up and keep the page visible. Asset downloads and clock synchronization begin automatically. Sound is attempted automatically, but browsers that require a gesture show **Tap to enable sound**. A successful tap removes that control; it does not falsely mark a suspended AudioContext as ready.
 2. In **Calibration**, select **Prepare calibration**. Start the recording cameras, then select **Cameras recording — start pattern**. Phones receive the existing raise-phone instructions and eleven-second optical sequence. Keep leading/trailing recording margin.
 3. On each recording phone, open `/upload`, sign in and choose its audience section **while facing the stage**. For stage-facing cameras, image-left/right is reversed relative to this audience convention; use the existing camera orientation controls to handle that geometry.

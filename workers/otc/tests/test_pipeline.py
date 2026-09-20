@@ -25,6 +25,38 @@ def assert_positions(result, truth, required=None):
     return localized
 
 
+@pytest.mark.parametrize("fps", [24, 30, 60])
+def test_red_blue_three_camera_mp4_decodes_ids_and_positions(capture, fps):
+    path, manifest, truth = capture(count=6, fps=fps, red_blue=True)
+    # Inspect encoded pixels independently: a red manifest must not conceal the
+    # generator's former hard-coded amber emission.
+    for pts, rgb in read_frames(Path(manifest["cameras"][0]["videoPath"])):
+        if pts >= truth["cameraPhasePtsMs"][0] + 500:
+            assert np.count_nonzero((rgb[:, :, 0] > 200) & (rgb[:, :, 1] < 40) & (rgb[:, :, 2] < 40)) > 30
+            break
+    else:
+        pytest.fail("Video never reached the red pilot")
+    result = process_manifest(manifest, path, "synthetic")
+    validate_result(manifest, result)
+    assert_positions(result, truth, manifest["participantIds"])
+    assert any("red/blue preamble" in message
+               for camera in result["cameras"] for message in camera["messages"])
+
+
+@pytest.mark.parametrize("case", ["emissive-background", "reflected-motion"])
+def test_red_blue_washed_dim_and_reflected_screens(capture, case):
+    path, manifest, truth = capture(case, count=6, red_blue=True)
+    result = process_manifest(manifest, path, "synthetic")
+    assert_positions(result, truth, manifest["participantIds"])
+
+
+def test_red_blue_wrong_run_stays_rejected(capture):
+    path, manifest, _ = capture("wrong-tag", count=6, red_blue=True)
+    result = process_manifest(manifest, path, "synthetic")
+    assert not any(o["status"] == "accepted" for o in result["observations"])
+    assert all(p["status"] == "unseen" for p in result["locations"])
+
+
 def test_actual_three_camera_mp4_roundtrip_and_review_artifacts(capture, tmp_path):
     path, manifest, truth = capture(count=30)
     events = []
