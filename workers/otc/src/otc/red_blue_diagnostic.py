@@ -174,7 +174,11 @@ def carry_qualification_to_current_fragment(tracks, qualified_track_ids, now_ms)
                 parents.append(parent.track_id)
         if len(parents) == 1:
             links.setdefault(parents[0], []).append(child.track_id)
+    handoffs = []
     for parent_id, child_ids in links.items():
         if len(child_ids) == 1:
+            child_id = child_ids[0]
             qualified_track_ids.remove(parent_id)
-            qualified_track_ids.add(child_ids[0])
+            qualified_track_ids.add(child_id)
+            handoffs.append((parent_id, child_id))
+    return handoffs

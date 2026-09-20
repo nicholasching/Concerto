@@ -2,7 +2,13 @@ from pathlib import Path
 
 import numpy as np
 
-from otc.boxing import _palette_phase_by_track, box_video
+from otc.boxing import (
+    ConfirmedSession,
+    _attach_session,
+    _palette_phase_by_track,
+    _recovery_session,
+    box_video,
+)
 from otc.red_blue_diagnostic import (
     FlashSequence,
     carry_qualification_to_current_fragment,
@@ -111,3 +117,32 @@ def test_dim_red_candidate_can_start_without_a_blue_core():
     detections = detect_screens(rgb, 0, np.zeros(rgb.shape[:2], dtype=np.uint8))
 
     assert any(sample.width >= 15 and sample.height >= 20 for sample in detections)
+
+
+def test_one_confirmed_session_recovers_one_short_unambiguous_track_fragment():
+    previous = Sample(300, 50, 50, 12, 20, (0, 0, 0))
+    last = Sample(400, 52, 50, 12, 20, (0, 0, 0))
+    session = ConfirmedSession("flash-1", "old-track", last, 400, previous)
+    sessions = {session.session_id: session}
+    returned = Sample(700, 58, 50, 12, 20, (0, 0, 0))
+
+    assert _recovery_session(sessions, {"new-track"}, returned, 700) is session
+
+    session_by_track = {"old-track": session.session_id}
+    qualified_track_ids = {"old-track"}
+    _attach_session(session_by_track, qualified_track_ids, session, "new-track", returned, 700)
+
+    assert session_by_track == {"new-track": "flash-1"}
+    assert qualified_track_ids == {"new-track"}
+    assert session.track_id == "new-track"
+
+
+def test_recovery_refuses_ambiguous_or_expired_sessions():
+    sample = Sample(100, 50, 50, 12, 20, (0, 0, 0))
+    first = ConfirmedSession("flash-1", "old-1", sample, 100)
+    second = ConfirmedSession("flash-2", "old-2", sample, 100)
+    sessions = {first.session_id: first, second.session_id: second}
+    returned = Sample(300, 50, 50, 12, 20, (0, 0, 0))
+
+    assert _recovery_session(sessions, {"new-track"}, returned, 300) is None
+    assert _recovery_session({first.session_id: first}, {"new-track"}, returned, 900) is None

@@ -1,7 +1,9 @@
 """Render the existing OTC screen tracks as a local diagnostic video."""
 
 from collections import defaultdict
+from dataclasses import dataclass
 from fractions import Fraction
+from math import hypot
 from pathlib import Path
 import tempfile
 
@@ -24,6 +26,21 @@ GREEN = (0, 220, 0)
 MAGENTA = (255, 0, 255)
 MIN_PALETTE_TRACK_COVERAGE = .10
 MIN_PALETTE_COMPONENT_OVERLAP = .65
+RECOVERY_WINDOW_MS = 750
+RECOVERY_MIN_AREA_RATIO = .5
+RECOVERY_MAX_AREA_RATIO = 2.0
+RECOVERY_MIN_OVERLAP = .10
+
+
+@dataclass
+class ConfirmedSession:
+    """One logical flashing phone, which may span short raw-track fragments."""
+
+    session_id: str
+    track_id: str
+    last_sample: Sample
+    last_seen_ms: float
+    previous_sample: Sample | None = None
 
 
 def _frame_key(pts_ms):
@@ -55,6 +72,59 @@ def _overlap_area(first, second):
     height = max(0, min(first.y + first.height / 2, second.y + second.height / 2)
                  - max(first.y - first.height / 2, second.y - second.height / 2))
     return width * height
+
+
+def _session_prediction(session, pts_ms):
+    """Project a recently lost footprint using its last observed motion."""
+    last = session.last_sample
+    previous = session.previous_sample
+    if previous is None or last.pts_ms <= previous.pts_ms:
+        return last.x, last.y
+    elapsed = min(pts_ms - last.pts_ms, RECOVERY_WINDOW_MS)
+    velocity_x = (last.x - previous.x) / (last.pts_ms - previous.pts_ms)
+    velocity_y = (last.y - previous.y) / (last.pts_ms - previous.pts_ms)
+    return last.x + velocity_x * elapsed, last.y + velocity_y * elapsed
+
+
+def _matches_recovery(session, sample, pts_ms):
+    """Use size, overlap, and short-term motion to reject a different phone."""
+    previous = session.last_sample
+    area_ratio = sample.width * sample.height / (previous.width * previous.height)
+    if not RECOVERY_MIN_AREA_RATIO <= area_ratio <= RECOVERY_MAX_AREA_RATIO:
+        return False
+    overlap = _overlap_area(previous, sample)
+    smaller_area = min(previous.width * previous.height, sample.width * sample.height)
+    if overlap < smaller_area * RECOVERY_MIN_OVERLAP:
+        return False
+    predicted_x, predicted_y = _session_prediction(session, pts_ms)
+    radius = max(16.0, max(previous.width, previous.height, sample.width, sample.height) * 1.25)
+    return hypot(sample.x - predicted_x, sample.y - predicted_y) <= radius
+
+
+def _recovery_session(sessions, active_track_ids, sample, pts_ms):
+    """Return a session only when one unambiguous recently lost match exists."""
+    candidates = [
+        session for session in sessions.values()
+        if (session.track_id not in active_track_ids and
+            0 < pts_ms - session.last_seen_ms <= RECOVERY_WINDOW_MS and
+            _matches_recovery(session, sample, pts_ms))
+    ]
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _attach_session(session_by_track, qualified_track_ids, session, track_id, sample, pts_ms):
+    """Move a logical session to its current raw track without double counting."""
+    if session.track_id != track_id:
+        session_by_track.pop(session.track_id, None)
+        qualified_track_ids.discard(session.track_id)
+        session.previous_sample = None
+    else:
+        session.previous_sample = session.last_sample
+    session.track_id = track_id
+    session.last_sample = sample
+    session.last_seen_ms = pts_ms
+    session_by_track[track_id] = session.session_id
+    qualified_track_ids.add(track_id)
 
 
 def _palette_phase_by_track(rgb, pts_ms, red, blue, screen_tracks):
@@ -128,6 +198,8 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
     frames_written = boxes_drawn = 0
     qualification_tracks, phase_by_track = {}, {}
     qualified_track_ids, seen_qualified_track_ids = set(), set()
+    sessions, session_by_track = {}, {}
+    next_session_number = 0
     previous_value = None
     try:
         with tempfile.NamedTemporaryFile(dir=output_path.parent, suffix=".mp4", delete=False) as target:
@@ -147,9 +219,26 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
                 for sample in _masked_screens(rgb, pts_ms, flash):
                     _rectangle(annotated, sample, MAGENTA)
                 frame_tracks = boxes_by_frame.get(key, [])
+                active_track_ids = {track_id for track_id, _sample in frame_tracks}
                 palette_phases = _palette_phase_by_track(
                     rgb, pts_ms, red, blue, frame_tracks
                 )
+                # Keep the raw box currently carrying each recovered session up
+                # to date before considering new fragments.
+                for track_id, sample in frame_tracks:
+                    session_id = session_by_track.get(track_id)
+                    if session_id:
+                        _attach_session(session_by_track, qualified_track_ids,
+                                        sessions[session_id], track_id, sample, pts_ms)
+                # A short loss may make a new raw track for the same phone.
+                # Reclaim it only when one inactive session is a clear match.
+                for track_id, sample in frame_tracks:
+                    if track_id in session_by_track:
+                        continue
+                    session = _recovery_session(sessions, active_track_ids, sample, pts_ms)
+                    if session:
+                        _attach_session(session_by_track, qualified_track_ids,
+                                        session, track_id, sample, pts_ms)
                 for track_id, sample in frame_tracks:
                     cv2.circle(annotated, (round(sample.x), round(sample.y)), 3, CYAN, -1)
                     qualification_tracks.setdefault(track_id, Track(track_id)).samples.append(
@@ -157,17 +246,33 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
                     )
                     sequence = phase_by_track.setdefault(track_id, FlashSequence())
                     if sequence.observe(palette_phases.get(track_id, "none"), pts_ms):
-                        qualified_track_ids.add(track_id)
+                        session_id = session_by_track.get(track_id)
+                        if session_id is None:
+                            session = _recovery_session(sessions, active_track_ids, sample, pts_ms)
+                            if session is None:
+                                next_session_number += 1
+                                session = ConfirmedSession(
+                                    f"flash-{next_session_number}", track_id, sample, pts_ms
+                                )
+                                sessions[session.session_id] = session
+                            _attach_session(session_by_track, qualified_track_ids,
+                                            session, track_id, sample, pts_ms)
                 current_tracks = list(qualification_tracks.values())
-                carry_qualification_to_current_fragment(current_tracks, qualified_track_ids, pts_ms)
+                for parent_id, child_id in carry_qualification_to_current_fragment(
+                    current_tracks, qualified_track_ids, pts_ms
+                ):
+                    session_id = session_by_track.get(parent_id)
+                    child_sample = dict(frame_tracks).get(child_id)
+                    if session_id and child_sample:
+                        _attach_session(session_by_track, qualified_track_ids,
+                                        sessions[session_id], child_id, child_sample, pts_ms)
                 for track in current_tracks:
                     if (track.track_id not in qualified_track_ids or
                             pts_ms - track.samples[-1].pts_ms > SELECTED_TRACK_MAX_AGE_MS):
                         continue
                     track_id, sample = track.track_id, track.samples[-1]
                     _rectangle(annotated, sample, GREEN, "flash sequence")
-                    qualified_track_ids.add(track_id)
-                    seen_qualified_track_ids.add(track_id)
+                    seen_qualified_track_ids.add(session_by_track[track_id])
                     boxes_drawn += 1
                 frame = av.VideoFrame.from_ndarray(annotated, format="rgb24")
                 frame.pts = round(pts_ms)

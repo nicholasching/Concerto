@@ -158,3 +158,22 @@ changing the production detector or identity policy.
   submitted through the local boxing endpoint. It completed with 3 qualified
   tracks, 780 green-box frames, and an HTTP 200 MP4 result. No full gate was
   run.
+
+## Confirmed-session recovery
+
+- User-reported failure: one physical phone could briefly lose its raw screen
+  track, return as a new green box, and inflate the detected-sequence count
+  even though the boxes did not exist at the same time.
+- Added a logical confirmed-session layer above raw track IDs. The summary now
+  counts seen session IDs rather than raw green track IDs. The existing direct
+  one-to-one fragment handoff preserves that same session.
+- A new raw track may reclaim an inactive confirmed session only within 750 ms,
+  with area ratio 0.5--2.0, at least 10% overlap of the smaller box, and a
+  short-term motion prediction within a size-scaled radius. It must be the only
+  eligible session; ambiguous or expired candidates remain separate. Pending
+  red/blue phase state is never transferred.
+- Focused check: `pytest workers/otc/tests/test_boxing.py -q` passed (8 tests)
+  and worker Ruff passed. Added direct recovery tests for one valid short
+  fragment and for ambiguous/expired rejection. The local HTTP red/blue upload
+  completed with 3 logical detections, 780 green-box frames, and an HTTP 200
+  result video. No full gate was run.
