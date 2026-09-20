@@ -34,6 +34,7 @@ def read_frames(path: Path, rotation_degrees: int = 0):
             raise ValueError(f"No video stream: {path}")
         stream = container.streams.video[0]
         stream.codec_context.thread_count = 2
+        stream.codec_context.thread_type = "AUTO"  # Offline PTS-order decode across frames too.
         for frame in container.decode(stream):
             if frame.pts is None or frame.time_base is None:
                 raise ValueError("Video frame lacks a presentation timestamp")

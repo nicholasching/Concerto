@@ -10,6 +10,7 @@ import numpy as np
 
 from .camera_worker import run_cameras
 from .geometry import build_mappings, fuse_locations, reject_duplicates
+from .resources import worker_allocation
 from .validation import validate_manifest, validate_result, validate_schema
 from .video import verify_video
 
@@ -17,7 +18,7 @@ DECODER_VERSION = "otc-v1.7"
 
 
 def process_manifest(manifest, base_dir, evidence, *, job_id=None, debug_dir=None, progress=None,
-                     workers=3):
+                     workers=3, cpu_budget=None):
     start = time.perf_counter()
     validate_manifest(manifest)
     if evidence not in ("synthetic", "physical"):
@@ -50,7 +51,8 @@ def process_manifest(manifest, base_dir, evidence, *, job_id=None, debug_dir=Non
     cv2.setNumThreads(1)
     observations, diagnostics, artifacts = [], [], []
     dimensions = {}
-    camera_results = run_cameras(manifest, paths, debug_dir, workers, report)
+    concurrent, frame_workers = worker_allocation(len(paths), workers, cpu_budget)
+    camera_results = run_cameras(manifest, paths, debug_dir, concurrent, report, frame_workers)
     for camera, result in zip(manifest["cameras"], camera_results):
         observations.extend(result["observations"])
         dimensions[camera["cameraId"]] = result["dimensions"]

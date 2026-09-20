@@ -18,6 +18,7 @@ import numpy as np
 
 from otc.__main__ import write_result
 from otc.pipeline import process_manifest
+from otc.resources import worker_allocation
 
 
 def peak_memory_bytes():
@@ -250,6 +251,7 @@ def main():
     parser.add_argument("--truth", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--workers", choices=(1, 3), type=int, default=3)
+    parser.add_argument("--cpu-budget", type=int)
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     truth = json.loads(args.truth.read_text(encoding="utf-8"))
@@ -266,7 +268,7 @@ def main():
             progress.write(json.dumps(event) + "\n")
             progress.flush()
         result = process_manifest(manifest, args.manifest.resolve().parent, "synthetic",
-                                  progress=report, workers=args.workers)
+                                  progress=report, workers=args.workers, cpu_budget=args.cpu_budget)
     write_result(args.output_dir / "result.json", result)
     elapsed_ms = (time.perf_counter() - start) * 1000
     errors, wrong = [], []
@@ -278,14 +280,17 @@ def main():
         errors.append(error)
         if point["column"] != ground["column"] or error >= .015:
             wrong.append(point["deviceId"])
+    camera_concurrency, frame_workers = worker_allocation(len(manifest["cameras"]), args.workers,
+                                                        args.cpu_budget)
     metrics = {
         "evidence": "synthetic", "case": truth["case"], "seed": truth["seed"],
         "participants": len(expected), "statuses": dict(Counter(p["status"] for p in result["locations"])),
         "wrongLocalizedIds": wrong, "positionErrorTolerance": .015,
         "maximumPositionError": max(errors, default=None), "wallMs": elapsed_ms,
         "processingMs": result["processingMs"], "workersRequested": args.workers,
-        "cameraWorkerProcesses": min(args.workers, len(manifest["cameras"]))
-                                 if args.workers > 1 else 0,
+        "cameraWorkerProcesses": camera_concurrency if camera_concurrency > 1 else 0,
+        "frameWorkersPerCameraSlot": frame_workers,
+        "cpuBudgetRequested": args.cpu_budget,
         "parentPeakResidentBytes": peak_memory_bytes(),
         "parentMemoryMethod": "GetProcessMemoryInfo(self).PeakWorkingSetSize"
                               if sys.platform == "win32" else "getrusage(RUSAGE_SELF).ru_maxrss",

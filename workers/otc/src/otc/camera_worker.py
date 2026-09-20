@@ -11,15 +11,16 @@ from .sampling import decode_tracks
 from .tracking import scan_camera
 
 
-def process_camera(index, camera, path, manifest, debug_dir, report):
+def process_camera(index, camera, path, manifest, debug_dir, report, frame_workers=1):
     cv2.setNumThreads(1)
     camera_id = camera["cameraId"]
     report("decode", f"Decoding camera {camera_id} in process {os.getpid()}")
+    report("decode", f"{camera_id}: {frame_workers} frame analysis worker(s)")
 
     def on_frames(frames, pts_ms):
         report("track", f"{camera_id}: {frames} frames, clip PTS {pts_ms:.1f} ms")
 
-    scan = scan_camera(path, camera, on_frames)
+    scan = scan_camera(path, camera, on_frames, frame_workers=frame_workers)
     seen, details, phase, messages = decode_tracks(scan, manifest, camera_id)
     diagnostic = {
         "cameraId": camera_id, "frameWidth": scan.width, "frameHeight": scan.height,
@@ -52,11 +53,11 @@ def process_camera(index, camera, path, manifest, debug_dir, report):
             "dimensions": (scan.width, scan.height)}
 
 
-def _camera_entry(sender, index, camera, path, manifest, debug_dir):
+def _camera_entry(sender, index, camera, path, manifest, debug_dir, frame_workers):
     try:
         def report(stage, message):
             sender.send(("progress", (stage, message)))
-        result = process_camera(index, camera, path, manifest, debug_dir, report)
+        result = process_camera(index, camera, path, manifest, debug_dir, report, frame_workers)
         sender.send(("result", result))
     except Exception as error:
         sender.send(("error", f"{type(error).__name__}: {error}"))
@@ -64,7 +65,7 @@ def _camera_entry(sender, index, camera, path, manifest, debug_dir):
         sender.close()
 
 
-def run_cameras(manifest, paths, debug_dir, workers, report):
+def run_cameras(manifest, paths, debug_dir, workers, report, frame_workers):
     """Return camera results in manifest order; clean all children on any failure.
 
     The parent alone emits public progress. Spawn avoids inheriting native codec
@@ -77,29 +78,36 @@ def run_cameras(manifest, paths, debug_dir, workers, report):
         for index, (camera, path) in enumerate(zip(manifest["cameras"], paths)):
             def on_progress(stage, message):
                 report(stage, .05 + .75 * index / count, message)
-            results.append(process_camera(index, camera, path, manifest, debug_dir, on_progress))
+            results.append(process_camera(index, camera, path, manifest, debug_dir, on_progress,
+                                          frame_workers[0]))
         return results
 
     context = mp.get_context("spawn")
     children, readers, pending = [], [], {}
     results = [None] * count
     completed = 0
+    next_index = 0
     try:
-        for index, (camera, path) in enumerate(zip(manifest["cameras"], paths)):
+        def launch(index, slot):
+            camera, path = manifest["cameras"][index], paths[index]
             receiver, sender = context.Pipe(duplex=False)
             readers.append(receiver)
             child = context.Process(target=_camera_entry,
-                                    args=(sender, index, camera, path, manifest, debug_dir),
+                                    args=(sender, index, camera, path, manifest, debug_dir,
+                                          frame_workers[slot]),
                                     name=f"otc-camera-{index}")
             try:
                 child.start()
             finally:
                 sender.close()
             children.append(child)
-            pending[receiver] = index
+            pending[receiver] = (index, slot)
+        for slot in range(min(workers, count)):
+            launch(next_index, slot)
+            next_index += 1
         while pending:
             for receiver in wait(list(pending)):
-                index = pending[receiver]
+                index, slot = pending[receiver]
                 camera_id = manifest["cameras"][index]["cameraId"]
                 try:
                     kind, payload = receiver.recv()
@@ -116,6 +124,9 @@ def run_cameras(manifest, paths, debug_dir, workers, report):
                     completed += 1
                     report("track", .05 + .75 * completed / count,
                            f"Completed camera {camera_id} ({completed}/{count})")
+                    if next_index < count:
+                        launch(next_index, slot)
+                        next_index += 1
         # Results have arrived; allow normal interpreter shutdown before cleanup.
         for child in children:
             child.join(timeout=1)

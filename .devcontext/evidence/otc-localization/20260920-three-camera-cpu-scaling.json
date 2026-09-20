@@ -1,0 +1,61 @@
+{
+  "platform": "Windows-11-10.0.26200-SP0",
+  "cpuCapacity": 16,
+  "evidence": "synthetic",
+  "debugArtifactsEnabled": false,
+  "inputHashes": [
+    {
+      "cameraId": "camera-left",
+      "sha256": "b7c710bb4c5e8e2270ec47909178427aec3f333a1a5b9a1a563fd467e75ae064"
+    },
+    {
+      "cameraId": "camera-center",
+      "sha256": "0cf974703216aa0964c0beff0d0a0afb6e97b9862e9c790043d77c9e206a2cc8"
+    },
+    {
+      "cameraId": "camera-right",
+      "sha256": "f87bfc29777bfa49162079d4588d72dee18fd622af388d5ff9c362b30713228c"
+    }
+  ],
+  "resultSha256ExcludingTiming": "bac6d1a37fddf63429f2f5e9e70c7ac0e871aab039ad72d035b7f1bc843d3056",
+  "runs": [
+    {
+      "requestedCpuBudget": 3,
+      "cameraConcurrency": 3,
+      "frameWorkersPerCameraSlot": [
+        1,
+        1,
+        1
+      ],
+      "wallSeconds": 68.96082920004847,
+      "exactResultMatch": true,
+      "peakSampledProcessTreeResidentBytes": 1085607936,
+      "processTreeMemoryMethod": "Toolhelp32 descendants + sum of live WorkingSetSize",
+      "memorySamplingIntervalMs": 100,
+      "memorySamples": 551,
+      "incompleteMemorySamples": 0,
+      "maximumSampledProcessCount": 4,
+      "memorySamplingError": null,
+      "memorySamplingCaveat": "Sampled process-resident sum; shared pages may be counted more than once; peaks between samples can be missed. Incomplete samples are excluded from the peak."
+    },
+    {
+      "requestedCpuBudget": 16,
+      "cameraConcurrency": 3,
+      "frameWorkersPerCameraSlot": [
+        6,
+        5,
+        5
+      ],
+      "wallSeconds": 38.48125179996714,
+      "exactResultMatch": true,
+      "peakSampledProcessTreeResidentBytes": 3291738112,
+      "processTreeMemoryMethod": "Toolhelp32 descendants + sum of live WorkingSetSize",
+      "memorySamplingIntervalMs": 100,
+      "memorySamples": 267,
+      "incompleteMemorySamples": 0,
+      "maximumSampledProcessCount": 20,
+      "memorySamplingError": null,
+      "memorySamplingCaveat": "Sampled process-resident sum; shared pages may be counted more than once; peaks between samples can be missed. Incomplete samples are excluded from the peak."
+    }
+  ]
+}

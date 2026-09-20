@@ -1,6 +1,7 @@
 """Screen candidates and conservative, spatially gated motion association."""
 
 from collections import defaultdict
+from contextlib import closing
 from dataclasses import dataclass, field
 import math
 from statistics import median
@@ -9,6 +10,7 @@ import cv2
 import numpy as np
 
 from .sampling import MIN_PHASE_SAMPLES
+from .frame_worker import detected_frames
 from .video import read_frames
 
 
@@ -190,6 +192,10 @@ def associate(tracks, active, detections, pts_ms, track_id_offset=0):
             for dy in (-1, 0, 1):
                 for index in grid[(gx + dx, gy + dy)]:
                     x, y, radius = predictions[index]
+                    # Most neighboring-bin entries are outside this same gate.
+                    # Reject them before computing unused footprint comparisons.
+                    if not math.hypot(detection.x - x, detection.y - y) <= radius:
+                        continue
                     last = tracks[index].samples[-1]
                     # Proximity alone lets a dim clothing fragment steal a phone
                     # or make it ambiguous. Require compatible footprint and
@@ -201,8 +207,7 @@ def associate(tracks, active, detections, pts_ms, track_id_offset=0):
                     overlap_height = max(0, min(y + last.height / 2, detection.y + detection.height / 2)
                                          - max(y - last.height / 2, detection.y - detection.height / 2))
                     smaller_area = min(last.width * last.height, detection.width * detection.height)
-                    if (math.hypot(detection.x - x, detection.y - y) <= radius and
-                            0.35 <= area_ratio <= 4 and
+                    if (0.35 <= area_ratio <= 4 and
                             min(brightness) >= 0.6 * max(brightness) and
                             overlap_width * overlap_height >= smaller_area * 0.2):
                         matches[detection_index].append(index)
@@ -292,33 +297,25 @@ def retire_fragments(tracks, active, pts_ms):
     return next_active, removed
 
 
-def scan_camera(path, camera, progress=None):
+def scan_camera(path, camera, progress=None, *, frame_workers=1):
     tracks, active = [], set()
-    excluded = preview = None
+    preview = None
     width = height = frame_count = best_count = 0
     preview_pts = 0.0
     discarded_fragments = 0
-    for pts_ms, rgb in read_frames(path, camera["rotationDegrees"]):
-        if excluded is None:
+    frames = detected_frames(read_frames(path, camera["rotationDegrees"]),
+                             camera["exclusionRois"], detect_screens, frame_workers)
+    with closing(frames):
+        for pts_ms, rgb, detections in frames:
             height, width = rgb.shape[:2]
-            excluded = np.zeros((height, width), np.uint8)
-            for polygon in camera["exclusionRois"]:
-                points = np.array([[p["x"], p["y"]] for p in polygon], dtype=np.float64)
-                if (not np.isfinite(points).all() or (points < 0).any() or
-                        (points[:, 0] >= width).any() or (points[:, 1] >= height).any()):
-                    raise ValueError("Exclusion ROI lies outside rotated video dimensions")
-                cv2.fillPoly(excluded, [points.round().astype(np.int32)], 255)
-        elif rgb.shape[:2] != (height, width):
-            raise ValueError("Video dimensions changed during capture")
-        detections = detect_screens(rgb, pts_ms, excluded)
-        active, removed = retire_fragments(tracks, active, pts_ms)
-        discarded_fragments += removed
-        active = associate(tracks, active, detections, pts_ms, discarded_fragments)
-        if preview is None or len(detections) > best_count or (
-            len(detections) == best_count and frame_count % 30 == 0
-        ):
-            preview, preview_pts, best_count = rgb.copy(), pts_ms, len(detections)
-        frame_count += 1
-        if progress and frame_count % 90 == 0:
-            progress(frame_count, pts_ms)
+            active, removed = retire_fragments(tracks, active, pts_ms)
+            discarded_fragments += removed
+            active = associate(tracks, active, detections, pts_ms, discarded_fragments)
+            if preview is None or len(detections) > best_count or (
+                len(detections) == best_count and frame_count % 30 == 0
+            ):
+                preview, preview_pts, best_count = rgb.copy(), pts_ms, len(detections)
+            frame_count += 1
+            if progress and frame_count % 90 == 0:
+                progress(frame_count, pts_ms)
     return CameraScan(tracks, width, height, frame_count, preview, preview_pts, discarded_fragments)

@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### OTC CPU parallelism
+
+The worker distributes independent frame analysis across the available CPU allocation instead of stopping at one analysis core per camera. One shared budget respects container quotas; all frames retain PTS order for tracking. The user plans up to 24 Railway CPUs. See the [decision](decisions/20260920-otc-frame-parallelism.md), [performance configuration](../docs/otc-performance.md) and [measured verification journal](teams/otc-localization/journal/20260920-frame-parallelism.md). Detection and geometry accuracy work remains separate; live Railway throughput must be measured after deployment.
+
 ### Red/blue calibration palette
 
 New runs use user-requested full red `#FF0000` and existing blue `#0066FF`. Decoder v1.7 selects pilot/phase checks from the saved palette and retains old amber/blue captures. Timing/codewords are unchanged. See the [decision](decisions/20260920-red-blue-calibration.md) and [checks/handoff](teams/otc-localization/journal/20260920-red-blue-palette.md).

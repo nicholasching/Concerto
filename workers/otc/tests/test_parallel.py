@@ -10,6 +10,7 @@ import sys
 import pytest
 
 from otc.pipeline import process_manifest
+from otc.resources import worker_allocation
 from otc.validation import validate_result, validate_schema
 
 
@@ -39,18 +40,21 @@ def cli_command(manifest_path, output):
             "--output", str(output), "--evidence", "synthetic", "--job-id", "parallel-cli"]
 
 
-def test_parallel_matches_serial_with_ordered_artifacts_and_parent_progress(capture, tmp_path):
+@pytest.mark.parametrize("cpu_budget", [2, 6])
+def test_parallel_matches_serial_with_ordered_artifacts_and_parent_progress(capture, tmp_path,
+                                                                          cpu_budget):
     path, manifest, _ = capture(count=6)
     ordered = copy.deepcopy(manifest)
     ordered["cameras"] = [ordered["cameras"][2], ordered["cameras"][0], ordered["cameras"][1]]
-    serial = process_manifest(ordered, path, "synthetic", workers=1)
+    serial = process_manifest(ordered, path, "synthetic", workers=1, cpu_budget=1,
+                              debug_dir=tmp_path / "serial-debug")
     events, callback_pids = [], []
 
     def record(event):
         events.append(event)
         callback_pids.append(os.getpid())
 
-    result = process_manifest(ordered, path, "synthetic", workers=3,
+    result = process_manifest(ordered, path, "synthetic", workers=3, cpu_budget=cpu_budget,
                               debug_dir=tmp_path / "debug", job_id="parallel-test", progress=record)
     validate_result(ordered, result)
     assert {k: v for k, v in result.items() if k != "processingMs"} == {
@@ -81,6 +85,8 @@ def test_parallel_matches_serial_with_ordered_artifacts_and_parent_progress(capt
         assert {track["trackId"] for track in detail["tracks"]} == set(observations)
         for track in detail["tracks"]:
             assert track["status"] == observations[track["trackId"]]["status"]
+    for artifact in (tmp_path / "debug").iterdir():
+        assert artifact.read_bytes() == (tmp_path / "serial-debug" / artifact.name).read_bytes()
 
 
 def test_parallel_camera_failure_reaps_started_children(capture, tmp_path):
@@ -127,7 +133,7 @@ def test_progress_callback_failure_reaps_camera_children(capture):
     assert {child.pid for child in multiprocessing.active_children()} <= before
 
 
-def test_cli_defaults_to_three_camera_processes_and_publishes_complete(capture, tmp_path):
+def test_cli_uses_detected_camera_budget_and_publishes_complete(capture, tmp_path):
     _, manifest, _ = capture(count=6)
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps(manifest))
@@ -141,10 +147,25 @@ def test_cli_defaults_to_three_camera_processes_and_publishes_complete(capture, 
     events = [json.loads(line) for line in completed.stdout.splitlines()]
     for event in events:
         validate_schema("JobProgress", event)
-    assert len(set(camera_processes(events).values())) == 3
+    concurrent, _ = worker_allocation(3, 3)
+    assert len(set(camera_processes(events).values())) == (3 if concurrent > 1 else 1)
     assert [e["progress"] for e in events] == sorted(e["progress"] for e in events)
     assert events[-1]["stage"] == "complete"
     assert events[-1]["progress"] == 1
+
+
+def test_callback_failure_after_frame_processing_reaps_frame_workers(capture):
+    path, manifest, _ = capture(count=6)
+    one = {**manifest, "cameras": manifest["cameras"][:1]}
+    before = {p.pid for p in multiprocessing.active_children()}
+
+    def fail_during_frames(event):
+        if event["stage"] == "track":
+            raise RuntimeError("frame progress consumer disconnected")
+
+    with pytest.raises(RuntimeError, match="frame progress consumer"):
+        process_manifest(one, path, "synthetic", cpu_budget=2, progress=fail_during_frames)
+    assert {p.pid for p in multiprocessing.active_children()} <= before
 
 
 def test_cli_parallel_camera_failure_never_publishes_success(capture, tmp_path):

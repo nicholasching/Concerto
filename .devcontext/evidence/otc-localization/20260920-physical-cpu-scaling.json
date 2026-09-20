@@ -1,0 +1,83 @@
+{
+  "platform": "Windows-11-10.0.26200-SP0",
+  "cpuCapacity": 16,
+  "evidence": "physical",
+  "debugArtifactsEnabled": false,
+  "inputHashes": [
+    {
+      "cameraId": "camera-center",
+      "sha256": "c06a58a0c04d1e36bc8ce815ea9900ad2d1e2c777e16da1573fa2cf569e97a18"
+    }
+  ],
+  "resultSha256ExcludingTiming": "61bdde7c5c2e12b3ad7df48463ae5eb1094f55d1280cc184a066572b243968a9",
+  "runs": [
+    {
+      "requestedCpuBudget": 1,
+      "cameraConcurrency": 1,
+      "frameWorkersPerCameraSlot": [
+        1
+      ],
+      "wallSeconds": 127.34242270002142,
+      "exactResultMatch": true,
+      "peakSampledProcessTreeResidentBytes": 392507392,
+      "processTreeMemoryMethod": "Toolhelp32 descendants + sum of live WorkingSetSize",
+      "memorySamplingIntervalMs": 100,
+      "memorySamples": 916,
+      "incompleteMemorySamples": 0,
+      "maximumSampledProcessCount": 1,
+      "memorySamplingError": null,
+      "memorySamplingCaveat": "Sampled process-resident sum; shared pages may be counted more than once; peaks between samples can be missed. Incomplete samples are excluded from the peak."
+    },
+    {
+      "requestedCpuBudget": 4,
+      "cameraConcurrency": 1,
+      "frameWorkersPerCameraSlot": [
+        4
+      ],
+      "wallSeconds": 41.68968200002564,
+      "exactResultMatch": true,
+      "peakSampledProcessTreeResidentBytes": 1001336832,
+      "processTreeMemoryMethod": "Toolhelp32 descendants + sum of live WorkingSetSize",
+      "memorySamplingIntervalMs": 100,
+      "memorySamples": 244,
+      "incompleteMemorySamples": 0,
+      "maximumSampledProcessCount": 5,
+      "memorySamplingError": null,
+      "memorySamplingCaveat": "Sampled process-resident sum; shared pages may be counted more than once; peaks between samples can be missed. Incomplete samples are excluded from the peak."
+    },
+    {
+      "requestedCpuBudget": 8,
+      "cameraConcurrency": 1,
+      "frameWorkersPerCameraSlot": [
+        8
+      ],
+      "wallSeconds": 36.71839719999116,
+      "exactResultMatch": true,
+      "peakSampledProcessTreeResidentBytes": 1536335872,
+      "processTreeMemoryMethod": "Toolhelp32 descendants + sum of live WorkingSetSize",
+      "memorySamplingIntervalMs": 100,
+      "memorySamples": 197,
+      "incompleteMemorySamples": 0,
+      "maximumSampledProcessCount": 9,
+      "memorySamplingError": null,
+      "memorySamplingCaveat": "Sampled process-resident sum; shared pages may be counted more than once; peaks between samples can be missed. Incomplete samples are excluded from the peak."
+    },
+    {
+      "requestedCpuBudget": 16,
+      "cameraConcurrency": 1,
+      "frameWorkersPerCameraSlot": [
+        16
+      ],
+      "wallSeconds": 38.12316550000105,
+      "exactResultMatch": true,
+      "peakSampledProcessTreeResidentBytes": 2676789248,
+      "processTreeMemoryMethod": "Toolhelp32 descendants + sum of live WorkingSetSize",
+      "memorySamplingIntervalMs": 100,
+      "memorySamples": 201,
+      "incompleteMemorySamples": 0,
+      "maximumSampledProcessCount": 17,
+      "memorySamplingError": null,
+      "memorySamplingCaveat": "Sampled process-resident sum; shared pages may be counted more than once; peaks between samples can be missed. Incomplete samples are excluded from the peak."
+    }
+  ]
+}
