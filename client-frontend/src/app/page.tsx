@@ -6,6 +6,7 @@ import { ClockSync } from "@orchestra/sync";
 import { CalibrationSession, type CalibrationPhase } from "../lib/calibration";
 import { browserSocket, ParticipantConnection, type ConnectionState } from "../lib/connection";
 import { FlashRenderer } from "../lib/flash-renderer";
+import { FLOOR, LevelMeter } from "../lib/level-meter";
 import { unlockWithin } from "../lib/audio-unlock";
 import { browserStorage, joinSession, tokenKey } from "../lib/join";
 import { buildReadiness, statusMessage, StatusReporter } from "../lib/readiness";
@@ -54,6 +55,7 @@ export default function Page() {
   const calibration = useRef<CalibrationSession | null>(null);
   const surface = useRef<HTMLDivElement | null>(null);
   const surfaceText = useRef<HTMLParagraphElement | null>(null);
+  const stageSurface = useRef<HTMLDivElement | null>(null);
   const showControl = useRef<ShowControl | null>(null);
   const [, setTick] = useState(0);
 
@@ -162,6 +164,8 @@ export default function Page() {
   // Download and decode while the browser waits for an audio gesture too.
   const show = conn.snapshot?.show;
   const showKey = JSON.stringify([show?.showId, show?.showRevision, show?.tracks]);
+  const playing = conn.snapshot?.transport.status === "playing";
+  const channel = show?.channels.find(value => value.channelId === conn.snapshot?.assignment.channelId);
   useEffect(() => {
     const audio = host.current;
     if (!show || !audioState || !audio) return;
@@ -222,6 +226,25 @@ export default function Page() {
     return () => { renderer.stop(); void wakeLock?.release().catch(() => {}); };
   }, [phase]);
 
+  // During the show the phone is a light: its channel's colour, brightness following its own part.
+  // Painted straight to the DOM each frame, like the calibration surface above.
+  const channelColor = channel?.color;
+  useEffect(() => {
+    if (!playing) return;
+    const color = channelColor ?? "#d4f884";
+    const audio = host.current;
+    const meter = audio && audioState === "running" ? new LevelMeter(audio.context(), audio.masterGain) : null;
+    let handle = requestAnimationFrame(function frame() {
+      const surfaceEl = stageSurface.current;
+      if (surfaceEl) {
+        surfaceEl.style.backgroundColor = color;
+        surfaceEl.style.opacity = String(meter ? meter.read() : FLOOR);
+      }
+      handle = requestAnimationFrame(frame);
+    });
+    return () => { cancelAnimationFrame(handle); meter?.dispose(); };
+  }, [playing, channelColor, audioState]);
+
   async function enableSound(automatic = false) {
     if (!host.current) {
       host.current = new AudioContextHost();
@@ -258,8 +281,6 @@ export default function Page() {
   const needsSection = connected && stage === "complete" && !mapped && !manual && phase.kind !== "armed";
   const holding = phase.kind === "prepared" || phase.kind === "armed";
   const awaitingMap = phase.kind === "finished" && stage !== "complete" || stage === "processing";
-  const playing = conn.snapshot?.transport.status === "playing";
-  const channel = show?.channels.find(value => value.channelId === conn.snapshot?.assignment.channelId);
   const reset = conn.status.kind === "reset";
   const checks = [
     { label: "Connection", value: connected ? "Connected" : connectionLabel(conn), ok: connected },
@@ -272,6 +293,13 @@ export default function Page() {
     if (snapshot) connection.current?.send(ClientMessage.parse({ protocolVersion: 1, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch,
       messageId: crypto.randomUUID(), type: "participant.column", payload: { column } }));
   }
+
+  // The show is playing: colour only. Nothing but a silent phone or a lost socket interrupts it.
+  if (playing && !reset) return <main className="performance-shell">
+    <div ref={stageSurface} className="performance-surface" aria-hidden="true" />
+    {audioState !== "running" && <div className="sound-prompt performance-notice"><button className="primary" onClick={() => void enableSound()}>{isAudioContextPaused(audioState) ? "Tap to enable sound" : "Enable sound"}</button></div>}
+    {!connected && <p role="alert" className="notice performance-notice">{connectionLabel(conn)}</p>}
+  </main>;
 
   return <main className="audience-shell">
     <header className="audience-brand"><span className="brand-mark" aria-hidden="true">◒</span><span>AUDIENCE<br />ORCHESTRA</span>
