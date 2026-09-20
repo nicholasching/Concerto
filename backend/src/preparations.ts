@@ -8,6 +8,8 @@ export class Preparations {
   assignment: { preparationId: string; assignmentRevision: number; mapRevision: number; channelId: string | null; deviceIds: number[] } | null = null;
   private readonly active = new Map<PreparationDomain, Barrier>();
 
+  reset(): void { this.active.clear(); this.assignment = null; }
+
   start(domain: PreparationDomain, barrier: Barrier): void {
     this.active.set(domain, barrier);
   }

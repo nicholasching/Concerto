@@ -20,6 +20,8 @@ export class DeviceRegistry {
   private readonly deviceIdByTokenHash = new Map<string, number>();
   private nextDeviceId = 0;
 
+  reset(): void { this.devices.clear(); this.deviceIdByTokenHash.clear(); this.nextDeviceId = 0; }
+
   // IDs are allocated from 0 upward and never recycled, so a stale message from a departed
   // device can never be attributed to whoever joined after it.
   join(resumeToken: string | undefined, joinedServerMs: number): JoinOutcome {

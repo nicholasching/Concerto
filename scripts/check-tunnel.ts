@@ -19,7 +19,9 @@ console.log("PASS: join and participant snapshot through the audience origin");
 
 assert.equal((await get("/api/transport", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status, 404);
 assert.equal((await get("/ws?operatorSecret=must-not-grant-operator-role")).status, 403);
-console.log("PASS: operator mutations and operator sockets are not exposed by the audience proxy");
+assert.equal((await get("/control/api/panic", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status, 401);
+assert.equal((await get("/api/camera/session")).status, 401);
+console.log("PASS: audience aliases stay participant-only; operator and camera routes require separate authorization");
 
 const socketUrl = new URL("/ws", origin); socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
 socketUrl.searchParams.set("resumeToken", identity.resumeToken);

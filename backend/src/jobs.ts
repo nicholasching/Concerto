@@ -92,6 +92,8 @@ export class JobRunner {
     return this.jobs.get(jobId);
   }
 
+  cancelAll(): void { for (const id of this.jobs.keys()) this.cancel(id); }
+
   // Jobs run one at a time. Decoding three 4K clips saturates the machine, and two concurrent
   // decodes would make both slower and starve the control process that is holding the sockets.
   enqueue(input: { jobId: string; runId: string; manifestPath: string; outputPath: string; manifest: CalibrationManifestData; evidence?: "synthetic" | "physical" }): JobRecord {

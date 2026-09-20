@@ -57,6 +57,15 @@ function create() {
 const settle = () => Bun.sleep(0);
 const last = () => states.at(-1)!;
 
+test("an audience reset clears identity and stays disconnected even after network wake or retry", async () => {
+  const connection = create(); connection.start(); await settle();
+  sockets[0].receive(snapshotMessage(snapshotFor()));
+  sockets[0].serverClose(4002);
+  expect(last().status.kind).toBe("reset"); expect(last().identity).toBeNull(); expect(last().snapshot).toBeNull();
+  connection.wake(); connection.retry(); timers.runAll(); await settle();
+  expect(sockets).toHaveLength(1); expect(timers.pending.size).toBe(0);
+});
+
 beforeEach(() => { sockets = []; timers = new FakeTimers(); states = []; joins = []; logs = []; });
 
 test("joins, opens a token-bound socket and connects on its own snapshot", async () => {

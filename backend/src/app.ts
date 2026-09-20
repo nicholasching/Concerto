@@ -27,6 +27,7 @@ import type { RateLimiter } from "./rate-limit";
 import type { SessionState } from "./state";
 import { nextTransport, positionAt } from "./transport";
 import { validateShow } from "./show-validation";
+import { registerStageRoutes } from "./stage-routes";
 
 export const DEFAULT_LEAD_TIME_MS = 3000;
 
@@ -160,6 +161,7 @@ export function createApp(deps: AppDeps) {
   app.get("/api/health", c => c.json({
     service: "audience-orchestra-control", protocolVersion: 1, implementation: "sync-control",
   }));
+  registerStageRoutes(app, deps, persist);
   app.get("/api/foundation", c => c.json({
     status: "software-complete", owner: "sync-control",
     implemented: [
@@ -188,6 +190,7 @@ export function createApp(deps: AppDeps) {
     const body = JoinRequest.safeParse(await c.req.json().catch(() => ({})));
     if (!body.success) return c.json(apiError("INVALID_REQUEST", "Join body did not match the protocol v1 schema."), 400);
 
+    const joiningEpoch = deps.clock.serverEpoch;
     const outcome = deps.registry.join(body.data.resumeToken, deps.clock.nowServerMs());
     if (!outcome.ok) {
       return outcome.code === "CAPACITY_REACHED"
@@ -196,6 +199,7 @@ export function createApp(deps: AppDeps) {
     }
     // A newly allocated identity is durable before the client is told it owns one.
     if (outcome.allocated) await persist();
+    if (joiningEpoch !== deps.clock.serverEpoch) return c.json(apiError("SESSION_RESET", "The audience was reset. Join again.", true), 409);
     deps.state.register(outcome.deviceId);
 
     return c.json(JoinResponse.parse({
@@ -440,6 +444,7 @@ export function createApp(deps: AppDeps) {
 
     const barrier = new Barrier(crypto.randomUUID(), deps.state.showRevision, deps.state.transport.transportRevision, participantIds);
     outcome.run.preparationId = barrier.preparationId;
+    deps.state.calibrationStage = "calibrating";
     deps.preparations.start("calibration", barrier);
     await persist();
     deps.connections.sendToParticipants(participantIds, JSON.stringify({
@@ -626,6 +631,7 @@ export function createApp(deps: AppDeps) {
     await writeFile(manifestPath, JSON.stringify(manifest), "utf8");
 
     deps.calibrations.setStatus(run.plan.runId, "processing");
+    deps.state.calibrationStage = "processing";
     const record = deps.jobs.enqueue({ jobId, runId: run.plan.runId, manifestPath: resolve(manifestPath), outputPath: resolve(outputPath), manifest, evidence: request.evidence });
     const progress = JobProgress.parse({
       protocolVersion: PROTOCOL_VERSION, jobId, runId: run.plan.runId,
@@ -688,6 +694,7 @@ export function createApp(deps: AppDeps) {
       return c.json(apiError("RUN_ALREADY_COMMITTED", "A committed run cannot be discarded; its map is in use."), 409);
     }
     deps.calibrations.setStatus(run.plan.runId, "discarded");
+    deps.state.calibrationStage = deps.state.audienceMap.runId ? "complete" : "waiting";
     deps.preparations.clear("calibration");
     return c.json({ runId: run.plan.runId, status: "discarded" });
   });
@@ -752,6 +759,7 @@ export function createApp(deps: AppDeps) {
       locations: job.result.locations, targets: run.plan.participantIds,
     });
     deps.calibrations.setStatus(run.plan.runId, "committed");
+    deps.state.calibrationStage = "complete";
     await persist();
 
     const ack = accepted(deps.clock, request.commandId, mapRevision);

@@ -158,6 +158,7 @@ export const AdminSnapshot = z.strictObject({
 export const ParticipantSnapshot = z.strictObject({
   ...snapshotBase, role: z.literal("participant"), deviceId: DeviceId,
   readiness: DeviceReadiness, assignment: Assignment, location: Location,
+  calibrationStage: z.enum(["waiting", "calibrating", "processing", "complete"]).optional(),
 });
 export const Snapshot = z.discriminatedUnion("role", [AdminSnapshot, ParticipantSnapshot]);
 

@@ -3,6 +3,8 @@
 Status: verified for local software, 2026-09-19. Physical rehearsal not started.
 Owner: integration captain / main / foundation-v1 plus all four development branches.
 
+Current UI follow-up: mapping checkpoint **f71cb1e** pushed, then the single-origin dashboard implemented. Read [stage-dashboard journal](journal/20260919-stage-dashboard.md) and [operator guide](../../../docs/stage-dashboard.md) for current routes, reset, uploads, audience flow and checks. Earlier routing/local-only-upload notes below describe historical checkpoints and are superseded by that handoff. The user is actively operating the live show; do not reset/restart it to run tests.
+
 - Tasks 1/2 pulled in their worktrees and reviewed. Fix commits: sync a35ce11, client b71425a. OTC 17299a1 and admin 82cd86f merged; all four are ancestors of main through merge 5eb08ab.
 - Real operator/participant clocks and authentication, show upload/editing/waveforms/cues, calibration prepare/arm/capture reports, camera geometry/upload/worker/review, map filtering/selection, channel assignment, transport/mix/panic and durable restart are integrated.
 - Shared protocol additions are coordinated under [the accepted ADR](../../decisions/20260919-140000-integration-boundaries.md). Generated schemas/fixtures and consumers move together.

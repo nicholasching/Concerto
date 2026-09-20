@@ -51,11 +51,6 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
-  async function panic() {
-    setError(null);
-    try { await adapter.panic(); setStatus("Panic — all pending cleared, transport stopped, channels muted."); refresh(); }
-    catch (e) { setError(String(e instanceof Error ? e.message : e)); }
-  }
   async function setMaster(value: number) {
     setError(null);
     try { await adapter.sendMix({ masterGain: value, channels: mixChannels, effectiveServerMs: futureMs(4) }); refresh(); }
@@ -69,14 +64,21 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
 
   return (
     <section>
-      <h2>Perform</h2>
-      <ShowEditor snapshot={snapshot} refresh={refresh} />
-      <p className="muted">One lane per channel. The playhead is driven by the shared clock, not a UI timer. Scheduled changes show a pending countdown before they take effect. Panic clears everything and mutes.</p>
+      <div className="stage-heading"><span className="stage-number">03</span><div><p className="eyebrow">CONDUCT THE SHOW</p><h2>Performance</h2></div><span className="stage-badge">{transport.status}</span></div>
+      <p className="muted">Prepare the music, check the ready count, then start the show. Every phone follows the same playhead.</p>
       {error && <p role="alert" className="error">Error: {error}</p>}
       {status && <p className="status">{status}</p>}
       {preparation && <p>Prepared cue: {preparation.readyIds.length}/{preparation.expectedIds.length} acknowledged. {preparation.excluded.length} excluded; {preparation.expectedIds.length - preparation.readyIds.length - preparation.excluded.length} awaiting response.</p>}
       {preparation?.excluded.map(item => <p key={item.deviceId}>Device {item.deviceId}: {item.reason}</p>)}
       {pendingCountdown !== null && pendingCountdown > 0 && <p className="notice">Pending change in {pendingCountdown.toFixed(1)}s…</p>}
+
+      <div className="actions transport-actions">
+        <button onClick={() => send("prepare")} disabled={!clockReady() || !show.clips.length}>Prepare cue</button>
+        <button className="primary large" onClick={() => send("play")} disabled={!clockReady() || !preparation?.readyIds.length || transport.status === "playing"}>▶ Start show</button>
+        <button onClick={() => send("pause")} disabled={transport.status === "stopped"}>Ⅱ Pause</button>
+        <button onClick={() => send("stop")}>■ Stop</button>
+        <span className="muted">Status: {transport.status}. Position: {(position / 1000).toFixed(1)}s / {(widthMs / 1000).toFixed(1)}s</span>
+      </div>
 
       <div className="timeline">
         <div className="ruler-row"><span /><div className="ruler">
@@ -98,8 +100,8 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
             </div>
             <div className="lane-controls">
               <input type="range" min={0} max={1} step={0.01} defaultValue={ch.gain} key={`${ch.channelId}-${ch.gain}`} onPointerUp={e => void setChannel(ch.channelId, { gain: Number(e.currentTarget.value) })} onKeyUp={e => void setChannel(ch.channelId, { gain: Number(e.currentTarget.value) })} aria-label={`${ch.label} gain`} />
-              <button className={ch.mute ? "toggle on" : "toggle"} onClick={() => setChannel(ch.channelId, { mute: !ch.mute })}>M</button>
-              <button className={ch.solo ? "toggle on" : "toggle"} onClick={() => setChannel(ch.channelId, { solo: !ch.solo })}>S</button>
+              <button className={ch.mute ? "toggle on" : "toggle"} onClick={() => setChannel(ch.channelId, { mute: !ch.mute })}>Mute</button>
+              <button className={ch.solo ? "toggle on" : "toggle"} onClick={() => setChannel(ch.channelId, { solo: !ch.solo })}>Solo</button>
             </div>
           </div>
         ))}
@@ -107,17 +109,9 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
 
       <div className="actions">{(show.cueMarkers ?? []).map(cue => <button key={cue.cueId} onClick={() => { setCuePosition(cue.positionMs); setStatus(`Next play starts at ${cue.label}, ${(cue.positionMs / 1000).toFixed(1)}s. Prepare the cue, then play.`); }}>{cue.label} · {(cue.positionMs / 1000).toFixed(1)}s</button>)}</div>
 
-      <div className="actions">
-        <button onClick={() => send("prepare")} disabled={!clockReady() || !show.clips.length}>Prepare cue</button>
-        <button onClick={() => send("play")} disabled={!clockReady() || !preparation?.readyIds.length || transport.status === "playing"}>Play ready phones</button>
-        <button onClick={() => send("pause")} disabled={transport.status === "stopped"}>Pause</button>
-        <button onClick={() => send("stop")}>Stop</button>
-        <button onClick={() => send("seek", 0)}>Rewind</button>
-        <span className="muted">Status: {transport.status}. Position: {(position / 1000).toFixed(1)}s / {(widthMs / 1000).toFixed(1)}s</span>
-        <button className="panic" onClick={panic}>PANIC</button>
-      </div>
       <label>Seek to seconds <input type="number" min={0} max={widthMs / 1000} defaultValue={0} onKeyDown={e => { if (e.key === "Enter") void send("seek", Number(e.currentTarget.value) * 1000); }} /></label>
       <label>Master gain <input type="range" min={0} max={1} step={0.01} key={masterGain} defaultValue={masterGain} onPointerUp={e => void setMaster(Number(e.currentTarget.value))} onKeyUp={e => void setMaster(Number(e.currentTarget.value))} /></label>
+      <ShowEditor snapshot={snapshot} refresh={refresh} />
     </section>
   );
 }

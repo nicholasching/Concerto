@@ -2,118 +2,53 @@
 import { useState } from "react";
 import { useSnapshot, useAdapter } from "../lib/useSnapshot";
 import { audienceSummary } from "../lib/summary";
-import { MapPanel } from "../components/MapPanel";
 import { CalibrationPanel } from "../components/CalibrationPanel";
 import { AssignPanel } from "../components/AssignPanel";
 import { PerformPanel } from "../components/PerformPanel";
-import { JoinCode } from "../components/JoinCode";
 import { clockReady } from "../lib/clock";
-
-type Tab = "session" | "calibration" | "review" | "assign" | "perform";
 
 export default function Page() {
   const { snapshot, error, loading, refresh, login } = useSnapshot(1000);
   const adapter = useAdapter();
-  const [tab, setTab] = useState<Tab>("session");
   const [secret, setSecret] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
-
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const summary = snapshot ? audienceSummary(snapshot) : null;
   const pending = adapter.pending();
-  const pendingCount = pending.filter(p => p.status === "pending").length;
-  const disconnected = !loading && !!error;
-
-  return (
-    <main>
-      <p className="eyebrow">AUDIENCE ORCHESTRA</p>
-      <h1>Admin console</h1>
-      {disconnected && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-      {!snapshot && <form onSubmit={event => { event.preventDefault(); setActionError(null); void login(secret).catch(cause => setActionError(String(cause))); }}>
-        <label>Operator secret <input type="password" autoComplete="current-password" value={secret} onChange={event => setSecret(event.target.value)} /></label>
-        <button type="submit">Connect operator</button>
-      </form>}
+  const pendingCount = pending.filter(command => ["pending", "accepted", "scheduled"].includes(command.status)).length;
+  const musicReady = snapshot?.devices.filter(device => device.connected && snapshot.show.tracks.length > 0 && snapshot.show.tracks.every(track => device.decodedTrackHashes[track.trackId] === track.sha256)).length ?? 0;
+  async function reset() {
+    setResetting(true); setActionError(null);
+    try { await adapter.resetAudience(); setResetOpen(false); await refresh(); }
+    catch (cause) { setActionError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setResetting(false); }
+  }
+  if (!snapshot) return <main className="login-shell"><div className="brand"><span className="brand-mark">◒</span>AUDIENCE ORCHESTRA</div>
+    <div className="login-panel"><p className="eyebrow">STAGE CONTROL</p><h1>Bring the crowd<br />into the music.</h1><p className="muted">Sign in to run the show.</p>
+      <form onSubmit={event => { event.preventDefault(); setActionError(null); void login(secret).catch(cause => setActionError(cause instanceof Error ? cause.message : String(cause))); }}>
+        <label>Admin password<input type="password" autoComplete="current-password" autoFocus value={secret} onChange={event => setSecret(event.target.value)} /></label>
+        <button className="primary large" type="submit" disabled={!secret}>Enter control room <span aria-hidden="true">→</span></button>
+      </form>
       {actionError && <p role="alert" className="error">{actionError}</p>}
-      {snapshot && <div className="operator-bar"><span>{clockReady() ? "Operator clock synchronized" : "Synchronizing operator clock…"}</span>
-        <button className="panic" onClick={() => { setActionError(null); void adapter.panic().then(refresh).catch(cause => setActionError(String(cause))); }}>PANIC — MUTE ALL</button></div>}
+      {!loading && error?.includes("not detected") && <p className="error">The control server is unavailable. Start the concert services to connect.</p>}
+    </div><p className="muted">One audience. One orchestra.</p></main>;
 
-      <nav className="tabs">
-        {(["session", "calibration", "review", "assign", "perform"] as Tab[]).map(t => (
-          <button key={t} className={tab === t ? "tab on" : "tab"} onClick={() => setTab(t)}>{t}</button>
-        ))}
-      </nav>
-
-      {loading && !snapshot && <p>Trying the real server…</p>}
-
-      {tab === "session" && (
-        snapshot && summary ? (
-          <section>
-            <h2>Session</h2>
-            <p className="muted">The audience scans the QR code to join. Watch the counts; keep the panic control visible.</p>
-            <div className="stats">
-              <p><strong>{summary.connected}</strong><br />connected</p>
-              <p><strong>{summary.clockReady}</strong><br />clock synced</p>
-              <p><strong>{summary.audioUnlocked}</strong><br />audio unlocked</p>
-              <p><strong>{summary.localized}</strong><br />localized</p>
-              <p><strong>{summary.unresolved}</strong><br />unresolved</p>
-            </div>
-            <p>{snapshot.show.channels.map(channel => `${channel.label}: ${snapshot.assignments.filter(item => item.channelId === channel.channelId).length} assigned`).join(" · ")}</p>
-            <JoinCode sessionId={snapshot.sessionId} />
-            <p className="muted">Revision {snapshot.revision}. Pending commands: {pendingCount}. {pendingCount > 0 && "Shown as pending until the server confirms."}</p>
-          </section>
-        ) : <NotDetectedSection label="Session" />
-      )}
-
-      <div hidden={tab !== "calibration"}>
-        <CalibrationPanel refresh={refresh} snapshot={snapshot} />
-      </div>
-
-      {tab === "review" && (
-        snapshot ? (
-          <section>
-            <h2>Review</h2>
-            <p className="muted">The audience map after calibration. One dot per phone, colored by status or assignment. Switch to Assign to draw selections.</p>
-            <MapPanel map={snapshot.audienceMap} assignments={snapshot.assignments} channels={snapshot.show.channels} drawable={false} />
-            <div className="legend">
-              <span><i style={{ background: "#71d0b0" }} /> localized</span>
-              <span><i style={{ background: "#f2c76d" }} /> coarse</span>
-              <span><i style={{ background: "#e08a8a" }} /> ambiguous</span>
-              <span><i style={{ background: "#5a6b86" }} /> unseen</span>
-            </div>
-            <p className="muted">Evidence: {snapshot.audienceMap.evidence}. Run: {snapshot.audienceMap.runId ?? "none"}.</p>
-          </section>
-        ) : <NotDetectedSection label="Review" />
-      )}
-
-      {tab === "assign" && (
-        snapshot ? <AssignPanel snapshot={snapshot} refresh={refresh} /> : <NotDetectedSection label="Assign" />
-      )}
-
-      {tab === "perform" && (
-        snapshot ? <PerformPanel snapshot={snapshot} refresh={refresh} /> : <NotDetectedSection label="Perform" />
-      )}
-
-      {pending.length > 0 && (
-        <section>
-          <h2>Pending vs confirmed</h2>
-          <p className="muted">Accepted commands remain scheduled until the server reports their execution.</p>
-          <ul className="pending">
-            {pending.slice(-6).map(p => <li key={p.commandId}>{p.commandId.slice(0, 10)} — {p.domain} — {p.status}</li>)}
-          </ul>
-        </section>
-      )}
-    </main>
-  );
-}
-
-function NotDetectedSection({ label }: { label: string }) {
-  return (
-    <section>
-      <h2>{label}</h2>
-      <p className="muted">Connect with the operator secret to use {label}. If the server is unavailable, start the local concert services.</p>
-    </section>
-  );
+  return <main className="console-shell">
+    <header className="console-header"><div><div className="brand"><span className="brand-mark">◒</span>AUDIENCE ORCHESTRA</div><h1>Stage control<span className="live-tag">LIVE</span></h1></div>
+      <div className="header-links"><a href="/present" target="_blank" rel="noreferrer">Projector view ↗</a><a href="/upload" target="_blank" rel="noreferrer">Camera uploads ↗</a></div></header>
+    <div className="command-bar"><nav aria-label="Show stages"><button className="reset-control" onClick={() => setResetOpen(true)}>↺ Reset</button><a href="#calibration"><span>01</span> Calibration</a><a href="#assign"><span>02</span> Assign</a><a href="#performance"><span>03</span> Performance</a></nav>
+      <button className="panic" onClick={() => { setActionError(null); void adapter.panic().then(refresh).catch(cause => setActionError(String(cause))); }}>■ MUTE ALL</button></div>
+    {(error || actionError) && <p role="alert" className="error notice-box">{actionError ?? error}</p>}
+    <div className="session-overview"><div className="section-caption"><span>AUDIENCE STATUS</span><span className={clockReady() ? "status" : "muted"}>{clockReady() ? "● Control clock in sync" : "○ Synchronizing control clock"}</span></div>
+      <div className="metric-grid">{[[summary?.connected, "Connected", "Live phones"], [summary?.clockReady, "In sync", "Ready for timing"], [musicReady, "Music verified", "Assets on device"], [summary?.audioUnlocked, "Sound enabled", "Audio ready"], [summary?.localized, "Mapped", "Positions confirmed"]].map(([count, label, description]) => <div className="metric" key={String(label)}><span>{label}</span><strong>{count ?? 0}</strong><small>{description}</small></div>)}</div>
+    </div>
+    <div className="stage-panels" key={snapshot.serverEpoch}>
+      <div id="calibration"><CalibrationPanel refresh={refresh} snapshot={snapshot} /></div>
+      <div id="assign"><AssignPanel snapshot={snapshot} refresh={refresh} /></div>
+      <div id="performance"><PerformPanel snapshot={snapshot} refresh={refresh} /></div>
+    </div>
+    <footer className="console-footer"><span>{snapshot.show.label}</span><span>{snapshot.transport.status} · {pendingCount} pending commands</span><details><summary>Command history</summary><ul className="pending">{pending.slice(-8).map(command => <li key={command.commandId}>{command.domain} · {command.status}{command.error ? ` · ${command.error}` : ""}</li>)}</ul></details></footer>
+    {resetOpen && <div className="modal-backdrop"><div className="reset-dialog" role="alertdialog" aria-modal="true" aria-labelledby="reset-title"><p className="eyebrow">FRESH AUDIENCE</p><h2 id="reset-title">Reset all devices?</h2><p>This stops playback and clears every device, position and assignment. The prepared show and audio stay saved.</p><p>Audience phones will need to refresh to join again.</p><div className="actions"><button onClick={() => setResetOpen(false)} disabled={resetting}>Keep this audience</button><button className="panic" onClick={() => void reset()} disabled={resetting}>{resetting ? "Resetting…" : "Disconnect and reset"}</button></div></div></div>}
+  </main>;
 }

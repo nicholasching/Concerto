@@ -1,0 +1,7 @@
+# Stage workflow integration handoff
+
+Integration captain on main, baseline f71cb1e. User explicitly requested shared-origin admin/projector/camera pages and an audience reset. See the [accepted decision](../../../decisions/20260919-single-domain-stage-workflow.md) and [integration journal](../../integration/journal/20260919-stage-dashboard.md).
+
+`stage-routes.ts` adds public aggregate counts, operator-only reset, and camera-only login/session/chunk/status/completion endpoints. Reset cancels jobs/barriers, revokes devices/tokens, rotates epoch, closes audience sockets with 4002 and persists empty audience state while retaining saved music and monotonic run tags. An old join cannot cross a reset epoch. Camera chunks are bounded, hashed, owner scoped and retryable; final concatenation streams without buffering the whole clip. The final backend gate passes 214 tests; additional client tests cover older-server resume-query compatibility.
+
+The live backend was started before the resume-status GET route was added. Restart was deliberately avoided after the user began a physical calibration; the frontend safely falls back to the already-idempotent PUT chunks when GET returns 501. Their next video was received and entered processing. On a normal restart all current routes activate, but an unfinished calibration is transient and must be repeated. Never restart the live concert just to run tests; use the isolated harness.

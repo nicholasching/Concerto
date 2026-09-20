@@ -1,16 +1,15 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { AudioContextHost, DecodedBudget, isAudioContextPaused, PlaybackEngine, preloadTracks, type LoadedTrack } from "@orchestra/audio";
-import { ClientMessage, type ShowData } from "@orchestra/contracts";
-import { CLOCK_PROFILES, ClockSync } from "@orchestra/sync";
+import { ClientMessage } from "@orchestra/contracts";
+import { ClockSync } from "@orchestra/sync";
 import { CalibrationSession, type CalibrationPhase } from "../lib/calibration";
 import { browserSocket, ParticipantConnection, type ConnectionState } from "../lib/connection";
 import { FlashRenderer } from "../lib/flash-renderer";
 import { unlockWithin } from "../lib/audio-unlock";
-import { browserStorage, joinSession } from "../lib/join";
+import { browserStorage, joinSession, tokenKey } from "../lib/join";
 import { buildReadiness, statusMessage, StatusReporter } from "../lib/readiness";
-import { ShowControl, type PlaybackView } from "../lib/show-control";
-import { participantStatus } from "../lib/status";
+import { ShowControl } from "../lib/show-control";
 import { participantEndpoints } from "../lib/endpoints";
 import { CalibrationOverlay } from "./calibration-overlay";
 
@@ -19,33 +18,6 @@ const { api, wsUrl } = participantEndpoints(typeof window === "undefined" ? "htt
 const mock = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCKS === "1";
 const clockProfile = process.env.NEXT_PUBLIC_CLOCK_PROFILE === "strict" ? "strict" : "internet";
 const timers = { setTimeout: (callback: () => void, ms: number) => window.setTimeout(callback, ms), clearTimeout: (handle: unknown) => window.clearTimeout(handle as number) };
-
-function calibrationLabel(phase: CalibrationPhase, optedOut: boolean): string {
-  if (optedOut) return "Calibration: skipped";
-  switch (phase.kind) {
-    case "idle": return "Calibration: waiting for the operator";
-    case "prepared": return "Calibration: ready, waiting for the start";
-    case "armed": return "Calibration: running";
-    case "finished": return phase.completed ? "Calibration: done" : `Calibration: didn't finish (${phase.reason})`;
-  }
-}
-
-const clockTime = (ms: number) => `${Math.floor(ms / 60000)}:${(Math.floor(ms / 1000) % 60).toString().padStart(2, "0")}.${Math.floor((ms % 1000) / 100)}`;
-
-function playbackLabels(view: PlaybackView, show: ShowData | undefined, nowServerMs: number | null): { channel: string; color: string | null; transport: string; pending: string[] } {
-  const channelName = (id: string | null) => id === null ? "no channel" : show?.channels.find(channel => channel.channelId === id)?.label ?? id;
-  const inSeconds = (at: number) => nowServerMs === null ? "" : ` in ${Math.max(0, (at - nowServerMs) / 1000).toFixed(1)} s`;
-  const t = view.transport;
-  const transport = view.panicked ? "Muted by operator"
-    : !t || t.status === "stopped" ? "Stopped"
-    : t.status === "paused" ? `Paused at ${clockTime(view.positionMs)}`
-    : nowServerMs !== null && nowServerMs < t.startServerMs ? `Starting at ${clockTime(t.positionMs)}${inSeconds(t.startServerMs)}`
-    : `Playing ${clockTime(view.positionMs)}`;
-  const pending: string[] = [];
-  if (view.pendingChannel) pending.push(`Switching to ${channelName(view.pendingChannel.value)}${inSeconds(view.pendingChannel.atServerMs)}`);
-  if (view.pendingTransport) pending.push(`${view.pendingTransport.value.status === "playing" ? "Play" : view.pendingTransport.value.status === "paused" ? "Pause" : "Stop"}${inSeconds(view.pendingTransport.atServerMs)}`);
-  return { channel: channelName(view.channelId), color: show?.channels.find(channel => channel.channelId === view.channelId)?.color ?? null, transport, pending };
-}
 
 function connectionLabel(state: ConnectionState): string {
   const { status } = state;
@@ -56,6 +28,7 @@ function connectionLabel(state: ConnectionState): string {
     case "gave-up": return "Can't reach the server";
     case "replaced": return "Opened in another tab";
     case "full": return "Session full";
+    case "reset": return "The audience has been reset";
   }
 }
 
@@ -77,8 +50,6 @@ export default function Page() {
   const [assetNote, setAssetNote] = useState<string | null>(null);
   const [audioNote, setAudioNote] = useState<string | null>(null);
   const [phase, setPhase] = useState<CalibrationPhase>({ kind: "idle" });
-  const [optedOut, setOptedOut] = useState(false);
-  const optedOutRef = useRef(false);
   const calibration = useRef<CalibrationSession | null>(null);
   const surface = useRef<HTMLDivElement | null>(null);
   const surfaceText = useRef<HTMLParagraphElement | null>(null);
@@ -108,7 +79,7 @@ export default function Page() {
       }),
       preload: async showToLoad => {
         const audio = host.current;
-        if (!audio || audio.state !== "running") return;
+        if (!audio) return;
         await preloadTracks(showToLoad.tracks, { ctx: audio.context(), budget: budget.current, baseUrl: api }, cache.current);
         setVerifiedHashes(Object.fromEntries([...cache.current.values()].map(track => [track.trackId, track.sha256])));
       },
@@ -119,6 +90,10 @@ export default function Page() {
       wsUrl,
       join: () => joinSession({ api, sessionId: new URLSearchParams(window.location.search).get("session") ?? process.env.NEXT_PUBLIC_SESSION_ID ?? (mock ? "demo" : "dev-session"), storage: browserStorage() }),
       openSocket: browserSocket,
+      onReset: () => {
+        const sessionId = connection.current?.current.identity?.sessionId;
+        if (sessionId) browserStorage().removeItem(tokenKey(sessionId));
+      },
       onChange: state => {
         // A run can't survive losing the socket or a server restart.
         if (state.status.kind !== "connected") { session.abort("disconnected"); control.disconnected(); serverClock.stop(); }
@@ -128,7 +103,7 @@ export default function Page() {
       onMessage: message => {
         if (message.type === "clock.reply") serverClock.accept({ ...message.payload, serverEpoch: message.serverEpoch });
         else if (message.type === "calibration.prepare") {
-          session.onPrepare(message, { foreground: document.visibilityState === "visible", clockUsable: serverClock.quality().ready, optedOut: optedOutRef.current });
+          session.onPrepare(message, { foreground: document.visibilityState === "visible", clockUsable: serverClock.quality().ready, optedOut: false });
         } else if (message.type === "calibration.arm" && serverClock.quality().ready) {
           session.onArm(message, serverClock.nowServerMs());
         } else {
@@ -173,12 +148,12 @@ export default function Page() {
   }, [conn.identity, connected, foreground, clockQuality, audioState, verifiedHashes, conn.snapshot?.serverEpoch]);
   useEffect(() => () => reporter.current?.dispose(), []);
 
-  // Preload the show once audio is unlocked; only hash-verified tracks count.
+  // Download and decode while the browser waits for an audio gesture too.
   const show = conn.snapshot?.show;
   const showKey = JSON.stringify([show?.showId, show?.showRevision, show?.tracks]);
   useEffect(() => {
     const audio = host.current;
-    if (!show || audioState !== "running" || !audio) return;
+    if (!show || !audioState || !audio) return;
     let cancelled = false;
     setAssetNote(`Loading ${show.tracks.length} tracks...`);
     preloadTracks(show.tracks, { ctx: audio.context(), budget: budget.current, baseUrl: api }, cache.current).then(failures => {
@@ -235,74 +210,70 @@ export default function Page() {
     return () => { renderer.stop(); void wakeLock?.release().catch(() => {}); };
   }, [phase]);
 
-  function toggleSkip() {
-    const next = !optedOutRef.current;
-    optedOutRef.current = next;
-    setOptedOut(next);
-    if (next) calibration.current?.abort("opted-out");
-  }
-
-  async function enableSound() {
+  async function enableSound(automatic = false) {
     if (!host.current) {
       host.current = new AudioContextHost();
       host.current.onStateChange(setAudioState);
     }
-    setAudioNote("Unlocking audio...");
-    const outcome = await unlockWithin(() => host.current!.unlock(), timers);
-    setAudioNote(outcome.kind === "running" ? null : outcome.kind === "timeout" ? "Sound didn't start. Tap the sound button again." : `Audio failed: ${outcome.message}`);
+    host.current.context();
     setAudioState(host.current.state);
+    if (!automatic) setAudioNote("Starting sound…");
+    const outcome = await unlockWithin(() => host.current!.unlock(), timers);
+    setAudioNote(host.current?.state === "running" || automatic ? null : outcome.kind === "error" ? "Sound could not start. Tap to try again." : "Tap once more to enable sound.");
+    setAudioState(host.current?.state ?? null);
   }
 
+  useEffect(() => {
+    void enableSound(true);
+    const gesture = () => { if (host.current?.state !== "running") void enableSound(true); };
+    window.addEventListener("pointerdown", gesture, { passive: true });
+    window.addEventListener("keydown", gesture);
+    return () => { window.removeEventListener("pointerdown", gesture); window.removeEventListener("keydown", gesture); void host.current?.dispose(); };
+  }, []);
+
   const identity = conn.identity;
-  const readiness = identity ? buildReadiness(identity.deviceId, { connected, foreground, clock: clockQuality, audioState, verifiedHashes }) : null;
   const tracks = show?.tracks ?? [];
   const assetsVerified = tracks.length > 0 && tracks.every(track => verifiedHashes[track.trackId] === track.sha256);
-  const checks: [string, boolean][] = readiness ? [
-    ["Connected", readiness.connected],
-    ["Clock synced", readiness.clockReady],
-    ["Page in foreground", readiness.foreground],
-    ["Audio unlocked", readiness.audioUnlocked],
-    [`Assets verified (${Object.keys(verifiedHashes).length}/${tracks.length})`, assetsVerified],
-  ] : [];
-  const kind = conn.status.kind;
-  const playback = showControl.current && show ? playbackLabels(showControl.current.view(), show, serverClock?.nowServerMs() ?? null) : null;
+  const location = conn.snapshot?.location;
+  const stage = conn.snapshot?.calibrationStage ?? "waiting";
+  const section = location?.column;
+  const mapped = location?.status === "localized" || location?.mappingMode === "optical-column";
+  const manual = location?.mappingMode === "manual-column";
+  const needsSection = connected && stage === "complete" && !mapped && !manual && phase.kind !== "armed";
+  const holding = phase.kind === "prepared" || phase.kind === "armed";
+  const awaitingMap = phase.kind === "finished" && stage !== "complete" || stage === "processing";
+  const playing = conn.snapshot?.transport.status === "playing";
+  const channel = show?.channels.find(value => value.channelId === conn.snapshot?.assignment.channelId);
+  const reset = conn.status.kind === "reset";
+  const checks = [
+    { label: "Connection", value: connected ? "Connected" : connectionLabel(conn), ok: connected },
+    { label: "Show clock", value: clockQuality.ready ? "In sync" : "Syncing…", ok: clockQuality.ready },
+    { label: "Music", value: assetsVerified ? "Verified" : tracks.length ? "Loading…" : "Waiting for show", ok: assetsVerified },
+  ];
+  function chooseSection(column: "left" | "center" | "right") {
+    const snapshot = connection.current?.current.snapshot;
+    if (snapshot) connection.current?.send(ClientMessage.parse({ protocolVersion: 1, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch,
+      messageId: crypto.randomUUID(), type: "participant.column", payload: { column } }));
+  }
 
-  return <main>
-    <p className="eyebrow">AUDIENCE ORCHESTRA / TEAM 2</p>
-    <h1>Audience client</h1>
-    {mock && <p className="notice">SYNTHETIC MOCK SERVER</p>}
-    <section>
-      <h2>{identity ? `Device ${identity.deviceId}` : "Joining the show"}</h2>
-      <p className="status" role="status">{connectionLabel(conn)}</p>
-      {conn.notice && <p role="alert">{conn.notice}</p>}
-      {(kind === "gave-up" || kind === "replaced") && <button type="button" onClick={() => connection.current?.retry()}>{kind === "replaced" ? "Use this tab instead" : "Tap to reconnect"}</button>}
-      {conn.snapshot && readiness && <p>{participantStatus({ ...conn.snapshot, readiness })}</p>}
-      <ul className="checks">{checks.map(([label, ok]) => <li key={label} className={ok ? "ok" : "no"}>{ok ? "✓" : "✗"} {label}</li>)}</ul>
-      <p>Keep this page open and your phone volume up. Calibration uses an eleven-second color pattern; you can skip it and choose your column.</p>
-      <p>Timing tolerance: {clockProfile === "internet" ? "Internet / cellular" : "Strict"}</p>
-      {clockQuality.uncertaintyMs !== null && <p>Estimated clock uncertainty: {clockQuality.uncertaintyMs.toFixed(1)} ms</p>}
-      {clockQuality.ready && clockQuality.uncertaintyMs !== null && clockQuality.uncertaintyMs > CLOCK_PROFILES.strict.readyUncertaintyMs &&
-        <p className="notice">Ready with relaxed timing tolerance. Higher network latency may reduce audio and calibration alignment.</p>}
-      {identity && audioState !== "running" && <button type="button" onClick={enableSound}>{isAudioContextPaused(audioState) ? "Tap to resume sound" : "Enable sound"}</button>}
-      {audioNote && <p role="alert">{audioNote}</p>}
-      {assetNote && <p>{assetNote}</p>}
-      <p>{calibrationLabel(phase, optedOut)}</p>
-      {identity && phase.kind !== "armed" && <button type="button" onClick={toggleSkip}>{optedOut ? "Take part in calibration" : "Skip calibration"}</button>}
-      {connected && phase.kind !== "armed" && <label>My column (facing the stage)
-        <select aria-label="My column" value={conn.snapshot?.location.mappingMode === "manual-column" ? conn.snapshot.location.column ?? "" : ""} onChange={event => {
-          const snapshot = connection.current?.current.snapshot;
-          if (snapshot) connection.current?.send(ClientMessage.parse({ protocolVersion: 1, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch,
-            messageId: crypto.randomUUID(), type: "participant.column", payload: { column: event.target.value || null } }));
-        }}><option value="">No manual choice</option><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select>
-      </label>}
-    </section>
-    {playback && <section>
-      <h2><span className="swatch" style={{ background: playback.color ?? "transparent" }} /> Channel: {playback.channel}</h2>
-      <p className="status">{playback.transport}</p>
-      {playback.pending.map(line => <p key={line}>{line}</p>)}
-      {!clockQuality.ready && <p>Synchronizing with the show. Sound stays off until the clock is ready.</p>}
-      {serverClock && audioState !== "running" && <p>Enable sound to play your part.</p>}
-    </section>}
-    {phase.kind === "armed" && <CalibrationOverlay surface={surface} text={surfaceText} onSkip={toggleSkip} />}
+  return <main className="audience-shell">
+    <header className="audience-brand"><span className="brand-mark" aria-hidden="true">◒</span><span>AUDIENCE<br />ORCHESTRA</span>
+      <span className="device-number">{identity ? `PHONE ${String(identity.deviceId).padStart(3, "0")}` : "LIVE EXPERIENCE"}</span></header>
+    {mock && <p className="notice">Test session</p>}
+    <div className={`audience-orbit ${connected ? "ready" : ""}`} aria-hidden="true"><span>♪</span></div>
+    <p className="eyebrow">{reset ? "SESSION RESET" : playing ? "THE SHOW IS LIVE" : holding ? "CALIBRATION" : mapped || manual ? "YOU’RE IN POSITION" : "YOUR PHONE. PART OF THE ORCHESTRA."}</p>
+    <h1>{reset ? "Ready for a fresh start." : holding ? "Raise your phone." : needsSection ? "Where are you sitting?" : mapped || manual ? `${section?.toUpperCase()} SECTION` : awaitingMap ? "Finding your place." : "You’re part of the show."}</h1>
+    <p className="audience-instruction">{reset ? "Refresh this page when you’re ready to join again." : holding ? "Face your screen toward the stage and hold it steady." : needsSection ? "We couldn’t locate your phone. Choose your section while facing the stage." : awaitingMap ? "You can lower your phone. We’re processing the camera recordings." : "Turn your volume all the way up. Keep this page open and wait for the stage team."}</p>
+    {!reset && <div className="audience-checks" aria-label="Phone readiness">{checks.map(check => <div key={check.label}><span className={check.ok ? "status-dot ok" : "status-dot"} /><span>{check.label}</span><strong>{check.value}</strong></div>)}</div>}
+    {!reset && audioState !== "running" && <div className="sound-prompt"><button className="primary" onClick={() => void enableSound()}>{isAudioContextPaused(audioState) ? "Tap to enable sound" : "Enable sound"}</button><small>Your browser needs one tap before it can play music.</small></div>}
+    {audioNote && <p role="alert" className="notice">{audioNote}</p>}
+    {assetNote?.startsWith("Failed:") && <p role="alert" className="notice">Music couldn’t finish loading. Keep this page open while the stage team checks the connection.</p>}
+    {needsSection && <div className="section-picker">{(["left", "center", "right"] as const).map(column => <button key={column} onClick={() => chooseSection(column)}>{column}</button>)}</div>}
+    {(mapped || manual) && !holding && channel && <p className="your-part"><span style={{ background: channel.color }} />Your part: <strong>{channel.label}</strong></p>}
+    {conn.status.kind === "gave-up" && <button onClick={() => connection.current?.retry()}>Reconnect</button>}
+    {conn.status.kind === "replaced" && <p className="notice">This phone is open in another tab. Keep just one tab open.</p>}
+    {!foreground && !reset && <p className="notice">Return to this page to stay ready.</p>}
+    <footer className="audience-footer">ONE AUDIENCE. ONE ORCHESTRA.</footer>
+    {phase.kind === "armed" && <CalibrationOverlay surface={surface} text={surfaceText} />}
   </main>;
 }

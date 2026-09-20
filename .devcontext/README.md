@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Stage dashboard update, 2026-09-19
+
+The mapping checkpoint was committed and pushed as **f71cb1e** before the UI work. The new shared-origin stage workflow is documented in the [operator guide](../docs/stage-dashboard.md), [decision](decisions/20260919-single-domain-stage-workflow.md), and [verification journal](teams/integration/journal/20260919-stage-dashboard.md). Audience `/`, admin `/admin`, projector `/present` and phone recordings `/upload` share one origin. Reset, one-page operation, automatic audience readiness and post-calibration section fallback are implemented. The journal separates unit/build evidence, production browser checks and outstanding physical rehearsal. It also records the live upload-route compatibility fix without restarting the user's active calibration.
+
 ### Local integration, 2026-09-19
 
 All four feature branches are merged into main, through merge 5eb08ab. Captain integration is verified locally: real clocks, operator authentication, show editing, calibration uploads/worker/review, map selection, routing, transport, mix and recovery are connected. All software gates, real-worker E2E, production startup, source isolation and the five-minute 1500-socket test pass. User requested local functionality before Railway deployment.

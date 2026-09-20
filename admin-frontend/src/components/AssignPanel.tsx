@@ -57,8 +57,8 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
 
   return (
     <section>
-      <h2>Assign</h2>
-      <p className="muted">Select mapped devices by clicking, drawing a box/lasso, or moving the left/center/right dividers. Assign each group to Melody, Vocals or Percussion. Column-only devices can be selected explicitly below. Undo restores previous assignments.</p>
+      <div className="stage-heading"><span className="stage-number">02</span><div><p className="eyebrow">GIVE EVERY PHONE A PART</p><h2>Assign the audience</h2></div><span className="stage-badge">{snapshot.assignments.filter(item => item.channelId).length} assigned</span></div>
+      <p className="muted">Draw a group on the map, choose its musical part, then assign. White outlines show your selection.</p>
       {error && <p role="alert" className="error">Error: {error}</p>}
       {status && <p className="status">{status}</p>}
       <MapPanel
@@ -78,16 +78,11 @@ export function AssignPanel({ snapshot, refresh }: { snapshot: AdminSnapshotData
       </label>)}</details>
       <p>Selection: {selected?.deviceIds.length ?? 0} phones, map revision {selected?.mapRevision ?? "—"}. {selected && selected.mapRevision !== snapshot.audienceMap.mapRevision && "Map changed: select again."}</p>
       <div className="actions">
-        <label>Channel
-          <select value={channelId} onChange={e => setChannelId(e.target.value)}>
-            {snapshot.show.channels.map(ch => <option key={ch.channelId} value={ch.channelId}>{ch.label}</option>)}
-          </select>
-        </label>
-        <span className="swatch" style={{ background: channelColor }} />
+        <div className="channel-picker" role="group" aria-label="Musical part">{snapshot.show.channels.map(ch => <button key={ch.channelId} aria-pressed={ch.channelId === channelId} className={ch.channelId === channelId ? "chosen" : ""} style={{ borderColor: ch.channelId === channelId ? channelColor : undefined }} onClick={() => setChannelId(ch.channelId)}><span className="swatch" style={{ background: ch.color }} />{ch.label}</button>)}</div>
         <label>Apply in
         <input type="number" min={4} value={effectiveDelay} onChange={e => setEffectiveDelay(Math.max(4, Number(e.target.value)))} /> seconds after preparation
         </label>
-        <button onClick={() => assign(channelId, effectiveDelay, selected)}>Assign {selected?.deviceIds.length ?? 0} phones</button>
+        <button className="primary large" disabled={!selected?.deviceIds.length || selected.mapRevision !== snapshot.audienceMap.mapRevision} onClick={() => assign(channelId, effectiveDelay, selected)}>Assign {selected?.deviceIds.length ?? 0} phones</button>
         <button onClick={() => assign(null, effectiveDelay, selected)}>Clear assignment</button>
         <button disabled={!undo} onClick={doUndo}>Undo</button>
       </div>

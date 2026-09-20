@@ -123,17 +123,17 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   const now = tick >= 0 && clockReady() ? nowServerMs() : null;
   const finishedCapture = run?.startServerMs !== null && run?.startServerMs !== undefined && now !== null && now >= run.startServerMs + 11000;
   return <section>
-    <h2>Calibration and map review</h2>
-    <p>Use one, two or three fixed cameras with a few seconds of margin. Each view maps its chosen audience column; omitted views do not block the others. The phone pattern lasts 11 seconds.</p>
+    <div className="stage-heading"><span className="stage-number">01</span><div><p className="eyebrow">FIND THE AUDIENCE</p><h2>Calibration</h2></div><span className="stage-badge">{run ? run.status : "Ready to begin"}</span></div>
+    <p className="muted">Start your cameras, prepare the phones, then run the 11-second pattern. Upload one, two or three views from this console or <a href="/upload" target="_blank" rel="noreferrer">a camera phone ↗</a>.</p>
     {error && <p role="alert" className="error">{error}</p>}
-    {!run && <><label>Target device IDs (optional, comma separated) <input value={targetIds} placeholder="All ready phones" onChange={event => setTargetIds(event.target.value)} /></label><button disabled={busy || !snapshot} onClick={() => void act(prepare)}>Prepare calibration</button></>}
+    {!run && <><button className="primary large" disabled={busy || !snapshot} onClick={() => void act(prepare)}>Prepare calibration <span aria-hidden="true">→</span></button><details><summary>Choose specific phones</summary><label>Target device IDs <input value={targetIds} placeholder="All ready phones" onChange={event => setTargetIds(event.target.value)} /></label></details></>}
     {run && <>
       <p>Run tag {run.plan.runTag} · {run.status} · {run.plan.participantIds.length} participating phones</p>
       {run.reports.length > 0 && <p>{run.reports.filter(report => report.completed).length} phones finished; {run.reports.filter(report => !report.completed).length} interrupted.</p>}
       {run.reports.filter(report => !report.completed).map(report => <p key={report.deviceId}>Device {report.deviceId}: {report.reason ?? "pattern interrupted"}</p>)}
       {barrier && <p>{barrier.readyIds.length}/{barrier.expectedIds.length} ready; {barrier.excluded.length} excluded; {barrier.expectedIds.length - barrier.readyIds.length - barrier.excluded.length} pending.</p>}
       {barrier?.excluded.map(item => <p key={item.deviceId}>Device {item.deviceId}: {item.reason}</p>)}
-      {run.status === "created" && <button disabled={busy || !barrier?.readyIds.length || !clockReady()} onClick={() => void act(() => adapter.armCalibration(run.plan.runId, run.preparationId, futureServerMs(4)))}>Cameras recording — arm ready phones</button>}
+      {run.status === "created" && <button className="primary large" disabled={busy || !barrier?.readyIds.length || !clockReady()} onClick={() => void act(() => adapter.armCalibration(run.plan.runId, run.preparationId, futureServerMs(4)))}>Cameras recording — start pattern</button>}
       {run.startServerMs !== null && now !== null && <p role="status">{now < run.startServerMs ? `Starts in ${((run.startServerMs - now) / 1000).toFixed(1)} s` : !finishedCapture ? `Pattern running · ${Math.max(0, (run.startServerMs + 11000 - now) / 1000).toFixed(1)} s remaining` : "Pattern finished. Stop recordings after the trailing margin, then upload."}</p>}
       <button disabled={busy || !!activeJob} onClick={() => void act(() => adapter.discardCalibration(run.plan.runId))}>Discard run and retry</button>
       <div className="slots">{slots.map((_, index) => {
@@ -163,7 +163,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
       })}</div>
       <label>Recording source <select value={evidence} onChange={e => setEvidence(e.target.value as typeof evidence)}><option value="physical">Actual camera recordings</option><option value="synthetic">Generated test clips (synthetic)</option></select></label>
       {repeatedRecording && <p role="alert">The same recording is selected more than once. Select one copy per camera view.</p>}
-      <button disabled={busy || !selectedUploads.length || repeatedRecording || !!activeJob} onClick={() => void act(processClips)}>{progress?.stage === "failed" || progress?.stage === "cancelled" ? "Retry processing" : "Process uploaded recordings"}</button>
+      <button className="primary large" disabled={busy || !selectedUploads.length || repeatedRecording || !!activeJob} onClick={() => void act(processClips)}>{progress?.stage === "failed" || progress?.stage === "cancelled" ? "Retry processing" : "Process uploaded recordings"}</button>
       {progress && <p role="status">{progress.stage} · {Math.round(progress.progress * 100)}% · {progress.message}</p>}
       {progress?.stage === "failed" && diagnostics.length > 0 && <details><summary>Processing diagnostics</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{diagnostics.join("\n")}</pre></details>}
       {activeJob && jobId && <button onClick={() => void act(() => adapter.cancelJob(jobId))}>Cancel processing</button>}
@@ -183,7 +183,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
         </details>
         {candidate.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
         <label><input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} /> I reviewed mapped positions, audience orientation, and unresolved devices.</label>
-        <button disabled={!checked || busy || geometryDirty || candidateRevision !== snapshot.audienceMap.mapRevision} onClick={() => void act(async () => {
+        <button className="primary large" disabled={!checked || busy || geometryDirty || candidateRevision !== snapshot.audienceMap.mapRevision} onClick={() => void act(async () => {
           await adapter.commitMap(run.plan.runId, jobId!, candidateRevision); setCandidate(null); setJobId(null);
         })}>Commit reviewed map</button>
         {candidateRevision !== snapshot.audienceMap.mapRevision && <p>The map changed during review. Process again against the current map before committing.</p>}

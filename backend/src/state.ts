@@ -69,6 +69,18 @@ export class SessionState {
   private readonly locations = new Map<number, LocationData>();
   private adminContext: () => Partial<Pick<AdminSnapshotData, "preparations" | "calibration">> = () => ({});
   private readonly appliedCommands = new Set<string>();
+  calibrationStage: "waiting" | "calibrating" | "processing" | "complete" = "waiting";
+
+  resetAudience(): void {
+    this.pendingTransport = null; this.pendingMix = null; this.pendingAssignments.clear();
+    this.pendingActionsCache = null; this.transportRecipients.clear(); this.appliedCommands.clear();
+    this.readiness.clear(); this.assignments.clear(); this.locations.clear();
+    this.assignmentRevisionCounter = 0; this.mixRevisionCounter = 0; this.effectiveMixRevision = 0;
+    this.channelState = null; this.masterGainState = 1;
+    this.mapRevisionCounter = 0; this.mapRunId = null; this.mapEvidence = "synthetic"; this.committedRunTag = null;
+    this.transportState = stoppedTransport(0, this.showRevision);
+    this.calibrationStage = "waiting"; this.revisionCounter = 0;
+  }
 
   setAdminContext(provider: typeof this.adminContext): void { this.adminContext = provider; }
   private applied(commandId: string): void {
@@ -407,7 +419,8 @@ export class SessionState {
     const excluded = this.transportState.status === "playing" && this.transportRecipients.has(this.transportState.transportRevision)
       && !this.transportRecipients.get(this.transportState.transportRevision)!.has(deviceId);
     return ParticipantSnapshot.parse({ ...this.base(clock), transport: excluded ? stoppedTransport(this.transportState.transportRevision, this.showRevision) : this.transportState,
-      pendingActions, role: "participant", deviceId, readiness, assignment, location });
+      pendingActions, role: "participant", deviceId, readiness, assignment, location,
+      calibrationStage: this.calibrationStage === "waiting" && this.mapRunId ? "complete" : this.calibrationStage });
   }
 
   adminSnapshot(clock: ServerClock): AdminSnapshotData {

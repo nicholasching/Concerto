@@ -5165,6 +5165,15 @@
                 "additionalProperties": false
               }
             ]
+          },
+          "calibrationStage": {
+            "type": "string",
+            "enum": [
+              "waiting",
+              "calibrating",
+              "processing",
+              "complete"
+            ]
           }
         },
         "required": [
@@ -7960,6 +7969,15 @@
             ],
             "additionalProperties": false
           }
+        ]
+      },
+      "calibrationStage": {
+        "type": "string",
+        "enum": [
+          "waiting",
+          "calibrating",
+          "processing",
+          "complete"
         ]
       }
     },
@@ -13740,6 +13758,15 @@
                         ],
                         "additionalProperties": false
                       }
+                    ]
+                  },
+                  "calibrationStage": {
+                    "type": "string",
+                    "enum": [
+                      "waiting",
+                      "calibrating",
+                      "processing",
+                      "complete"
                     ]
                   }
                 },

@@ -68,12 +68,22 @@ export async function loadTrack(track: TrackData, { ctx, budget, baseUrl, fetch:
 }
 
 export interface PreloadFailure { trackId: string; message: string }
+const pendingLoads = new WeakMap<Map<string, LoadedTrack>, Map<string, Promise<LoadedTrack>>>();
 
 // Loads every track not already cached with the same hash. One bad track does not
 // block the others; only verified tracks enter the cache.
 export async function preloadTracks(tracks: TrackData[], options: LoadTrackOptions, cache: Map<string, LoadedTrack>): Promise<PreloadFailure[]> {
   const missing = tracks.filter(track => cache.get(track.trackId)?.sha256 !== track.sha256);
-  const results = await Promise.allSettled(missing.map(track => loadTrack(track, options)));
+  let pending = pendingLoads.get(cache);
+  if (!pending) { pending = new Map(); pendingLoads.set(cache, pending); }
+  // Automatic preload and a later audio gesture can overlap. Share the decode so a phone
+  // never allocates a second copy of the show simply because its context became running.
+  const results = await Promise.allSettled(missing.map(track => {
+    const key = `${track.trackId}:${track.sha256}`;
+    let request = pending.get(key);
+    if (!request) { request = loadTrack(track, options).finally(() => pending.delete(key)); pending.set(key, request); }
+    return request;
+  }));
   const failures: PreloadFailure[] = [];
   results.forEach((result, index) => {
     const trackId = missing[index].trackId;

@@ -1,0 +1,7 @@
+# One-page stage command dashboard
+
+Integration captain on main, baseline f71cb1e. The user transferred this cross-app UI change to integration. [Decision](../../../decisions/20260919-single-domain-stage-workflow.md), [evidence](../../integration/journal/20260919-stage-dashboard.md), [operator guide](../../../../docs/stage-dashboard.md).
+
+Admin is a separately built Next zone with basePath `/admin`, routed from the audience origin. API/socket defaults use same-origin `/control`. Password lives only in ignored backend configuration. Navigation now anchors Calibration, Assign and Performance on one page; persistent Reset/MUTE ALL, large stage buttons, readiness tiles and responsive dark styling replace separate tabs. Candidate review stays within Calibration; confirmed selection stays in Assign. Show editing/history/advanced geometry use disclosure. The old duplicated QR component and its admin-only dependency are removed; `/present` owns QR construction.
+
+Reset intentionally changes epoch, so its adapter path accepts the new epoch then discards stale cached revisions. The browser confirmed zero audience/positions/assignments and retained the fixture show after reset in an isolated session. A phone upload appeared in the existing center camera slot, preserving all geometry/process/review tools. Live user show edits and calibration were not overwritten. Password and private footage are not in Git.

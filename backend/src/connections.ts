@@ -4,10 +4,17 @@ export interface ClientSocket {
 }
 
 export const REPLACED_CODE = 4001;
+export const RESET_CODE = 4002;
 
 export class ConnectionRegistry {
   private readonly participants = new Map<number, ClientSocket>();
   private readonly operators = new Set<ClientSocket>();
+
+  resetParticipants(): void {
+    const sockets = [...this.participants.values()];
+    this.participants.clear(); // Late close events must not touch a newly allocated device.
+    for (const socket of sockets) socket.close(RESET_CODE, "Audience reset. Refresh to join the next session.");
+  }
 
   // A second authenticated connection for one identity replaces the first, so a reopened tab
   // takes over instead of two sockets both believing they speak for the device.

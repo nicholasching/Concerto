@@ -18,7 +18,7 @@ if (mode === "sync-demo" || mode === "all") {
   spawn([resolve(ROOT, "backend/src/index.ts")], { OPERATOR_SECRET: process.env.OPERATOR_SECRET ?? "local-demo-only",
     HOST: process.env.HOST ?? "0.0.0.0", CHECKPOINT_PATH: process.env.CHECKPOINT_PATH ?? "runtime/local/checkpoint.json",
     ASSETS_PATH: process.env.ASSETS_PATH ?? "runtime/local/assets", UPLOADS_PATH: process.env.UPLOADS_PATH ?? "runtime/local/uploads", JOBS_PATH: process.env.JOBS_PATH ?? "runtime/local/jobs" });
-  console.log("Local concert: audience http://localhost:3000 | operator http://localhost:3001. Default local operator secret: local-demo-only (override with OPERATOR_SECRET).");
+  console.log("Local concert: http://localhost:3000 | /admin control | /present projector | /upload cameras. Set OPERATOR_SECRET in .env for operator access.");
 }
 if (mode === "client-demo") { spawn([resolve(ROOT, "tools/client-demo/index.ts")]); frontend("client-frontend", 3000, 18081); }
 else if (mode === "admin-demo") { frontend("admin-frontend", 3001); }

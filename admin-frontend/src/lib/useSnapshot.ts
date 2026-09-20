@@ -4,7 +4,7 @@ import { createAdapter } from "./adapter";
 import { connectClock } from "./clock";
 import type { AdminSnapshotData } from "@orchestra/contracts";
 
-export const api = process.env.NEXT_PUBLIC_API_URL ?? (typeof window === "undefined" ? "http://localhost:8080" : `${window.location.protocol}//${window.location.hostname}:8080`);
+export const api = process.env.NEXT_PUBLIC_API_URL ?? (typeof window === "undefined" ? "http://localhost:3000/control" : `${window.location.origin}/control`);
 
 // One adapter instance for the whole console so pending state is shared across screens.
 const adapter = createAdapter(api);

@@ -3,6 +3,8 @@
 export class CommandLog {
   private readonly results = new Map<string, unknown>();
 
+  clear(): void { this.results.clear(); }
+
   constructor(private readonly limit = 10_000) {}
 
   get<T>(commandId: string): T | undefined {

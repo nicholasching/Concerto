@@ -155,6 +155,12 @@ export function createAdapter(baseUrl: string, fetcher: Fetcher = fetch) {
     async sendTransport(args: TransportArgs) { return submit("/api/transport", args, "transport", value => CommandAccepted.parse(value)); },
     async sendMix(args: MixArgs) { return submit("/api/mix", args, "mix", value => CommandAccepted.parse(value)); },
     async panic() { return submit("/api/panic", {}, "panic", value => CommandAccepted.parse(value)); },
+    async resetAudience() {
+      const response = await check(await safeFetch("/api/reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(context(id(), "panic")) }));
+      const ack = CommandAccepted.parse(await response.json());
+      pending.clear(); newestSnapshot = null; session = { sessionId: ack.sessionId, serverEpoch: ack.serverEpoch, revision: ack.revision };
+      return ack;
+    },
     async saveShow(show: ShowData) { return submit("/api/show", { show }, "show", value => CommandAccepted.parse(value), "PUT"); },
     async uploadAudio(file: File, metadata: { durationMs: number; sampleRateHz: number; channels: number }) {
       return Track.parse(await upload("/api/assets", metadata, file));

@@ -191,6 +191,14 @@ describe("schedule", () => {
 });
 
 describe("preload", () => {
+  test("autostart and a simultaneous audio gesture share one download and decoded buffer", async () => {
+    const bytes = await toneBytes(); const cache = new Map(); let fetches = 0;
+    let release!: () => void; const wait = new Promise<void>(resolve => { release = resolve; });
+    const options = { ctx: asAudioContext(new FakeAudioContext()), budget: new DecodedBudget(), baseUrl: "http://mock", fetch: async () => { fetches++; await wait; return new Response(bytes.slice(0)); } };
+    const automatic = preloadTracks([track], options, cache), gesture = preloadTracks([track], options, cache);
+    release();
+    expect(await automatic).toEqual([]); expect(await gesture).toEqual([]); expect(fetches).toBe(1); expect(cache.size).toBe(1);
+  });
   test("loads every track, keeps verified ones and reports failures separately", async () => {
     const bytes = await toneBytes();
     const broken = { ...show.tracks[1], sha256: "0".repeat(64) };

@@ -8,6 +8,8 @@ Integration update (2026-09-19): all four development branches are merged into m
 
 Current concert scope (user update, 2026-09-19): exactly three musical channels, **Melody, Vocals and Percussion**. The four development teams/branches remain unchanged. See the [three-channel decision](.devcontext/decisions/20260919-three-show-channels.md).
 
+Stage UI update (user request, 2026-09-19): one public origin serves audience `/`, operator `/admin`, projector QR/counts `/present`, and camera-crew `/upload`. The admin uses one page with Reset, Calibration, Assign and Performance. Audience joins, clock sync and asset verification are automatic; sound is attempted automatically with one gesture only when the browser requires it. After calibration, mapped phones display their section and unmapped phones choose left/center/right. See the [stage guide](docs/stage-dashboard.md) and [accepted workflow decision](.devcontext/decisions/20260919-single-domain-stage-workflow.md).
+
 Give each teammate this file, [rules.md](rules.md), and their stage brief from the table below. Work on the assigned branch in a separate clone/worktree; continue from the shared foundation.
 
 1. Read [README.md](README.md) for setup, then `AGENTS.md`, `rules.md`, `.devcontext/README.md`, and your stage/status/handoff files.

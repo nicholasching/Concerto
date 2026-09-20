@@ -8,16 +8,17 @@ Current user updates: shows now use **Melody, Vocals and Percussion** with a sha
 
 ## Run
 
-From the root, `bun install --frozen-lockfile`, `bun run setup:python`, then `bun run dev:all`. In a second terminal, `bun run demo:seed` only if no show exists. This uploads four original eight-second tones, not bundled third-party music. Local state/media are in ignored `runtime/local/` and are preserved across restarts.
+From the root, `bun install --frozen-lockfile`, `bun run setup:python`, then `bun run dev:all`. In a second terminal, `bun run demo:seed` only if no show exists. This uploads three original eight-second tones, not bundled third-party music. Local state/media are in ignored `runtime/local/` and are preserved across restarts. Current workflow: [stage guide](../../../docs/stage-dashboard.md) and [UI verification journal](journal/20260919-stage-dashboard.md).
 
-- Operator: `http://localhost:3001`, development secret `local-demo-only` (override `OPERATOR_SECRET`).
+- Operator: `http://localhost:3000/admin`, password from ignored `.env` (`OPERATOR_SECRET`). The local configured password intentionally differs from the unconfigured development default.
 - Participant: `http://localhost:3000/?session=dev-session`.
+- Projector: `http://localhost:3000/present`; camera crew: `http://localhost:3000/upload`.
 - Backend: `http://localhost:8080`.
 - This machine has Bun at `.tools/bun-1.3.14/bun-windows-x64/bun.exe` if it is absent from PATH. Python dependencies are in `.venv/`.
 
-For other devices, follow [Cloudflare setup](../../../docs/cloudflare-tunnel.md). Node 22+ now runs Next so its external WebSocket rewrites work; Bun still runs the backend. Start `bun run tunnel:quick`, paste its HTTPS URL into the console's Participant link and select Use participant link. The audience uses the public origin for join/snapshot/audio/WSS; operator and uploads stay local. Run `bun run check:tunnel -- <public-origin>` for transport evidence. The public link is saved per console browser/session; a new Quick Tunnel URL requires updating it. See the [tunnel verification journal](journal/20260919-cloudflare-testing.md).
+For other devices, follow [Cloudflare setup](../../../docs/cloudflare-tunnel.md). Node 22+ runs Next; Bun runs the backend. One tunnel to port 3000 serves all four pages. Open `/present` on the public hostname for its QR, or configure `NEXT_PUBLIC_PARTICIPANT_URL` before starting/building. Operator routes authenticate under `/control`; camera crew use limited tokens and small resumable chunks. The [workflow ADR](../../decisions/20260919-single-domain-stage-workflow.md) supersedes the earlier local-only-admin design.
 
-Tap Enable sound on the participant and keep it visible. Select a manual column, then assign a channel from the console. Prepare the cue, inspect readiness and play the ready subset. The tones end at eight seconds; the shared timeline continues until stopped. Test with your prepared stems through Perform → Prepare show and stems.
+Phones automatically join, sync and verify music. Sound is attempted automatically; tap once only if the browser requires it. Keep the page visible. After calibration, mapped phones display their section and unlocated phones choose a manual section. Assign musical parts in the console, prepare the cue, inspect readiness and start the show. The original fixture tones end at eight seconds; the shared timeline continues until stopped. Edit stems through Performance → Prepare show and stems.
 
 Calibration: prepare all ready phones or explicit target IDs, start three cameras, arm, wait for the eleven-second pattern and trailing margin. Upload original clips, label column/rotation, set four ordered seating anchors or keep a coarse map, and process. Review decoded stills, camera contributions, map status/ID filters and unresolved evidence before committing. Geometry edits or late interrupted-pattern reports invalidate old candidates. Synthetic video must stay labeled synthetic. Failed jobs can be cancelled/retried; discard releases an unusable run.
 

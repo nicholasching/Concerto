@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 const backend = (process.env.BACKEND_INTERNAL_URL ?? "http://127.0.0.1:8080").replace(/\/$/, "");
+const admin = (process.env.ADMIN_INTERNAL_URL ?? "http://127.0.0.1:3001").replace(/\/$/, "");
 const development = process.env.NODE_ENV === "development";
 const config: NextConfig = {
   transpilePackages: ["@orchestra/audio", "@orchestra/contracts", "@orchestra/sync"],
@@ -17,8 +18,12 @@ const config: NextConfig = {
     ] }] : [];
   },
   async rewrites() {
-    // Expose audience operations only. Operator APIs and camera uploads use the local console.
+    // One public origin; operator routes still authenticate at the backend.
     return [
+      { source: "/admin/:path*", destination: `${admin}/admin/:path*` },
+      { source: "/control/:path*", destination: `${backend}/:path*` },
+      { source: "/api/presentation", destination: `${backend}/api/presentation` },
+      { source: "/api/camera/:path*", destination: `${backend}/api/camera/:path*` },
       { source: "/api/health", destination: `${backend}/api/health` },
       { source: "/api/session", destination: `${backend}/api/session` },
       { source: "/api/sessions/:sessionId/join", destination: `${backend}/api/sessions/:sessionId/join` },

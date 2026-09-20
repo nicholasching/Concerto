@@ -4,6 +4,7 @@ import type { JoinData, JoinResult } from "./join";
 // Backoff adapted from BeatSync apps/client/src/hooks/useWebSocketReconnection.ts (MIT).
 export const BACKOFF = { initialMs: 1000, factor: 1.1, maxMs: 10000, jitter: 0.15, maxAttempts: 15, connectTimeoutMs: 5000, receiveTimeoutMs: 10000 };
 export const REPLACED_CLOSE_CODE = 4001;
+export const RESET_CLOSE_CODE = 4002;
 const OPEN = 1;
 
 export function backoffDelayMs(attempt: number, random: () => number = Math.random): number {
@@ -30,6 +31,7 @@ export type ConnectionStatus =
   | { kind: "reconnecting"; attempt: number }
   | { kind: "gave-up" }
   | { kind: "replaced" }
+  | { kind: "reset" }
   | { kind: "full" };
 
 export interface ConnectionState {
@@ -72,6 +74,7 @@ export interface ConnectionOptions {
   join: () => Promise<JoinResult>;
   openSocket: (url: string) => SocketLike;
   onChange: (state: ConnectionState) => void;
+  onReset?: () => void;
   /** Every other validated message for the current socket, after the connection has its snapshot. */
   onMessage?: (message: ServerMessageData) => void;
   timers?: Timers;
@@ -164,6 +167,10 @@ export class ParticipantConnection {
     socket.onclose = event => {
       if (this.socket !== socket || this.stopped) return;
       this.socket = null;
+      if (event.code === RESET_CLOSE_CODE) {
+        this.stopped = true; this.clearTimers(); this.options.onReset?.();
+        this.update({ status: { kind: "reset" }, identity: null, snapshot: null, notice: null }); return;
+      }
       if (event.code === REPLACED_CLOSE_CODE) { this.clearTimers(); this.update({ status: { kind: "replaced" } }); return; }
       this.scheduleRetry();
     };

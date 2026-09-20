@@ -49,6 +49,11 @@ export class CalibrationRuns {
   private readonly runs = new Map<string, CalibrationRunRecord>();
   private nextRunTag = 0;
 
+  reset(): void {
+    for (const run of this.runs.values()) run.status = "discarded";
+    this.runs.clear(); // Preserve nextRunTag: old physical clips must not match a new run.
+  }
+
   create(input: {
     sessionId: string;
     serverEpoch: string;
