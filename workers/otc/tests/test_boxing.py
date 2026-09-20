@@ -154,8 +154,8 @@ def test_palette_tracking_ignores_a_bright_nonpalette_object():
     assert _palette_screens(rgb, 0, red, blue) == []
 
 
-def test_palette_mask_excludes_dim_pink_but_retains_saturated_phone_red():
-    hsv = np.array([[[0, 155, 180], [0, 165, 220], [0, 207, 255]]], dtype=np.uint8)
+def test_recall_tuned_palette_rejects_weak_colour_but_keeps_dim_phone_red():
+    hsv = np.array([[[0, 135, 200], [0, 150, 45], [0, 207, 255]]], dtype=np.uint8)
     rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
 
     red, _blue = palette_masks(rgb, opening_kernel=1)

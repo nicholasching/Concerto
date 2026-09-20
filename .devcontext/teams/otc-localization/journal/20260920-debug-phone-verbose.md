@@ -103,3 +103,16 @@ Verification after this change:
 Approved change: lower the red/blue palette saturation floor from 170 to 160.
 The measured pink-shirt samples remain at or below 155, while the new focused
 regression accepts a 165-saturation red phone sample.
+
+## Follow-up tuning: recall-oriented palette
+
+Approved change: prioritize missed-phone recall by lowering the palette
+saturation floor from 160 to 145, brightness floor from 50 to 40, and default
+morphological opening kernel from 3 to 1. This intentionally admits more
+coloured room pixels; a green result still requires the temporal red-blue-red-
+blue sequence from one palette track.
+
+Verification: the focused boxing suite passes 11 tests and Ruff passes. A
+fresh verbose run of the representative 424-frame clip retained four qualified
+phones and introduced no extra green sequence. It did create more discarded
+short palette fragments, which is the expected recall/precision trade-off.

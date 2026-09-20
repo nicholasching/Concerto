@@ -14,10 +14,10 @@ class PaletteSettings:
     blue_hue: int = 108
     red_hue_tolerance: int = 5
     blue_hue_tolerance: int = 20
-    # Tuned against the diagnostic auditorium clip: displayed phone colours
-    # remain above ~207 while the dim pink shirt stays at or below ~155.
-    saturation: int = 160
-    value: int = 50
+    # Recall-oriented defaults: temporal red/blue qualification still guards
+    # against static coloured clothing and room objects.
+    saturation: int = 145
+    value: int = 40
 
 
 @dataclass(frozen=True)
@@ -126,7 +126,7 @@ def _hue_band(hsv, center, tolerance, saturation, value):
     return cv2.bitwise_or(first, cv2.inRange(hsv, (0, saturation, value), (high - 180, 255, 255)))
 
 
-def palette_masks(rgb, *, opening_kernel=3, settings=DEFAULT_PALETTE_SETTINGS):
+def palette_masks(rgb, *, opening_kernel=1, settings=DEFAULT_PALETTE_SETTINGS):
     """Return red and blue masks with the monitor's default morphology."""
     if opening_kernel < 1 or opening_kernel % 2 == 0:
         raise ValueError("opening_kernel must be a positive odd integer")
