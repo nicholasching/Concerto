@@ -295,6 +295,26 @@ describe("committing a map", () => {
 });
 
 describe("a committed map makes earlier selections stale", () => {
+  test("commit persists automatic sections and assignments in one operation and refuses live playback", async () => {
+    const context = harness(workerWriting(manifest => resultFor(manifest, [localized(0, 0.05, 0.6), localized(1, 0.08, 0.6), localized(2, 0.9, 0.6)])));
+    context.state.saveShow({ ...context.state.show,
+      sectionChannels: { left: "channel-2", "center-left": "channel-0", "center-right": "channel-1", right: null } });
+    const { runId, jobId } = await runThrough(context, { participantIds: [0, 1, 2], commandPrefix: "automatic" });
+    context.state.scheduleTransport({ commandId: "play", domain: "transport", supersedesCommandId: null, effectiveServerMs: serverMs,
+      transport: { status: "playing", transportRevision: 2, showRevision: context.state.showRevision, positionMs: 0, startServerMs: serverMs } });
+    context.state.applyDue(serverMs);
+    const blocked = await commitMap(context, { runId, jobId, commandId: "commit-live" });
+    expect(blocked.status).toBe(409);
+    expect(ApiError.parse(await blocked.json()).error.code).toBe("TRANSPORT_ACTIVE");
+    expect(context.state.mapRevision).toBe(0);
+    context.state.panic();
+    expect((await commitMap(context, { runId, jobId, commandId: "commit-stopped" })).status).toBe(200);
+    const saved = await context.store.read();
+    expect(saved?.map?.sections?.map(item => item.section)).toEqual(["left", "center-left", "center-right"]);
+    expect(saved?.assignments.map(item => item.channelId)).toEqual(["channel-2", "channel-0", "channel-1"]);
+    expect(saved?.show?.sectionChannels).toEqual(context.state.show.sectionChannels);
+  });
+
   test("an assignment built against the previous map is refused afterwards", async () => {
     const context = harness(workerWriting(manifest => resultFor(manifest, [localized(0, 0.2, 0.6)])));
     const assign = (commandId: string, mapRevision: number) =>
@@ -304,21 +324,23 @@ describe("a committed map makes earlier selections stale", () => {
       });
 
     expect((await assign("assign-before", 0)).status).toBe(200);
+    serverMs += DEFAULT_LEAD_TIME_MS;
+    context.state.applyDue(serverMs);
 
     const { runId, jobId } = await runThrough(context, { participantIds: [0], commandPrefix: "a" });
-    await commitMap(context, { runId, jobId, commandId: "commit-1" });
+    expect((await commitMap(context, { runId, jobId, commandId: "commit-1" })).status).toBe(200);
 
     // The assignment domain has moved on too, so this names its current revision and still fails
     // on the map alone.
     const stale = await operator(context.app, "/api/assignments", {
-      commandId: "assign-after", expectedRevision: 1, mapRevision: 0, deviceIds: [0], channelId: null,
+      commandId: "assign-after", expectedRevision: context.state.assignmentRevision, mapRevision: 0, deviceIds: [0], channelId: null,
       effectiveServerMs: serverMs + DEFAULT_LEAD_TIME_MS,
     });
     expect(stale.status).toBe(409);
     expect(ApiError.parse(await stale.json()).error.code).toBe("STALE_MAP");
 
     const reselected = await operator(context.app, "/api/assignments", {
-      commandId: "assign-reselected", expectedRevision: 1, mapRevision: 1, deviceIds: [0], channelId: null,
+      commandId: "assign-reselected", expectedRevision: context.state.assignmentRevision, mapRevision: 1, deviceIds: [0], channelId: null,
       effectiveServerMs: serverMs + DEFAULT_LEAD_TIME_MS,
     });
     expect(reselected.status).toBe(200);

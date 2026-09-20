@@ -62,6 +62,13 @@ export const handleClientMessage = (input: {
     return error(clock, "STALE_EPOCH", "Resynchronize before reporting state for this server epoch.");
   }
 
+  if (message.data.type === "participant.section") {
+    if (!state.isRegistered(deviceId)) return error(clock, "UNKNOWN_DEVICE", "This device is not registered in the current session.");
+    state.chooseSection(deviceId, message.data.payload.section, clock.nowServerMs());
+    const snapshot = state.participantSnapshot(deviceId, clock)!;
+    return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };
+  }
+
   if (message.data.type === "participant.column") {
     if (!state.isRegistered(deviceId)) return error(clock, "UNKNOWN_DEVICE", "This device is not registered in the current session.");
     state.chooseColumn(deviceId, message.data.payload.column, clock.nowServerMs());

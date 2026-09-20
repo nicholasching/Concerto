@@ -5,7 +5,7 @@ Start `bun run dev:all` and the configured Cloudflare connector. One public host
 | Page | Use |
 | --- | --- |
 | `/` | Audience phones: automatic join, clock sync and music verification |
-| `/admin` | Password-protected Calibration, Assign and Performance controls |
+| `/admin` | Password-protected Calibration, Sections and Performance controls |
 | `/present` | Projector QR and live aggregate audience counts |
 | `/upload` | Camera crew login and left/center/right video delivery |
 
@@ -13,7 +13,7 @@ Locally use `http://localhost:3000`; the configured public origin is `https://ht
 
 ## Before the audience arrives
 
-1. Open `/admin`. In **Performance → Prepare show and stems**, save the desired Melody, Vocals and Percussion clips. Wait for phone asset verification after changes.
+1. Open `/admin`. In **Performance → Prepare show and stems**, upload the desired Melody, Vocals and Percussion clips and choose music for Left, Center left, Center right and Right. Each section can use any lane or remain Silent. Save while stopped and wait for phone asset verification after changes.
 2. Open `/present` in the projector browser and enter browser full screen. The QR uses `NEXT_PUBLIC_PARTICIPANT_URL` when configured, otherwise the page's own origin. Configure this before starting Next or building production. Counts show connected phones, usable clocks and verified music; they are aggregate data without audience identities.
 3. To start a fresh audience, choose **Reset**, then **Disconnect and reset**. This stops sound, cancels pending work, clears identities/positions/assignments/calibration, invalidates credentials and rotates the clock epoch. Saved show and audio remain. Existing audience pages stay disconnected until refreshed; old resume tokens cannot restore old devices. Calibration counters keep increasing for server-side ordering; the new optical packet does not identify its recording run.
 
@@ -25,14 +25,14 @@ New calibrations use OTC v2: full red `#FF0000` and blue `#0066FF`, 47 symbols a
 2. In **Calibration**, select **Prepare calibration**. Start the recording cameras, then select **Cameras recording — start pattern**. Phones receive the existing raise-phone instructions and 11.75-second optical sequence. Keep leading/trailing recording margin.
 3. On each recording phone, open `/upload`, sign in and choose its audience section **while facing the stage**. For stage-facing cameras, image-left/right is reversed relative to this audience convention; use the existing camera orientation controls to handle that geometry.
 4. Select the original video (up to 1 GiB). After the pattern finishes, select **Upload recording** and keep the page open until **Recording delivered**. Eight-MiB chunks are SHA-256 verified; **Retry upload** skips completed chunks after a dropped connection. Page reload or server restart starts a new transfer. Only one completed clip per section is accepted. Desktop uploads remain available in Calibration.
-5. Recordings appear in the admin camera slots automatically. Select one, two or three distinct views, specify the seating corners or explicitly use the approximate stage-facing frame preset, and process. Review the candidate and commit it before assigning parts. Geometry changes require reprocessing.
-6. Successfully mapped phones display their section. Unmapped phones get only **left / center / right** choices after calibration is complete. These fallback choices have no invented seat coordinates.
+5. Recordings appear in the admin camera slots automatically. Select one, two or three distinct views, specify the seating corners or explicitly use the approximate stage-facing frame preset, and process. Review the candidate and select **Commit map and assign sections automatically** while stopped with no pending commands. Geometry changes require reprocessing.
+6. Mapped phones are automatically split into Left, Center left, Center right and Right by horizontal rank, with balanced counts. Their music comes from the saved presets. Unmapped phones get these four fallback choices after calibration is complete; fallback choices have no invented seat coordinates.
 
-Manual choices also assign music automatically, normally within two seconds: **left → Melody, center → Vocals, right → Percussion**. An existing most common operator assignment in that column takes precedence; a tie uses the default. Manual phones follow later column assignments until you explicitly assign or clear that phone. A phone joining during playback waits for clock/audio/assets to be ready and starts at the current song position. It does not start playback while the show is paused or stopped.
+Fallback choices use the same saved music presets, normally within two seconds. For an older show without explicit presets, the defaults are Left → Melody, Center left → Vocals, Center right → Vocals and Right → Percussion. A phone joining during playback waits for clock/audio/assets to be ready and starts at the current song position. It does not start playback while the show is paused or stopped. Camera upload columns remain left/center/right; they are independent of the four music sections.
 
-## Assign and perform
+## Review sections and perform
 
-Use **Assign** to click phones, draw a box/lasso, or move the two region dividers. Choose **Melody**, **Vocals** or **Percussion**, then assign the selection. Column buttons include manual choices. Selection always carries the current map revision.
+Step **02 Sections** shows counts, music and automatic boundaries. It needs no manual operation. To change a group's music, edit its preset in **Prepare show and stems** and save while stopped; no recalibration is needed. Recalibration recomputes all four groups from the recognized device distribution.
 
 Use **Performance → Prepare cue**, inspect readiness/exclusions, then **Start show**. The existing shared clock drives playback, pause, seek and channel changes. **MUTE ALL** remains visible in the command bar. Prepare-show editing and command history are collapsed when not needed.
 
@@ -46,6 +46,7 @@ Ready, assigned phones automatically become full-screen music lights during play
 - A connection check, clock check and verified music are separate conditions. Keep phones visible and rehearse their actual audio output; software readiness does not measure speaker onset.
 - Uploads reporting a missing progress route during an in-place frontend update can retry against the older server's idempotent chunk endpoint. If the phone retains old frontend code, refresh `/upload`, sign in and reselect its original file. Do not reset or restart the active calibration just to refresh the uploader.
 - Backend restart preserves committed show/map/routing and identities, but an unfinished calibration must be repeated. Reset deliberately clears those audience identities and mappings.
+- Unsaved show edits are retained in this tab's browser session across reloads/restarts, provided the saved show revision has not changed. Successful save clears the recovery copy. Refresh phones after this four-section update because the snapshot schema has gained section fields.
 - Physical iOS/Android autoplay, three-camera coverage, projector scanning distance and acoustic synchronization still require rehearsal at the venue.
 
 ## Isolated browser verification

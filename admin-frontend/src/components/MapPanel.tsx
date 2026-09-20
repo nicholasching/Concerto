@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import type { AdminSnapshotData } from "@orchestra/contracts";
+import { AUDIENCE_SECTIONS, splitAudience, type AdminSnapshotData } from "@orchestra/contracts";
 import { selectDevices, selectRectangle, selectRegion } from "@orchestra/selection";
 import type { AudienceRegion, DeviceSelection } from "@orchestra/selection";
 import { canvasToMap, MAP_CANVAS, mapToCanvas } from "../lib/mapGeometry";
@@ -14,6 +14,7 @@ interface Props {
   assignments: AssignmentData[];
   channels: ChannelData[];
   drawable: boolean; // true on Assign; false on Review
+  automaticSections?: boolean;
   selection?: DeviceSelection | null;
   onSelection?: (selection: DeviceSelection) => void;
 }
@@ -23,7 +24,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 const W = MAP_CANVAS.width, H = MAP_CANVAS.height;
 
-export function MapPanel({ map, assignments, channels, drawable, selection, onSelection }: Props) {
+export function MapPanel({ map, assignments, channels, drawable, selection, onSelection, automaticSections = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [highlight, setHighlight] = useState<number[] | null>(null);
@@ -52,14 +53,17 @@ export function MapPanel({ map, assignments, channels, drawable, selection, onSe
     // stage strip
     ctx.fillStyle = "#6379ba"; ctx.fillRect(300, 0, 300, 18);
     ctx.fillStyle = "#88a9cf"; ctx.font = "11px sans-serif"; ctx.fillText("STAGE", 415, 13);
-    const boundaries = shape === "regions" ? [0, ...dividers, 1] : [0, 1 / 3, 2 / 3, 1];
+    const groups = splitAudience(map.locations);
+    const boundaries = automaticSections ? [0, ...groups.map(group => group.endX)] : shape === "regions" ? [0, ...dividers, 1] : [0, 1 / 3, 2 / 3, 1];
+    const labels = automaticSections ? AUDIENCE_SECTIONS.map(section => section.label.toUpperCase()) : ["LEFT", "CENTER", "RIGHT"];
+    const memberColors = new Map((map.sections ?? []).map(member => [member.deviceId, AUDIENCE_SECTIONS.find(section => section.id === member.section)!.color]));
     ctx.textAlign = "center";
-    ["LEFT", "CENTER", "RIGHT"].forEach((label, index) => {
+    labels.forEach((label, index) => {
       const start = mapToCanvas({ x: boundaries[index], y: 0 }), end = mapToCanvas({ x: boundaries[index + 1], y: 1 });
       ctx.fillStyle = index % 2 ? "#162238" : "#121c2d";
       ctx.fillRect(start.x, start.y, end.x - start.x, end.y - start.y);
-      ctx.fillStyle = "#b4c6df"; ctx.fillText(label, (start.x + end.x) / 2, 27);
-      if (index < 2) { ctx.strokeStyle = shape === "regions" ? "#b9ccff" : "#34435e"; ctx.lineWidth = shape === "regions" ? 3 : 1;
+      ctx.fillStyle = "#b4c6df"; if (end.x - start.x > 100) ctx.fillText(label, (start.x + end.x) / 2, 27);
+      if (index < labels.length - 1) { ctx.strokeStyle = shape === "regions" ? "#b9ccff" : "#34435e"; ctx.lineWidth = shape === "regions" ? 3 : 1;
         ctx.beginPath(); ctx.moveTo(end.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke(); }
     });
     ctx.textAlign = "start";
@@ -71,7 +75,7 @@ export function MapPanel({ map, assignments, channels, drawable, selection, onSe
       if (!drawable && (statusFilter !== "all" && loc.status !== statusFilter || deviceFilter.trim() && String(loc.deviceId) !== deviceFilter.trim())) continue;
       const { x: cx, y: cy } = mapToCanvas(loc);
       const ch = assignedChannel.get(loc.deviceId);
-      ctx.fillStyle = ch ? channelColor.get(ch) ?? STATUS_COLOR.localized : STATUS_COLOR[loc.status];
+      ctx.fillStyle = automaticSections ? memberColors.get(loc.deviceId) ?? STATUS_COLOR.localized : ch ? channelColor.get(ch) ?? STATUS_COLOR.localized : STATUS_COLOR[loc.status];
       const radius = locatedCount <= 80 ? 6 : 2.5;
       ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
       if (highlightSet.has(loc.deviceId)) { ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke(); }
@@ -89,7 +93,7 @@ export function MapPanel({ map, assignments, channels, drawable, selection, onSe
       ctx.beginPath(); points.map(mapToCanvas).forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
       ctx.closePath(); ctx.strokeStyle = "#9db8ff"; ctx.stroke();
     }
-  }, [map, assignments, channels, drag, highlight, points, shape, dividers, selection, drawable, statusFilter, deviceFilter]);
+  }, [map, assignments, channels, drag, highlight, points, shape, dividers, selection, drawable, statusFilter, deviceFilter, automaticSections]);
 
   function chooseRegion(next: AudienceRegion, bounds = dividers, source = map) {
     setRegion(next); onSelection?.(selectRegion(source.locations, next, bounds, source.mapRevision));
@@ -152,9 +156,9 @@ export function MapPanel({ map, assignments, channels, drawable, selection, onSe
         <option value="all">All phones</option><option value="localized">Accepted positions</option><option value="coarse">Coarse column only</option><option value="ambiguous">Ambiguous</option><option value="unseen">Unseen</option>
       </select></label><label>Device ID <input value={deviceFilter} inputMode="numeric" placeholder="All IDs" onChange={e => setDeviceFilter(e.target.value)} /></label></div>}
       <p className="muted">Stage at top. Audience-left is on the left while facing the stage. Evidence: {map.evidence}. Map revision: {map.mapRevision}.</p>
-      <p>{map.locations.filter(location => location.status === "localized").length} devices with map positions. {drawable && "Click a device, draw a box/lasso, or use the region dividers."}</p>
+      <p>{map.locations.filter(location => location.status === "localized").length} devices with map positions. {automaticSections ? "Colors show automatic sections; boundaries follow the device distribution." : drawable && "Click a device, draw a box/lasso, or use the region dividers."}</p>
       {map.locations.some(location => location.status === "localized") && <p className="muted">Positions estimate the audience layout from camera images. Verify front/back placement against known seats before the performance.</p>}
-      {!map.locations.some(location => location.status === "localized") && <p role="status">No map positions yet. Process recordings in Calibration and commit the reviewed map to enable spatial selection. Approximate frame positions are automatic; seating corners are optional.</p>}
+      {!map.locations.some(location => location.status === "localized") && <p role="status">No map positions yet. Process recordings in Calibration and commit the reviewed map to {automaticSections ? "generate automatic sections" : "review positions"}. Approximate frame positions are automatic; seating corners are optional.</p>}
       <canvas
         ref={canvasRef} width={W} height={H}
         style={{ width: "100%", background: "#101724", borderRadius: 8, cursor: drawable ? "crosshair" : "default", touchAction: "none" }}
@@ -162,7 +166,7 @@ export function MapPanel({ map, assignments, channels, drawable, selection, onSe
         role="img" aria-label="Audience map"
       />
       {selection && <p className="muted">Selected: {selection.deviceIds.length} phones</p>}
-      {reviewed.some(location => location.status === "coarse") && <div><h3>Column-only devices — row positions unavailable</h3>
+      {!automaticSections && reviewed.some(location => location.status === "coarse") && <div><h3>Column-only devices — row positions unavailable</h3>
         <div className="controls">{(["left", "center", "right"] as const).map(column => {
           const devices = reviewed.filter(location => location.status === "coarse" && location.column === column);
           return <div key={column}><strong>{column}: {devices.length}</strong><p>{devices.slice(0, 80).map(location => drawable

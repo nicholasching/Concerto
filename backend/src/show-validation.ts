@@ -5,6 +5,7 @@ export function validateShow(show: ShowData): string | null {
   if (!unique((show.cueMarkers ?? []).map(item => item.cueId))) return "Cue marker IDs must be unique.";
   if (show.tracks.reduce((bytes, track) => bytes + track.durationMs / 1000 * track.sampleRateHz * track.channels * 4, 0) > DECODED_AUDIO_BUDGET_BYTES) return `Prepared audio exceeds the ${DECODED_AUDIO_BUDGET_BYTES / 1024 / 1024} MiB decoded budget per phone.`;
   if (!unique(show.tracks.map(item => item.trackId)) || !unique(show.channels.map(item => item.channelId)) || !unique(show.clips.map(item => item.clipId))) return "Track, channel and clip IDs must be unique.";
+  if (show.sectionChannels && Object.values(show.sectionChannels).some(id => id !== null && !show.channels.some(channel => channel.channelId === id))) return "An audience section references an unknown musical channel.";
   for (const clip of show.clips) {
     const track = show.tracks.find(item => item.trackId === clip.trackId);
     if (!track || !show.channels.some(item => item.channelId === clip.channelId)) return "A clip references an unknown track or channel.";

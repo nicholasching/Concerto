@@ -182,9 +182,10 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
         </details>
         {candidate.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
         <label><input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} /> I reviewed mapped positions, audience orientation, and unresolved devices.</label>
-        <button className="primary large" disabled={!checked || busy || geometryDirty || candidateRevision !== snapshot.audienceMap.mapRevision} onClick={() => void act(async () => {
+        {snapshot.transport.status !== "stopped" && <p>Stop playback before committing the map and automatic sections.</p>}
+        <button className="primary large" disabled={!checked || busy || geometryDirty || candidateRevision !== snapshot.audienceMap.mapRevision || snapshot.transport.status !== "stopped" || snapshot.pendingActions.length > 0} onClick={() => void act(async () => {
           await adapter.commitMap(run.plan.runId, jobId!, candidateRevision); setCandidate(null); setJobId(null);
-        })}>Commit reviewed map</button>
+        })}>Commit map and assign sections automatically</button>
         {candidateRevision !== snapshot.audienceMap.mapRevision && <p>The map changed during review. Process again against the current map before committing.</p>}
       </div>}
     </>}

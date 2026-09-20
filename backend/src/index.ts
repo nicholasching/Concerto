@@ -47,6 +47,9 @@ if (restored) {
   if (restored.map) state.restoreMap(restored.map, restored.committedRunTag);
   state.restoreAssignments(restored.assignments);
   state.restoreManualRouting(restored.manualRoutingDeviceIds, clock.nowServerMs());
+  // Migrate older maps once. Existing saved assignments (including panic cancellations)
+  // are already authoritative on subsequent restarts.
+  if (!restored.map?.sections) state.applySectionRouting();
   calibrations.restoreNextTag(Math.max(restored.nextRunTag, (restored.committedRunTag ?? -1) + 1));
   await store.save(registry.toCheckpoint(clock.sessionId, state.durableShow, state.audienceMap,
     state.lastCommittedRunTag, state.durableAssignments, calibrations.nextTag, state.manualRoutingDeviceIds));

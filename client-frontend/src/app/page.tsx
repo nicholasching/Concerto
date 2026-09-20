@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { AudioContextHost, DecodedBudget, isAudioContextPaused, PlaybackEngine, preloadTracks, type LoadedTrack } from "@orchestra/audio";
-import { ClientMessage } from "@orchestra/contracts";
+import { AUDIENCE_SECTIONS, ClientMessage, type AudienceSectionId } from "@orchestra/contracts";
 import { ClockSync } from "@orchestra/sync";
 import { CalibrationSession, type CalibrationPhase } from "../lib/calibration";
 import { browserSocket, ParticipantConnection, type ConnectionState } from "../lib/connection";
@@ -174,9 +174,10 @@ export default function Page() {
   const assetsVerified = tracks.length > 0 && tracks.every(track => verifiedHashes[track.trackId] === track.sha256);
   const location = conn.snapshot?.location;
   const stage = conn.snapshot?.calibrationStage ?? "waiting";
-  const section = location?.column;
-  const mapped = location?.status === "localized" || location?.mappingMode === "optical-column";
-  const manual = location?.mappingMode === "manual-column";
+  const sectionId = conn.snapshot?.audienceSection;
+  const section = AUDIENCE_SECTIONS.find(item => item.id === sectionId)?.label;
+  const mapped = location?.status === "localized" && !!section;
+  const manual = location?.mappingMode === "manual-column" && !!section;
   const needsSection = connected && stage === "complete" && !mapped && !manual && phase.kind !== "armed";
   const holding = phase.kind === "prepared" || phase.kind === "armed";
   const awaitingMap = phase.kind === "finished" && stage !== "complete" || stage === "processing";
@@ -298,10 +299,10 @@ export default function Page() {
     { label: "Music", value: assetsVerified ? "Verified" : tracks.length ? "Loading…" : "Waiting for show", ok: assetsVerified },
     { label: "Sound", value: outputReady ? "Ready" : audioState === "running" ? "Warming up…" : "Tap to enable", ok: outputReady },
   ];
-  function chooseSection(column: "left" | "center" | "right") {
+  function chooseSection(section: AudienceSectionId) {
     const snapshot = connection.current?.current.snapshot;
     if (snapshot) connection.current?.send(ClientMessage.parse({ protocolVersion: 1, sessionId: snapshot.sessionId, serverEpoch: snapshot.serverEpoch,
-      messageId: crypto.randomUUID(), type: "participant.column", payload: { column } }));
+      messageId: crypto.randomUUID(), type: "participant.section", payload: { section } }));
   }
 
   return <main className="audience-shell">
@@ -316,7 +317,7 @@ export default function Page() {
     {!reset && audioState !== "running" && <div className="sound-prompt"><button className="primary" onClick={() => void enableSound()}>{isAudioContextPaused(audioState) ? "Tap to enable sound" : "Enable sound"}</button><small>Your browser needs one tap before it can play music.</small></div>}
     {audioNote && <p role="alert" className="notice">{audioNote}</p>}
     {assetNote?.startsWith("Failed:") && <p role="alert" className="notice">Music couldn’t finish loading. Keep this page open while the stage team checks the connection.</p>}
-    {needsSection && <div className="section-picker">{(["left", "center", "right"] as const).map(column => <button key={column} onClick={() => chooseSection(column)}>{column}</button>)}</div>}
+    {needsSection && <div className="section-picker audience-four-sections">{AUDIENCE_SECTIONS.map(section => <button key={section.id} onClick={() => chooseSection(section.id)}>{section.label}</button>)}</div>}
     {(mapped || manual) && !holding && channel && <p className="your-part"><span style={{ background: channel.color }} />Your part: <strong>{channel.label}</strong></p>}
     {manual && !holding && !channel && <p className="your-part">{conn.snapshot?.pendingActions.some(action => action.domain === "assignment") ? "Joining your section’s music…" : "Waiting for the stage team to assign music to this section."}</p>}
     {conn.status.kind === "gave-up" && <button onClick={() => connection.current?.retry()}>Reconnect</button>}

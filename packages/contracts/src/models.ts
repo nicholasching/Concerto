@@ -8,6 +8,13 @@ export const Milliseconds = z.number().nonnegative();
 export const Sha256 = z.string().regex(/^[a-f0-9]{64}$/);
 export const Color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 export const Column = z.enum(["left", "center", "right"]);
+export const AudienceSection = z.enum(["left", "center-left", "center-right", "right"]);
+export const SectionChannels = z.strictObject({
+  left: Id.nullable(), "center-left": Id.nullable(), "center-right": Id.nullable(), right: Id.nullable(),
+});
+export const SectionMembership = z.strictObject({
+  deviceId: DeviceId, section: AudienceSection, source: z.enum(["automatic", "manual"]),
+});
 export const Point = z.strictObject({ x: z.number(), y: z.number() });
 export const ParticipantIds = z.array(DeviceId).max(2048);
 export const SessionIdentity = { protocolVersion: z.literal(1), sessionId: Id, serverEpoch: Id };
@@ -47,6 +54,7 @@ export const Clip = z.strictObject({
 export const Show = z.strictObject({
   showId: Id, showRevision: Revision, label: z.string(),
   tracks: z.array(Track), channels: z.array(Channel).min(1), clips: z.array(Clip),
+  sectionChannels: SectionChannels.optional(),
   cueMarkers: z.array(z.strictObject({ cueId: Id, label: z.string().min(1).max(100), positionMs: Milliseconds })).max(100).optional(),
 });
 export const Transport = z.discriminatedUnion("status", [
@@ -76,6 +84,7 @@ export const Location = z.discriminatedUnion("status", [
 export const AudienceMap = z.strictObject({
   mapRevision: Revision, runId: Id.nullable(), evidence: z.enum(["synthetic", "physical"]),
   locations: z.array(Location).max(2048),
+  sections: z.array(SectionMembership).max(2048).optional(),
 });
 
 export const Palette = z.strictObject({ zero: Color, one: Color, neutral: Color });
@@ -165,6 +174,7 @@ export const AdminSnapshot = z.strictObject({
 export const ParticipantSnapshot = z.strictObject({
   ...snapshotBase, role: z.literal("participant"), deviceId: DeviceId,
   readiness: DeviceReadiness, assignment: Assignment, location: Location,
+  audienceSection: AudienceSection.nullable().optional(),
   calibrationStage: z.enum(["waiting", "calibrating", "processing", "complete"]).optional(),
 });
 export const Snapshot = z.discriminatedUnion("role", [AdminSnapshot, ParticipantSnapshot]);

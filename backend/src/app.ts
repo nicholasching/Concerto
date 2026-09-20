@@ -759,6 +759,10 @@ export function createApp(deps: AppDeps) {
       ), 409);
     }
 
+    deps.state.applyDue(deps.clock.nowServerMs());
+    if (deps.state.transport.status !== "stopped" || deps.state.pendingActions.length) {
+      return c.json(apiError("TRANSPORT_ACTIVE", "Stop playback and wait for pending changes before committing the map and automatic sections."), 409);
+    }
     const mapRevision = deps.state.commitMap({
       runId: run.plan.runId, runTag: run.plan.runTag, evidence: job.result.evidence,
       locations: job.result.locations, targets: run.plan.participantIds,

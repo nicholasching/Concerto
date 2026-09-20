@@ -2,7 +2,8 @@ import { z } from "zod";
 import {
   AdminSnapshot, Assignment, AudienceMap, Channel, DeviceReadiness, Location, ParticipantSnapshot, PendingAction,
   DEFAULT_SHOW_CHANNELS, PROTOCOL_VERSION, Show, Transport,
-  type AdminSnapshotData, type ParticipantSnapshotData, type ShowData,
+  sectionChannelsFor, splitAudience,
+  type AdminSnapshotData, type ParticipantSnapshotData, type ShowData, type AudienceSectionId, type SectionMembershipData,
 } from "@orchestra/contracts";
 import type { ServerClock } from "./clock";
 
@@ -70,6 +71,7 @@ export class SessionState {
   private readonly assignments = new Map<number, AssignmentData>();
   private readonly manualRouting = new Set<number>();
   private readonly locations = new Map<number, LocationData>();
+  private readonly sections = new Map<number, SectionMembershipData>();
   private adminContext: () => Partial<Pick<AdminSnapshotData, "preparations" | "calibration">> = () => ({});
   private readonly appliedCommands = new Set<string>();
   calibrationStage: "waiting" | "calibrating" | "processing" | "complete" = "waiting";
@@ -78,6 +80,7 @@ export class SessionState {
     this.pendingTransport = null; this.pendingMix = null; this.pendingAssignments.clear();
     this.pendingActionsCache = null; this.transportRecipients.clear(); this.appliedCommands.clear();
     this.readiness.clear(); this.assignments.clear(); this.locations.clear(); this.manualRouting.clear();
+    this.sections.clear();
     this.assignmentRevisionCounter = 0; this.mixRevisionCounter = 0; this.effectiveMixRevision = 0;
     this.channelState = null; this.masterGainState = 1;
     this.mapRevisionCounter = 0; this.mapRunId = null; this.mapEvidence = "synthetic"; this.committedRunTag = null;
@@ -158,6 +161,7 @@ export class SessionState {
     }
     this.transportState = stoppedTransport(this.transportState.transportRevision + 1, this.savedShow.showRevision);
     this.routeManualColumns(0); // Show edits are allowed only while stopped.
+    this.applySectionRouting();
     this.revisionCounter++;
     return this.savedShow;
   }
@@ -326,6 +330,7 @@ export class SessionState {
 
   chooseColumn(deviceId: number, column: "left" | "center" | "right" | null, nowServerMs: number): void {
     if (!this.isRegistered(deviceId)) return;
+    this.sections.delete(deviceId); // Compatibility path for older three-column clients.
     this.applyDue(nowServerMs);
     const previous = this.locations.get(deviceId);
     if (previous?.column === column && previous.mappingMode === "manual-column" && this.manualRouting.has(deviceId)) {
@@ -345,6 +350,49 @@ export class SessionState {
       this.manualRouting.add(deviceId);
       this.routeManualColumns(nowServerMs + MANUAL_ASSIGNMENT_LEAD_MS);
     }
+  }
+
+  chooseSection(deviceId: number, section: AudienceSectionId | null, nowServerMs: number): void {
+    if (!this.isRegistered(deviceId) || this.locations.get(deviceId)?.status === "localized") return;
+    this.applyDue(nowServerMs);
+    if (this.sections.get(deviceId)?.section === section) return;
+    this.manualRouting.delete(deviceId);
+    if (section === null) {
+      this.sections.delete(deviceId);
+      this.locations.set(deviceId, defaultLocation(deviceId));
+    } else {
+      this.sections.set(deviceId, { deviceId, section, source: "manual" });
+      this.locations.set(deviceId, { ...defaultLocation(deviceId), status: "coarse", mappingMode: "manual-column",
+        column: section === "left" || section === "right" ? section : "center", x: null, y: null });
+    }
+    this.mapRevisionCounter++;
+    this.revisionCounter++;
+    this.routeSections(nowServerMs + MANUAL_ASSIGNMENT_LEAD_MS, [deviceId]);
+  }
+
+  private rebuildSections(): void {
+    for (const [id, membership] of this.sections) {
+      if (membership.source !== "manual" || this.locations.get(id)?.mappingMode !== "manual-column") this.sections.delete(id);
+    }
+    for (const group of splitAudience([...this.locations.values()])) {
+      for (const deviceId of group.deviceIds) this.sections.set(deviceId, { deviceId, section: group.id, source: "automatic" });
+    }
+  }
+
+  // Map commits, saved presets and restart activation happen while stopped. Manual fallback
+  // during playback instead uses the existing future assignment/ready-at-playhead path.
+  applySectionRouting(): void { this.routeSections(0); this.applyDue(0); }
+
+  private routeSections(effectiveServerMs: number, deviceIds = [...this.sections.keys()]): void {
+    const routes = sectionChannelsFor(this.show);
+    const next = deviceIds.flatMap(deviceId => {
+      const section = this.sections.get(deviceId)?.section;
+      const channelId = section ? routes[section] : null;
+      const previous = this.pendingAssignments.get(deviceId)?.assignment ?? this.assignments.get(deviceId);
+      if (!previous || (previous.channelId === channelId && previous.mapRevision === this.mapRevision)) return [];
+      return [{ deviceId, channelId, mapRevision: this.mapRevision, assignmentRevision: this.assignmentRevision + 1 }];
+    });
+    if (next.length) this.scheduleAssignments({ commandId: crypto.randomUUID(), effectiveServerMs, assignments: next }, true);
   }
 
   private routeManualColumns(effectiveServerMs: number, reschedulePeers = false): void {
@@ -428,6 +476,7 @@ export class SessionState {
     return AudienceMap.parse({
       mapRevision: this.mapRevisionCounter, runId: this.mapRunId, evidence: this.mapEvidence,
       locations: [...this.locations.values()],
+      sections: [...this.sections.values()],
     });
   }
 
@@ -445,6 +494,7 @@ export class SessionState {
   }): number {
     const decoded = new Map(input.locations.map(location => [location.deviceId, location]));
     for (const deviceId of input.targets) {
+      this.sections.delete(deviceId);
       this.locations.set(deviceId, decoded.get(deviceId) ?? defaultLocation(deviceId));
       if (this.locations.get(deviceId)?.mappingMode !== "manual-column") this.manualRouting.delete(deviceId);
     }
@@ -453,6 +503,9 @@ export class SessionState {
     this.mapEvidence = input.evidence;
     this.committedRunTag = input.runTag;
     this.revisionCounter++;
+    this.rebuildSections();
+    this.routeSections(0, [...new Set([...this.sections.keys(), ...input.targets])]);
+    this.applyDue(0);
     return this.mapRevisionCounter;
   }
 
@@ -462,6 +515,11 @@ export class SessionState {
     this.mapEvidence = map.evidence;
     this.committedRunTag = committedRunTag;
     for (const location of map.locations) this.locations.set(location.deviceId, location);
+    this.sections.clear();
+    for (const membership of map.sections ?? []) {
+      if (this.isRegistered(membership.deviceId)) this.sections.set(membership.deviceId, membership);
+    }
+    this.rebuildSections();
   }
 
   // Only connected phones are expected to answer a preparation. An operator console is not a
@@ -500,6 +558,7 @@ export class SessionState {
       && !this.transportRecipients.get(this.transportState.transportRevision)!.has(deviceId);
     return ParticipantSnapshot.parse({ ...this.base(clock), transport: excluded ? stoppedTransport(this.transportState.transportRevision, this.showRevision) : this.transportState,
       pendingActions, role: "participant", deviceId, readiness, assignment, location,
+      audienceSection: this.sections.get(deviceId)?.section ?? null,
       calibrationStage: this.calibrationStage === "waiting" && this.mapRunId ? "complete" : this.calibrationStage });
   }
 

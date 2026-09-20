@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Automatic audience sections and show recovery
+
+Reviewed calibration now divides localized phones into four balanced groups by horizontal rank: Left, Center left, Center right and Right. The saved show presets choose each group's musical lane or silence; step 02 displays the resulting sections without manual assignment. Camera columns remain three. Show drafts survive tab reloads/backend restarts, and both frontend upload proxies accept the supported 128 MiB audio ceiling. The user confirmed the live workflow works and requested publication to main. See the [decision](decisions/20260920-automatic-audience-quartiles.md), [implementation and checks](teams/integration/journal/20260920-automatic-audience-sections.md) and [upload fix](teams/integration/journal/20260920-percussion-upload-diagnosis.md). Sync/client/admin gates and isolated browser checks pass; the full OTC Windows stall remains recorded separately, and physical four-section playback remains a rehearsal check.
+
 ### OTC v2 reliability
 
 New runs use 47 symbols at 250 ms (11.75 s), with no optical run-tag field. Joint identity decoding recovers complementary losses across both passes; preamble evidence can replace missing pilots. Red-only compact-core detection fixes observed merging with skin/clothing while preserving legacy amber behavior. See the [decision](decisions/20260920-otc-v2-redundancy.md) and [implementation/checks](teams/integration/journal/20260920-otc-v2.md). Correct clip selection is operator-managed; a fresh physical v2 rehearsal remains required.

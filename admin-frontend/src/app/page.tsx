@@ -37,7 +37,7 @@ export default function Page() {
   return <main className="console-shell">
     <header className="console-header"><div><div className="brand"><span className="brand-mark">◒</span>AUDIENCE ORCHESTRA</div><h1>Stage control<span className="live-tag">LIVE</span></h1></div>
       <div className="header-links"><a href="/present" target="_blank" rel="noreferrer">Projector view ↗</a><a href="/upload" target="_blank" rel="noreferrer">Camera uploads ↗</a></div></header>
-    <div className="command-bar"><nav aria-label="Show stages"><button className="reset-control" onClick={() => setResetOpen(true)}>↺ Reset</button><a href="#calibration"><span>01</span> Calibration</a><a href="#assign"><span>02</span> Assign</a><a href="#performance"><span>03</span> Performance</a></nav>
+    <div className="command-bar"><nav aria-label="Show stages"><button className="reset-control" onClick={() => setResetOpen(true)}>↺ Reset</button><a href="#calibration"><span>01</span> Calibration</a><a href="#assign"><span>02</span> Sections</a><a href="#performance"><span>03</span> Performance</a></nav>
       <button className="panic" onClick={() => { setActionError(null); void adapter.panic().then(refresh).catch(cause => setActionError(String(cause))); }}>■ MUTE ALL</button></div>
     {(error || actionError) && <p role="alert" className="error notice-box">{actionError ?? error}</p>}
     <div className="session-overview"><div className="section-caption"><span>AUDIENCE STATUS</span><span className={clockReady() ? "status" : "muted"}>{clockReady() ? "● Control clock in sync" : "○ Synchronizing control clock"}</span></div>
@@ -45,7 +45,7 @@ export default function Page() {
     </div>
     <div className="stage-panels" key={snapshot.serverEpoch}>
       <div id="calibration"><CalibrationPanel refresh={refresh} snapshot={snapshot} /></div>
-      <div id="assign"><AssignPanel snapshot={snapshot} refresh={refresh} /></div>
+      <div id="assign"><AssignPanel snapshot={snapshot} /></div>
       <div id="performance"><PerformPanel snapshot={snapshot} refresh={refresh} /></div>
     </div>
     <footer className="console-footer"><span>{snapshot.show.label}</span><span>{snapshot.transport.status} · {pendingCount} pending commands</span><details><summary>Command history</summary><ul className="pending">{pending.slice(-8).map(command => <li key={command.commandId}>{command.domain} · {command.status}{command.error ? ` · ${command.error}` : ""}</li>)}</ul></details></footer>

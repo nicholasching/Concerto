@@ -336,6 +336,66 @@
           "additionalProperties": false
         }
       },
+      "sectionChannels": {
+        "type": "object",
+        "properties": {
+          "left": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "center-left": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "center-right": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "right": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "left",
+          "center-left",
+          "center-right",
+          "right"
+        ],
+        "additionalProperties": false
+      },
       "cueMarkers": {
         "maxItems": 100,
         "type": "array",
@@ -1295,6 +1355,42 @@
               "additionalProperties": false
             }
           ]
+        }
+      },
+      "sections": {
+        "maxItems": 2048,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "deviceId": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2047
+            },
+            "section": {
+              "type": "string",
+              "enum": [
+                "left",
+                "center-left",
+                "center-right",
+                "right"
+              ]
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "automatic",
+                "manual"
+              ]
+            }
+          },
+          "required": [
+            "deviceId",
+            "section",
+            "source"
+          ],
+          "additionalProperties": false
         }
       }
     },
@@ -3055,6 +3151,66 @@
                   "additionalProperties": false
                 }
               },
+              "sectionChannels": {
+                "type": "object",
+                "properties": {
+                  "left": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "center-left": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "center-right": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "right": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "left",
+                  "center-left",
+                  "center-right",
+                  "right"
+                ],
+                "additionalProperties": false
+              },
               "cueMarkers": {
                 "maxItems": 100,
                 "type": "array",
@@ -3917,6 +4073,42 @@
                       "additionalProperties": false
                     }
                   ]
+                }
+              },
+              "sections": {
+                "maxItems": 2048,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "deviceId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2047
+                    },
+                    "section": {
+                      "type": "string",
+                      "enum": [
+                        "left",
+                        "center-left",
+                        "center-right",
+                        "right"
+                      ]
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "automatic",
+                        "manual"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "deviceId",
+                    "section",
+                    "source"
+                  ],
+                  "additionalProperties": false
                 }
               }
             },
@@ -4801,6 +4993,66 @@
                   ],
                   "additionalProperties": false
                 }
+              },
+              "sectionChannels": {
+                "type": "object",
+                "properties": {
+                  "left": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "center-left": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "center-right": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "right": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "left",
+                  "center-left",
+                  "center-right",
+                  "right"
+                ],
+                "additionalProperties": false
               },
               "cueMarkers": {
                 "maxItems": 100,
@@ -5746,6 +5998,22 @@
               }
             ]
           },
+          "audienceSection": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center-left",
+                  "center-right",
+                  "right"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "calibrationStage": {
             "type": "string",
             "enum": [
@@ -5963,6 +6231,66 @@
               ],
               "additionalProperties": false
             }
+          },
+          "sectionChannels": {
+            "type": "object",
+            "properties": {
+              "left": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "center-left": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "center-right": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "right": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "left",
+              "center-left",
+              "center-right",
+              "right"
+            ],
+            "additionalProperties": false
           },
           "cueMarkers": {
             "maxItems": 100,
@@ -6826,6 +7154,42 @@
                   "additionalProperties": false
                 }
               ]
+            }
+          },
+          "sections": {
+            "maxItems": 2048,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "deviceId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2047
+                },
+                "section": {
+                  "type": "string",
+                  "enum": [
+                    "left",
+                    "center-left",
+                    "center-right",
+                    "right"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "automatic",
+                    "manual"
+                  ]
+                }
+              },
+              "required": [
+                "deviceId",
+                "section",
+                "source"
+              ],
+              "additionalProperties": false
             }
           }
         },
@@ -7711,6 +8075,66 @@
               ],
               "additionalProperties": false
             }
+          },
+          "sectionChannels": {
+            "type": "object",
+            "properties": {
+              "left": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "center-left": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "center-right": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "right": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "left",
+              "center-left",
+              "center-right",
+              "right"
+            ],
+            "additionalProperties": false
           },
           "cueMarkers": {
             "maxItems": 100,
@@ -8656,6 +9080,22 @@
           }
         ]
       },
+      "audienceSection": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "left",
+              "center-left",
+              "center-right",
+              "right"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "calibrationStage": {
         "type": "string",
         "enum": [
@@ -9105,6 +9545,66 @@
               ],
               "additionalProperties": false
             }
+          },
+          "sectionChannels": {
+            "type": "object",
+            "properties": {
+              "left": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "center-left": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "center-right": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "right": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "left",
+              "center-left",
+              "center-right",
+              "right"
+            ],
+            "additionalProperties": false
           },
           "cueMarkers": {
             "maxItems": 100,
@@ -11634,6 +12134,68 @@
           "payload"
         ],
         "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "protocolVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "serverEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "type": {
+            "type": "string",
+            "const": "participant.section"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "section": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "left",
+                      "center-left",
+                      "center-right",
+                      "right"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "sessionId",
+          "serverEpoch",
+          "messageId",
+          "type",
+          "payload"
+        ],
+        "additionalProperties": false
       }
     ]
   },
@@ -12064,6 +12626,66 @@
                           ],
                           "additionalProperties": false
                         }
+                      },
+                      "sectionChannels": {
+                        "type": "object",
+                        "properties": {
+                          "left": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "center-left": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "center-right": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "right": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "left",
+                          "center-left",
+                          "center-right",
+                          "right"
+                        ],
+                        "additionalProperties": false
                       },
                       "cueMarkers": {
                         "maxItems": 100,
@@ -12927,6 +13549,42 @@
                               "additionalProperties": false
                             }
                           ]
+                        }
+                      },
+                      "sections": {
+                        "maxItems": 2048,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "deviceId": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2047
+                            },
+                            "section": {
+                              "type": "string",
+                              "enum": [
+                                "left",
+                                "center-left",
+                                "center-right",
+                                "right"
+                              ]
+                            },
+                            "source": {
+                              "type": "string",
+                              "enum": [
+                                "automatic",
+                                "manual"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "deviceId",
+                            "section",
+                            "source"
+                          ],
+                          "additionalProperties": false
                         }
                       }
                     },
@@ -13811,6 +14469,66 @@
                           ],
                           "additionalProperties": false
                         }
+                      },
+                      "sectionChannels": {
+                        "type": "object",
+                        "properties": {
+                          "left": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "center-left": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "center-right": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "right": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "left",
+                          "center-left",
+                          "center-right",
+                          "right"
+                        ],
+                        "additionalProperties": false
                       },
                       "cueMarkers": {
                         "maxItems": 100,
@@ -14756,6 +15474,22 @@
                       }
                     ]
                   },
+                  "audienceSection": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "left",
+                          "center-left",
+                          "center-right",
+                          "right"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "calibrationStage": {
                     "type": "string",
                     "enum": [
@@ -15504,6 +16238,66 @@
                       ],
                       "additionalProperties": false
                     }
+                  },
+                  "sectionChannels": {
+                    "type": "object",
+                    "properties": {
+                      "left": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "center-left": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "center-right": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "right": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "left",
+                      "center-left",
+                      "center-right",
+                      "right"
+                    ],
+                    "additionalProperties": false
                   },
                   "cueMarkers": {
                     "maxItems": 100,

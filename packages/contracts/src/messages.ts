@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ApiError, Assignment, CalibrationPlan, CalibrationRun, Column, DeviceReadiness, Id, Milliseconds, PendingAction, Revision, SessionIdentity, Sha256, Show, Snapshot } from "./models";
+import { ApiError, Assignment, AudienceSection, CalibrationPlan, CalibrationRun, Column, DeviceReadiness, Id, Milliseconds, PendingAction, Revision, SessionIdentity, Sha256, Show, Snapshot } from "./models";
 
 const envelope = { ...SessionIdentity, messageId: Id };
 const ready = { preparationId: Id, ready: z.boolean(), reason: z.string().nullable() };
@@ -14,6 +14,7 @@ export const ClientMessage = z.discriminatedUnion("type", [
   z.strictObject({ ...envelope, type: z.literal("transport.ready"), payload: z.strictObject({ ...ready, showRevision: Revision, transportRevision: Revision }) }),
   z.strictObject({ ...envelope, type: z.literal("device.status"), payload: DeviceReadiness }),
   z.strictObject({ ...envelope, type: z.literal("participant.column"), payload: z.strictObject({ column: Column.nullable() }) }),
+  z.strictObject({ ...envelope, type: z.literal("participant.section"), payload: z.strictObject({ section: AudienceSection.nullable() }) }),
 ]);
 
 export const ServerMessage = z.discriminatedUnion("type", [
