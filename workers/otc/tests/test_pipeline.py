@@ -62,8 +62,8 @@ def test_red_blue_three_camera_mp4_decodes_ids_and_positions(capture, fps):
     result = process_manifest(manifest, path, "synthetic")
     validate_result(manifest, result)
     assert_positions(result, truth, manifest["participantIds"])
-    assert any("red/blue preamble" in message
-               for camera in result["cameras"] for message in camera["messages"])
+    assert not any("Ignored" in message
+                   for camera in result["cameras"] for message in camera["messages"])
 
 
 @pytest.mark.parametrize("case", ["emissive-background", "reflected-motion"])
@@ -92,8 +92,8 @@ def test_actual_three_camera_mp4_roundtrip_and_review_artifacts(capture, tmp_pat
         assert abs(camera["phasePtsMs"]-expected_phase) < 40
     assert all(not (o["centerPx"]["x"] < 40 and o["centerPx"]["y"] < 20)
                for o in result["observations"])  # Stage light is not a device track.
-    assert any("without a complete amber/blue preamble" in message
-               for camera in result["cameras"] for message in camera["messages"])
+    assert not any("Ignored" in message
+                   for camera in result["cameras"] for message in camera["messages"])
     for event in events:
         validate_schema("JobProgress", event)
         assert event["jobId"] == "job-test"

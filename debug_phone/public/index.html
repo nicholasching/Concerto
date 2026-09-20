@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101317">
+    <title>Debug phone flash bench</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="setup" id="setup">
+      <section>
+        <p class="eyebrow">DEBUG PHONE</p>
+        <h1>Flash and palette test</h1>
+        <p>Scan this code on each test phone. The phone renders the frozen 11-second OTC packet in red and blue, then holds the chosen colour.</p>
+        <img class="qr" id="qr" width="280" height="280" alt="Scan to open the debug phone flash test">
+        <p class="address" id="address">Preparing QR code…</p>
+        <p class="warning">This is a full-screen flashing visual test. Stop immediately if anyone feels unwell.</p>
+        <label>Device ID <input id="device-id" type="number" min="0" max="2047" value="1" inputmode="numeric"></label>
+        <label>Run tag <input id="run-tag" type="number" min="0" max="255" value="37" inputmode="numeric"></label>
+        <label>Hold colour
+          <select id="hold-color">
+            <option value="red">Red</option>
+            <option value="blue">Blue</option>
+          </select>
+        </label>
+        <button id="start" type="button">Start flash sequence</button>
+      </section>
+    </main>
+
+    <section class="flash" id="flash" hidden aria-live="polite">
+      <div class="controls">
+        <p id="status"></p>
+        <button id="restart" type="button">Restart flash sequence</button>
+        <button id="stop" type="button">Stop and exit</button>
+      </div>
+    </section>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

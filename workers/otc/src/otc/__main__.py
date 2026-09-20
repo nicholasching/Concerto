@@ -11,6 +11,7 @@ import av
 import cv2
 from jsonschema.exceptions import ValidationError
 
+from .boxing import box_video
 from .pipeline import process_manifest
 from .validation import validate_manifest, validate_result
 
@@ -52,8 +53,23 @@ def main() -> int:
             command.add_argument("--cpu-budget", type=int,
                                  help="Total analysis CPUs across all cameras; defaults to "
                                       "OTC_CPU_BUDGET or detected container capacity")
+    box = commands.add_parser("box-video", help="Render local diagnostic boxes from existing screen tracks")
+    box.add_argument("--input", type=Path, required=True)
+    box.add_argument("--output", type=Path, required=True)
+    box.add_argument("--rotation-degrees", type=int, choices=(0, 90, 180, 270), default=0)
+    box.add_argument("--verbose-output-dir", type=Path,
+                     help="Write red/blue mask videos and evidence overlays for local debugging")
     args = parser.parse_args()
     try:
+        if args.command == "box-video":
+            def report(stage, frame_count, message):
+                print(json.dumps({"stage": stage, "frameCount": frame_count,
+                                  "message": message}), flush=True)
+            summary = box_video(args.input, args.output,
+                                rotation_degrees=args.rotation_degrees, progress=report,
+                                verbose_output_dir=args.verbose_output_dir)
+            print(json.dumps({"boxed": True, "output": str(args.output), **summary}), flush=True)
+            return 0
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
         validate_manifest(manifest)
         if args.command == "validate-manifest":

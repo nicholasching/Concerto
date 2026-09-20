@@ -7,8 +7,8 @@ import os
 
 import cv2
 
+from .boxing import scan_phone_detection_camera
 from .sampling import decode_tracks
-from .tracking import scan_camera
 
 
 def process_camera(index, camera, path, manifest, debug_dir, report, frame_workers=1):
@@ -20,8 +20,8 @@ def process_camera(index, camera, path, manifest, debug_dir, report, frame_worke
     def on_frames(frames, pts_ms):
         report("track", f"{camera_id}: {frames} frames, clip PTS {pts_ms:.1f} ms")
 
-    scan = scan_camera(path, camera, on_frames, frame_workers=frame_workers,
-                       zero_color=manifest["palette"]["zero"])
+    scan = scan_phone_detection_camera(path, camera, on_frames, frame_workers=frame_workers,
+                                      zero_color=manifest["palette"]["zero"])
     seen, details, phase, messages = decode_tracks(scan, manifest, camera_id)
     diagnostic = {
         "cameraId": camera_id, "frameWidth": scan.width, "frameHeight": scan.height,
