@@ -23,6 +23,10 @@
             <option value="270">270°</option>
           </select>
         </label>
+        <label class="toggle">
+          <input name="verbose" type="checkbox">
+          <span>Verbose debug mode: preserve red/blue evidence overlays and create HSV mask videos.</span>
+        </label>
         <p class="limit">Maximum 512 MiB. Files and results stay in ignored local runtime storage.</p>
         <button type="submit">Create boxed video</button>
       </form>
@@ -33,6 +37,22 @@
         <p id="summary"></p>
         <video id="output" controls playsinline></video>
         <p><a id="download" download="boxed.mp4">Download boxed video</a></p>
+      </section>
+      <section id="verbose-result" hidden>
+        <h2>Verbose palette views</h2>
+        <p>The annotated result retains the most recent red and blue components that qualified each green sequence.</p>
+        <div class="debug-grid">
+          <article>
+            <h3>Red channel</h3>
+            <video id="red-output" controls playsinline></video>
+            <p><a id="red-download" download="red-mask.mp4">Download red mask</a></p>
+          </article>
+          <article>
+            <h3>Blue channel</h3>
+            <video id="blue-output" controls playsinline></video>
+            <p><a id="blue-download" download="blue-mask.mp4">Download blue mask</a></p>
+          </article>
+        </div>
       </section>
     </main>
     <script type="module" src="/detection-boxing/app.js"></script>

@@ -19,6 +19,8 @@ type BoxingJob = {
   status: "running" | "complete" | "failed";
   workspace: string;
   outputPath: string;
+  verbose: boolean;
+  artifacts?: { redMaskPath: string; blueMaskPath: string };
   error?: string;
   summary?: Record<string, unknown>;
 };
@@ -52,26 +54,33 @@ function localBoxingOnly(request: Request): boolean {
   return !request.headers.has("x-forwarded-host") && !request.headers.has("x-forwarded-proto");
 }
 
-function boxingId(pathname: string): string | null {
-  const match = /^\/api\/boxing\/jobs\/([0-9a-f-]{36})(?:\/video)?$/.exec(pathname);
-  return match?.[1] ?? null;
+function boxingEndpoint(pathname: string): { jobId: string; artifact?: "video" | "red-mask" | "blue-mask" } | null {
+  const match = /^\/api\/boxing\/jobs\/([0-9a-f-]{36})(?:\/(video|red-mask|blue-mask))?$/.exec(pathname);
+  if (!match) return null;
+  return { jobId: match[1], artifact: match[2] as "video" | "red-mask" | "blue-mask" | undefined };
 }
 
-async function startBoxingJob(video: File, rotationDegrees: number): Promise<{ jobId: string }> {
+async function startBoxingJob(video: File, rotationDegrees: number, verbose: boolean): Promise<{ jobId: string }> {
   const jobId = crypto.randomUUID();
   const workspace = join(boxingRoot, jobId);
   const inputPath = join(workspace, "input.mp4");
   const outputPath = join(workspace, "boxed.mp4");
+  const artifacts = verbose ? {
+    redMaskPath: join(workspace, "verbose", "red-mask.mp4"),
+    blueMaskPath: join(workspace, "verbose", "blue-mask.mp4"),
+  } : undefined;
   await mkdir(workspace, { recursive: true });
   await Bun.write(inputPath, video);
-  const job: BoxingJob = { status: "running", workspace, outputPath };
+  const job: BoxingJob = { status: "running", workspace, outputPath, verbose, artifacts };
   boxingJobs.set(jobId, job);
   const python = process.platform === "win32"
     ? join(repositoryRoot, ".venv", "Scripts", "python.exe")
     : join(repositoryRoot, ".venv", "bin", "python");
+  const command = [python, "-m", "otc", "box-video", "--input", inputPath, "--output", outputPath,
+    "--rotation-degrees", String(rotationDegrees)];
+  if (verbose) command.push("--verbose-output-dir", join(workspace, "verbose"));
   const child = Bun.spawn({
-    cmd: [python, "-m", "otc", "box-video", "--input", inputPath, "--output", outputPath,
-      "--rotation-degrees", String(rotationDegrees)],
+    cmd: command,
     cwd: repositoryRoot,
     stdout: "pipe",
     stderr: "pipe",
@@ -82,7 +91,8 @@ async function startBoxingJob(video: File, rotationDegrees: number): Promise<{ j
       new Response(child.stderr).text(),
       child.exited,
     ]);
-    if (exitCode !== 0 || !(await Bun.file(outputPath).exists())) {
+    const expectedOutputs = [outputPath, ...(artifacts ? [artifacts.redMaskPath, artifacts.blueMaskPath] : [])];
+    if (exitCode !== 0 || !(await Promise.all(expectedOutputs.map(path => Bun.file(path).exists()))).every(Boolean)) {
       job.status = "failed";
       job.error = stderr.trim() || stdout.trim() || "Boxing worker did not create an annotated video.";
       return;
@@ -118,6 +128,7 @@ const server = Bun.serve({
       const form = await request.formData();
       const video = form.get("video");
       const rotationDegrees = Number(form.get("rotationDegrees") ?? 0);
+      const verbose = form.get("verbose") === "on";
       if (!(video instanceof File) || video.size === 0) {
         return json({ error: "Choose one non-empty video file." }, 400);
       }
@@ -125,21 +136,26 @@ const server = Bun.serve({
       if (![0, 90, 180, 270].includes(rotationDegrees)) {
         return json({ error: "Rotation must be 0, 90, 180, or 270 degrees." }, 400);
       }
-      return json(await startBoxingJob(video, rotationDegrees), 202);
+      return json(await startBoxingJob(video, rotationDegrees, verbose), 202);
     }
-    const jobId = boxingId(url.pathname);
-    if (jobId && request.method === "GET") {
-      const job = boxingJobs.get(jobId);
+    const endpoint = boxingEndpoint(url.pathname);
+    if (endpoint && request.method === "GET") {
+      const job = boxingJobs.get(endpoint.jobId);
       if (!job) return json({ error: "Unknown or expired boxing job." }, 404);
-      if (url.pathname.endsWith("/video")) {
+      if (endpoint.artifact) {
         if (job.status !== "complete") return json({ error: "Annotated video is not ready." }, 409);
-        return new Response(Bun.file(job.outputPath), { headers: {
+        const path = endpoint.artifact === "video" ? job.outputPath
+          : endpoint.artifact === "red-mask" ? job.artifacts?.redMaskPath : job.artifacts?.blueMaskPath;
+        if (!path) return json({ error: "Verbose output was not requested for this job." }, 404);
+        const filename = endpoint.artifact === "video" ? "boxed.mp4" : `${endpoint.artifact}.mp4`;
+        return new Response(Bun.file(path), { headers: {
           "Cache-Control": "no-store",
-          "Content-Disposition": "inline; filename=boxed.mp4",
+          "Content-Disposition": `inline; filename=${filename}`,
           "Content-Type": "video/mp4",
         } });
       }
-      return json({ jobId, status: job.status, error: job.error, summary: job.summary });
+      return json({ jobId: endpoint.jobId, status: job.status, verbose: job.verbose,
+        error: job.error, summary: job.summary });
     }
     if (url.pathname === "/qr.svg") {
       const phoneUrl = new URL("/", publicOrigin(request)).toString();

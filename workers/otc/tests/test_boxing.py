@@ -6,7 +6,7 @@ import numpy as np
 from otc.boxing import (
     ConfirmedSession,
     _attach_session,
-    _palette_phase_by_track,
+    _palette_evidence_by_track,
     _recovery_session,
     box_video,
 )
@@ -23,10 +23,16 @@ def test_box_video_reuses_screen_tracking_and_writes_visible_boxes(capture, tmp_
     _path, manifest, _truth = capture(count=6, red_blue=True)
     source = Path(manifest["cameras"][0]["videoPath"])
     output = tmp_path / "boxed.mp4"
+    verbose_output = tmp_path / "verbose"
 
-    summary = box_video(source, output)
+    summary = box_video(source, output, verbose_output_dir=verbose_output)
 
     assert output.is_file() and output.stat().st_size > 0
+    assert summary["verbose"] is True
+    for mask_name in ("red-mask.mp4", "blue-mask.mp4"):
+        mask_video = verbose_output / mask_name
+        assert mask_video.is_file() and mask_video.stat().st_size > 0
+        assert len(list(read_frames(mask_video))) == summary["frameCount"]
     assert summary["frameCount"] == len(list(read_frames(source)))
     assert summary["trackCount"] > 0
     assert summary["qualifiedTrackCount"] > 0
@@ -101,11 +107,13 @@ def test_palette_evidence_is_exclusive_and_rejects_an_enclosing_ghost_track():
         ("large-enclosing-ghost", Sample(0, 60, 60, 100, 100, (0, 0, 0))),
     ]
 
-    phases = _palette_phase_by_track(rgb, 0, red, blue, tracks)
+    evidence = _palette_evidence_by_track(rgb, 0, red, blue, tracks)
 
     # The exact phone footprint owns the red blob. The near match cannot share
     # it, and the large candidate fails the minimum colour-coverage requirement.
-    assert phases == {"phone": "red"}
+    assert set(evidence) == {"phone"}
+    assert evidence["phone"].phase == "red"
+    assert evidence["phone"].red is not None
 
 
 def test_static_red_blue_split_is_mixed_not_a_flash_phase():
@@ -115,7 +123,7 @@ def test_static_red_blue_split_is_mixed_not_a_flash_phase():
     red, blue = palette_masks(rgb)
     tracks = [("split-screen", Sample(0, 50, 49, 20, 20, (0, 0, 0)))]
 
-    assert _palette_phase_by_track(rgb, 0, red, blue, tracks) == {"split-screen": "mixed"}
+    assert _palette_evidence_by_track(rgb, 0, red, blue, tracks)["split-screen"].phase == "mixed"
 
 
 def test_dim_red_candidate_can_start_without_a_blue_core():

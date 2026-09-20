@@ -54,6 +54,8 @@ def main() -> int:
     box.add_argument("--input", type=Path, required=True)
     box.add_argument("--output", type=Path, required=True)
     box.add_argument("--rotation-degrees", type=int, choices=(0, 90, 180, 270), default=0)
+    box.add_argument("--verbose-output-dir", type=Path,
+                     help="Write red/blue mask videos and evidence overlays for local debugging")
     args = parser.parse_args()
     try:
         if args.command == "box-video":
@@ -61,7 +63,8 @@ def main() -> int:
                 print(json.dumps({"stage": stage, "frameCount": frame_count,
                                   "message": message}), flush=True)
             summary = box_video(args.input, args.output,
-                                rotation_degrees=args.rotation_degrees, progress=report)
+                                rotation_degrees=args.rotation_degrees, progress=report,
+                                verbose_output_dir=args.verbose_output_dir)
             print(json.dumps({"boxed": True, "output": str(args.output), **summary}), flush=True)
             return 0
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))

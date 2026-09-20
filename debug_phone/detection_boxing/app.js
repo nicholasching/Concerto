@@ -4,6 +4,11 @@ const result = document.querySelector("#result");
 const summary = document.querySelector("#summary");
 const output = document.querySelector("#output");
 const download = document.querySelector("#download");
+const verboseResult = document.querySelector("#verbose-result");
+const redOutput = document.querySelector("#red-output");
+const redDownload = document.querySelector("#red-download");
+const blueOutput = document.querySelector("#blue-output");
+const blueDownload = document.querySelector("#blue-download");
 
 function showStatus(message, error = false) {
   status.hidden = false;
@@ -26,6 +31,7 @@ form.addEventListener("submit", async event => {
   const button = form.querySelector("button");
   button.disabled = true;
   result.hidden = true;
+  verboseResult.hidden = true;
   showStatus("Uploading clip and tracking screens…");
   try {
     const response = await fetch("/api/boxing/jobs", { method: "POST", body: new FormData(form) });
@@ -36,6 +42,15 @@ form.addEventListener("submit", async event => {
     const videoUrl = `/api/boxing/jobs/${started.jobId}/video`;
     output.src = videoUrl;
     download.href = videoUrl;
+    if (job.verbose) {
+      const redUrl = `/api/boxing/jobs/${started.jobId}/red-mask`;
+      const blueUrl = `/api/boxing/jobs/${started.jobId}/blue-mask`;
+      redOutput.src = redUrl;
+      redDownload.href = redUrl;
+      blueOutput.src = blueUrl;
+      blueDownload.href = blueUrl;
+      verboseResult.hidden = false;
+    }
     const details = job.summary ?? {};
     summary.textContent = `${details.qualifiedTrackCount ?? 0} flash-sequence-qualified tracks, ${details.boxesDrawn ?? 0} green boxes across ${details.frameCount ?? 0} frames.`;
     result.hidden = false;

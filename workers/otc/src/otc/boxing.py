@@ -1,6 +1,7 @@
 """Render the existing OTC screen tracks as a local diagnostic video."""
 
 from collections import defaultdict
+from contextlib import ExitStack
 from dataclasses import dataclass
 from fractions import Fraction
 from math import hypot
@@ -9,8 +10,10 @@ import tempfile
 
 import av
 import cv2
+import numpy as np
 
 from .red_blue_diagnostic import (
+    DEFAULT_PALETTE_SETTINGS,
     FlashSequence,
     SELECTED_TRACK_MAX_AGE_MS,
     carry_qualification_to_current_fragment,
@@ -24,12 +27,32 @@ from .video import read_frames
 CYAN = (0, 220, 255)
 GREEN = (0, 220, 0)
 MAGENTA = (255, 0, 255)
+RED = (255, 80, 80)
+BLUE = (80, 160, 255)
 MIN_PALETTE_TRACK_COVERAGE = .10
 MIN_PALETTE_COMPONENT_OVERLAP = .65
 RECOVERY_WINDOW_MS = 750
 RECOVERY_MIN_AREA_RATIO = .5
 RECOVERY_MAX_AREA_RATIO = 2.0
 RECOVERY_MIN_OVERLAP = .10
+
+
+@dataclass(frozen=True)
+class PaletteEvidence:
+    """Exclusive red/blue components assigned to one screen in one frame."""
+
+    red: Sample | None = None
+    blue: Sample | None = None
+
+    @property
+    def phase(self):
+        if self.red is not None and self.blue is not None:
+            return "mixed"
+        if self.red is not None:
+            return "red"
+        if self.blue is not None:
+            return "blue"
+        return "none"
 
 
 @dataclass
@@ -41,6 +64,8 @@ class ConfirmedSession:
     last_sample: Sample
     last_seen_ms: float
     previous_sample: Sample | None = None
+    red_evidence: Sample | None = None
+    blue_evidence: Sample | None = None
 
 
 def _frame_key(pts_ms):
@@ -127,7 +152,15 @@ def _attach_session(session_by_track, qualified_track_ids, session, track_id, sa
     qualified_track_ids.add(track_id)
 
 
-def _palette_phase_by_track(rgb, pts_ms, red, blue, screen_tracks):
+def _remember_palette_evidence(session, evidence):
+    """Keep the latest qualifying components visible after a phase changes."""
+    if evidence.red is not None:
+        session.red_evidence = evidence.red
+    if evidence.blue is not None:
+        session.blue_evidence = evidence.blue
+
+
+def _palette_evidence_by_track(rgb, pts_ms, red, blue, screen_tracks):
     """Assign palette components exclusively, then classify each screen frame.
 
     Colour inside a broad candidate is not enough: the coloured component must
@@ -159,14 +192,35 @@ def _palette_phase_by_track(rgb, pts_ms, red, blue, screen_tracks):
             per_color = best_by_track.setdefault(track_id, {})
             previous = per_color.get(color)
             if previous is None or (score, coverage) > previous:
-                per_color[color] = (score, coverage)
+                per_color[color] = (score, coverage, component)
     return {
-        track_id: "mixed" if len(colors) > 1 else next(iter(colors))
+        track_id: PaletteEvidence(
+            red=colors.get("red", (None, None, None))[2],
+            blue=colors.get("blue", (None, None, None))[2],
+        )
         for track_id, colors in best_by_track.items()
     }
 
 
-def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
+def _mask_preview(rgb, mask, label):
+    """Render an HSV palette mask as a readable diagnostic video frame."""
+    preview = np.zeros_like(rgb)
+    preview[mask != 0] = rgb[mask != 0]
+    cv2.putText(preview, label, (18, 32), cv2.FONT_HERSHEY_SIMPLEX,
+                .65, (255, 255, 255), 2, cv2.LINE_AA)
+    return preview
+
+
+def _write_video_frame(destination, stream, rgb, pts_ms):
+    frame = av.VideoFrame.from_ndarray(rgb, format="rgb24")
+    frame.pts = round(pts_ms)
+    frame.time_base = Fraction(1, 1000)
+    for packet in stream.encode(frame):
+        destination.mux(packet)
+
+
+def box_video(input_path, output_path, *, rotation_degrees=0, progress=None,
+              verbose_output_dir=None):
     """Render the approved red/blue diagnostic monitor behavior for an uploaded clip.
 
     Cyan dots are current visual tracks. A green rectangle requires a true
@@ -179,6 +233,15 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
         raise ValueError("Output already exists; use a new path for each boxing attempt")
     if input_path == output_path:
         raise ValueError("Output must not overwrite the source video")
+    verbose_paths = {}
+    if verbose_output_dir is not None:
+        verbose_output_dir = Path(verbose_output_dir).resolve()
+        verbose_paths = {
+            "red": verbose_output_dir / "red-mask.mp4",
+            "blue": verbose_output_dir / "blue-mask.mp4",
+        }
+        if any(path.exists() for path in verbose_paths.values()):
+            raise ValueError("Verbose output already exists; use a new boxing attempt")
     if progress:
         progress("detect", 0, "Running the red/blue diagnostic tracker")
 
@@ -193,8 +256,10 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
         for sample in track.samples:
             boxes_by_frame[_frame_key(sample.pts_ms)].append((track.track_id, sample))
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = None
+    targets = {"boxed": output_path, **verbose_paths}
+    for target in targets.values():
+        target.parent.mkdir(parents=True, exist_ok=True)
+    temporary_paths = {}
     frames_written = boxes_drawn = 0
     qualification_tracks, phase_by_track = {}, {}
     qualified_track_ids, seen_qualified_track_ids = set(), set()
@@ -202,13 +267,21 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
     next_session_number = 0
     previous_value = None
     try:
-        with tempfile.NamedTemporaryFile(dir=output_path.parent, suffix=".mp4", delete=False) as target:
-            temporary = Path(target.name)
-        with av.open(str(temporary), "w") as destination:
-            stream = destination.add_stream("libx264", rate=30)
-            stream.width, stream.height = scan.width, scan.height
-            stream.pix_fmt = "yuv420p"
-            stream.time_base = Fraction(1, 1000)
+        for name, target_path in targets.items():
+            with tempfile.NamedTemporaryFile(dir=target_path.parent, suffix=".mp4", delete=False) as target:
+                temporary_paths[name] = Path(target.name)
+        with ExitStack() as stack:
+            destinations = {
+                name: stack.enter_context(av.open(str(temporary), "w"))
+                for name, temporary in temporary_paths.items()
+            }
+            streams = {}
+            for name, destination in destinations.items():
+                stream = destination.add_stream("libx264", rate=30)
+                stream.width, stream.height = scan.width, scan.height
+                stream.pix_fmt = "yuv420p"
+                stream.time_base = Fraction(1, 1000)
+                streams[name] = stream
             for pts_ms, rgb in read_frames(input_path, rotation_degrees):
                 key = _frame_key(pts_ms)
                 red, blue = palette_masks(rgb)
@@ -220,7 +293,7 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
                     _rectangle(annotated, sample, MAGENTA)
                 frame_tracks = boxes_by_frame.get(key, [])
                 active_track_ids = {track_id for track_id, _sample in frame_tracks}
-                palette_phases = _palette_phase_by_track(
+                palette_evidence = _palette_evidence_by_track(
                     rgb, pts_ms, red, blue, frame_tracks
                 )
                 # Keep the raw box currently carrying each recovered session up
@@ -228,8 +301,12 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
                 for track_id, sample in frame_tracks:
                     session_id = session_by_track.get(track_id)
                     if session_id:
+                        session = sessions[session_id]
                         _attach_session(session_by_track, qualified_track_ids,
-                                        sessions[session_id], track_id, sample, pts_ms)
+                                        session, track_id, sample, pts_ms)
+                        _remember_palette_evidence(
+                            session, palette_evidence.get(track_id, PaletteEvidence())
+                        )
                 # A short loss may make a new raw track for the same phone.
                 # Reclaim it only when one inactive session is a clear match.
                 for track_id, sample in frame_tracks:
@@ -239,13 +316,17 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
                     if session:
                         _attach_session(session_by_track, qualified_track_ids,
                                         session, track_id, sample, pts_ms)
+                        _remember_palette_evidence(
+                            session, palette_evidence.get(track_id, PaletteEvidence())
+                        )
                 for track_id, sample in frame_tracks:
                     cv2.circle(annotated, (round(sample.x), round(sample.y)), 3, CYAN, -1)
                     qualification_tracks.setdefault(track_id, Track(track_id)).samples.append(
                         Sample(sample.pts_ms, sample.x, sample.y, sample.width, sample.height, (0, 0, 0))
                     )
                     sequence = phase_by_track.setdefault(track_id, FlashSequence())
-                    if sequence.observe(palette_phases.get(track_id, "none"), pts_ms):
+                    evidence = palette_evidence.get(track_id, PaletteEvidence())
+                    if sequence.observe(evidence.phase, pts_ms):
                         session_id = session_by_track.get(track_id)
                         if session_id is None:
                             session = _recovery_session(sessions, active_track_ids, sample, pts_ms)
@@ -257,6 +338,7 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
                                 sessions[session.session_id] = session
                             _attach_session(session_by_track, qualified_track_ids,
                                             session, track_id, sample, pts_ms)
+                            _remember_palette_evidence(session, evidence)
                 current_tracks = list(qualification_tracks.values())
                 for parent_id, child_id in carry_qualification_to_current_fragment(
                     current_tracks, qualified_track_ids, pts_ms
@@ -264,29 +346,55 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
                     session_id = session_by_track.get(parent_id)
                     child_sample = dict(frame_tracks).get(child_id)
                     if session_id and child_sample:
+                        session = sessions[session_id]
                         _attach_session(session_by_track, qualified_track_ids,
-                                        sessions[session_id], child_id, child_sample, pts_ms)
+                                        session, child_id, child_sample, pts_ms)
+                        _remember_palette_evidence(
+                            session, palette_evidence.get(child_id, PaletteEvidence())
+                        )
                 for track in current_tracks:
                     if (track.track_id not in qualified_track_ids or
                             pts_ms - track.samples[-1].pts_ms > SELECTED_TRACK_MAX_AGE_MS):
                         continue
                     track_id, sample = track.track_id, track.samples[-1]
                     _rectangle(annotated, sample, GREEN, "flash sequence")
-                    seen_qualified_track_ids.add(session_by_track[track_id])
+                    session = sessions[session_by_track[track_id]]
+                    if verbose_paths:
+                        if session.red_evidence is not None:
+                            _rectangle(annotated, session.red_evidence, RED, "red evidence")
+                        if session.blue_evidence is not None:
+                            _rectangle(annotated, session.blue_evidence, BLUE, "blue evidence")
+                    seen_qualified_track_ids.add(session.session_id)
                     boxes_drawn += 1
-                frame = av.VideoFrame.from_ndarray(annotated, format="rgb24")
-                frame.pts = round(pts_ms)
-                frame.time_base = Fraction(1, 1000)
-                for packet in stream.encode(frame):
-                    destination.mux(packet)
+                _write_video_frame(destinations["boxed"], streams["boxed"], annotated, pts_ms)
+                if verbose_paths:
+                    settings = DEFAULT_PALETTE_SETTINGS
+                    _write_video_frame(
+                        destinations["red"], streams["red"],
+                        _mask_preview(
+                            rgb, red,
+                            f"RED MASK  H {settings.red_hue} +/- {settings.red_hue_tolerance}  "
+                            f"S >= {settings.saturation}  V >= {settings.value}",
+                        ), pts_ms,
+                    )
+                    _write_video_frame(
+                        destinations["blue"], streams["blue"],
+                        _mask_preview(
+                            rgb, blue,
+                            f"BLUE MASK  H {settings.blue_hue} +/- {settings.blue_hue_tolerance}  "
+                            f"S >= {settings.saturation}  V >= {settings.value}",
+                        ), pts_ms,
+                    )
                 frames_written += 1
                 if progress and frames_written % 90 == 0:
                     progress("render", frames_written, f"Rendered {frames_written} frames")
-            for packet in stream.encode():
-                destination.mux(packet)
-        temporary.replace(output_path)
+            for name, stream in streams.items():
+                for packet in stream.encode():
+                    destinations[name].mux(packet)
+        for name, target_path in targets.items():
+            temporary_paths[name].replace(target_path)
     finally:
-        if temporary is not None:
+        for temporary in temporary_paths.values():
             temporary.unlink(missing_ok=True)
 
     summary = {
@@ -297,6 +405,7 @@ def box_video(input_path, output_path, *, rotation_degrees=0, progress=None):
         "discardedFragments": scan.discarded_fragments,
         "width": scan.width,
         "height": scan.height,
+        "verbose": bool(verbose_paths),
     }
     if progress:
         progress("complete", frames_written, "Annotated boxing video written")
