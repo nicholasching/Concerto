@@ -51,3 +51,16 @@ Verification on the implementation working tree:
 Limitation: this verifies generated masks, worker output and local endpoint
 delivery. A human should still inspect verbose output on representative
 camera footage when choosing palette thresholds.
+
+## Follow-up diagnosis: visible but unqualified centre phone
+
+The latest representative local verbose job showed palette rectangles for all
+four phones, while the third from the left did not receive a green box. This
+is not an HSV miss: the centre footprint (approximately x=965) had a
+red/blue-mask component. Its raw screen observations were instead fragmented
+across early, middle and late track IDs. In the central fragment, a short
+unobserved interval during the second red phase reset `FlashSequence`; the
+following blue phase therefore had no valid red-blue-red history to complete.
+The current rule requires consecutive evidence from one raw screen track with
+gaps no greater than 100 ms. No detector behavior was changed from this
+diagnosis alone.
