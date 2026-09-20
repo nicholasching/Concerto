@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 libg
 
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+# OTC already parallelizes frames across processes. Native BLAS pools otherwise
+# create 95 threads per process on Railway and exhaust its container PID limit.
+ENV OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
 COPY package.json bun.lock ./
 COPY backend/package.json backend/
 COPY client-frontend/package.json client-frontend/

@@ -21,7 +21,7 @@ The root Dockerfile installs Bun 1.3.14, Node 22, Python 3.13 and the locked rec
    | `OPERATOR_SECRET` | Your production operator password |
    | `OTC_CPU_BUDGET` | `22` for the current 24-vCPU allocation; reduce this if the service limit is lower |
 
-   The image supplies loopback `BACKEND_INTERNAL_URL=http://127.0.0.1:8080`, `ADMIN_INTERNAL_URL=http://127.0.0.1:3001` and its Python interpreter. Keep these defaults. Leave `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL` and mock settings unset. The projector derives the join URL from its own origin.
+   The image supplies loopback `BACKEND_INTERNAL_URL=http://127.0.0.1:8080`, `ADMIN_INTERNAL_URL=http://127.0.0.1:3001` and its Python interpreter. It also caps `OPENBLAS_NUM_THREADS`, `OMP_NUM_THREADS` and `MKL_NUM_THREADS` to `1` so native libraries cannot multiply the 22 analysis processes into thousands of threads. Keep these defaults. Leave `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL` and mock settings unset. The projector derives the join URL from its own origin.
 
 5. In **Settings**, set Healthcheck Path to **`/api/health`** and timeout to **300 seconds**. Keep **one replica**, **Serverless off**, and **On Failure** restart policy. Choose the nearest available region to the venue. Keep enough CPU/memory headroom for control and audio serving alongside recognition.
 6. Apply the staged changes with **Deploy**. Verify the build uses the Dockerfile, installs the Python worker and builds both Next apps. Logs must show all three application processes starting. Wait for the deployment to be healthy.

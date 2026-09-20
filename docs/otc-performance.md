@@ -8,6 +8,8 @@ No extra service or dependency is needed. The existing Python worker CLI automat
 
 Set the backend service variable `OTC_CPU_BUDGET=24` to request a ceiling of 24 analysis CPUs, or leave it unset / `auto` to follow the detected allocation. A smaller actual container allocation caps the request. Use a lower ceiling when the backend and frontends need more CPU headroom. New processing jobs read the setting; restart the service to propagate changed deployment environment variables. Existing jobs keep their configuration.
 
+The production Docker image sets `OPENBLAS_NUM_THREADS=1`, `OMP_NUM_THREADS=1` and `MKL_NUM_THREADS=1` before Python starts. Keep these caps when running many frame processes: on Railway, importing NumPy and OpenCV created 95 native threads in each process even after OpenCV was capped, exhausting the container's 1,000-task limit with a 22-worker job. These settings cap nested native pools; `OTC_CPU_BUDGET` still controls parallel frame analysis.
+
 Railway's service resource limit must also permit the desired CPU and memory allocation. An "up to 24 vCPU" plan limit does not establish application throughput; measure the same recordings on the deployed service. See [Railway scaling](https://docs.railway.com/deployments/scaling).
 
 The buffer count is bounded by the configured worker count, independent of video length. Each 4K RGB frame is about 24 MiB; 24 slots use about 570 MiB for frame storage, plus codec/preview buffers, process heaps and detector scratch memory. Total memory is larger and must be measured. Shared storage uses Python's RawArray rather than requiring an enlarged container `/dev/shm` mount. No downsampling, frame dropping, or shortening of the flash sequence is used.
