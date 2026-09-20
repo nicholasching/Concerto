@@ -86,12 +86,12 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
           <div className="playhead" style={{ left: `${playheadPct}%` }} />
         </div><span /></div>
         {mixChannels.map(ch => (
-          <div key={ch.channelId} className="lane-row" style={{ borderColor: ch.color }}>
-            <div className="lane-label" style={{ background: ch.color }}>{ch.label}</div>
+          <div key={ch.channelId} className="lane-row">
+            <div className="lane-label"><span className="swatch" style={{ background: ch.color }} aria-hidden="true" />{ch.label}</div>
             <div className="lane-track">
               {show.clips.filter(c => c.channelId === ch.channelId).map(clip => (
                 <div key={clip.clipId} className="clip" title={`${clip.trackId}`}
-                  style={{ left: `${(clip.timelineStartMs / widthMs) * 100}%`, width: `${(clip.durationMs / widthMs) * 100}%`, background: ch.color }}>
+                  style={{ left: `${(clip.timelineStartMs / widthMs) * 100}%`, width: `${(clip.durationMs / widthMs) * 100}%`, background: `color-mix(in srgb, ${ch.color} 12%, transparent)`, borderColor: `color-mix(in srgb, ${ch.color} 35%, transparent)` }}>
                   {show.tracks.find(track => track.trackId === clip.trackId)?.label ?? clip.trackId}
                   {show.tracks.filter(track => track.trackId === clip.trackId).map(track => <Waveform key={track.trackId} track={track} offsetMs={clip.sourceOffsetMs} durationMs={clip.durationMs} />)}
                 </div>
@@ -100,8 +100,8 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
             </div>
             <div className="lane-controls">
               <input type="range" min={0} max={1} step={0.01} defaultValue={ch.gain} key={`${ch.channelId}-${ch.gain}`} onPointerUp={e => void setChannel(ch.channelId, { gain: Number(e.currentTarget.value) })} onKeyUp={e => void setChannel(ch.channelId, { gain: Number(e.currentTarget.value) })} aria-label={`${ch.label} gain`} />
-              <button className={ch.mute ? "toggle on" : "toggle"} onClick={() => setChannel(ch.channelId, { mute: !ch.mute })}>Mute</button>
-              <button className={ch.solo ? "toggle on" : "toggle"} onClick={() => setChannel(ch.channelId, { solo: !ch.solo })}>Solo</button>
+              <button className={ch.mute ? "toggle on" : "toggle"} aria-label={`${ch.label} mute`} aria-pressed={ch.mute} onClick={() => setChannel(ch.channelId, { mute: !ch.mute })}>Mute</button>
+              <button className={ch.solo ? "toggle on" : "toggle"} aria-label={`${ch.label} solo`} aria-pressed={ch.solo} onClick={() => setChannel(ch.channelId, { solo: !ch.solo })}>Solo</button>
             </div>
           </div>
         ))}
