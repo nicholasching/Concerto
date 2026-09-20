@@ -32,3 +32,9 @@ Status: implemented and verified in software/browser; physical checks remain sep
 ## Handoff
 
 Refresh `/` and `/present` to review Concerto on the existing development server. Check QR scanning from the intended projection distance and real iOS/Android sound unlock. No contract migration or saved-show edits are needed. Historical team stage documents remain physical acceptance references, not UI completion claims.
+
+## Alignment follow-up
+
+User screenshot follow-up on baseline `abe72ed` (clean tree): center the readiness chevron vertically, center the Enable sound label without an arrow, and optically center the italic c in its metal badge. The screenshot's badge is the requested icon; there is no separate favicon asset in this app. Scope is the audience JSX/CSS and shared projector badge class. Replaced the font chevron with a symmetric 12px SVG, centered the button contents, and compensated the italic glyph's right/bottom visual bearings. Verify with the client gate and phone-size browser inspection; no timing or behavior changes.
+
+Follow-up verification: client gate PASS (19 shared contract + 160 focused tests, typecheck/lint and production build), log runtime/concerto-alignment-gate.log. Isolated browser at 390x844 verified the button text is centered with no arrow, badge appearance, and a measured 0px chevron vertical-center offset in both collapsed and expanded states. Temporary test services stopped; live show untouched. Refresh the audience/projector page for the alignment fixes.

@@ -309,7 +309,7 @@ export default function Page() {
   }
 
   return <main className="audience-shell">
-    <header className="audience-brand"><span className="brand-mark" aria-hidden="true">c</span><span>Concerto</span>
+    <header className="audience-brand"><span className="brand-mark concerto-mark" aria-hidden="true">c</span><span>Concerto</span>
       {identity && <span className="device-number">NO. {String(identity.deviceId).padStart(3, "0")}</span>}</header>
     {mock && <p className="notice">Test session</p>}
     <section className="audience-main">
@@ -318,10 +318,10 @@ export default function Page() {
       <h1>{reset ? "Until next time." : !connected ? conn.status.kind === "joining" ? "Joining the show." : connectionLabel(conn) : holding ? "Raise your phone." : needsSection ? "Choose your section." : awaitingMap ? "Finding your place." : mapped || manual ? `${section}.` : ready ? "You’re in." : "Getting ready."}</h1>
       <p className="audience-instruction">{reset ? "Refresh to join again." : holding ? "Screen toward the stage. Hold steady." : needsSection ? "While facing the stage." : awaitingMap ? "You can lower your phone." : "Volume up. Keep this page open."}</p>
     </div>
-    {!reset && <details className="readiness-details"><summary><span className={ready ? "status-dot ok" : "status-dot"} /><span role="status">{readiness}</span><span className="details-chevron" aria-hidden="true">⌄</span></summary>
+    {!reset && <details className="readiness-details"><summary><span className={ready ? "status-dot ok" : "status-dot"} /><span role="status">{readiness}</span><svg className="details-chevron" aria-hidden="true" viewBox="0 0 12 12"><path d="m3 4.5 3 3 3-3" /></svg></summary>
       <div className="audience-checks" aria-label="Phone readiness">{checks.map(check => <div key={check.label}><span className={check.ok ? "status-dot ok" : "status-dot"} /><span>{check.label}</span><strong>{check.value}</strong></div>)}</div>
     </details>}
-    {!reset && audioState !== "running" && <div className="sound-prompt"><button className="primary" onClick={() => void enableSound()}>Enable sound <span aria-hidden="true">↗</span></button></div>}
+    {!reset && audioState !== "running" && <div className="sound-prompt"><button className="primary" onClick={() => void enableSound()}>Enable sound</button></div>}
     {audioNote && <p role="alert" className="notice">{audioNote}</p>}
     {assetNote?.startsWith("Failed:") && <p role="alert" className="notice">Music couldn’t load. Check your connection.</p>}
     {needsSection && <div className="section-picker audience-four-sections">{AUDIENCE_SECTIONS.map(section => <button key={section.id} onClick={() => chooseSection(section.id)}>{section.label}</button>)}</div>}
