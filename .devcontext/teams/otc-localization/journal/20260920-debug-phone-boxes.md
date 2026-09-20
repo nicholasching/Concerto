@@ -196,3 +196,19 @@ changing the production detector or identity policy.
   exact source clip completed with 424 frames, 3 logical detections and 544
   green-box frames. Visual inspection at the same 5.5-second point confirmed
   the oversized enclosing green box is absent. No full gate was run.
+
+## Palette saturation tuning on the real scene
+
+- Measured HSV saturation on the same rendered source frame before tuning:
+  visible red phone regions were approximately 207--255, while the dim pink
+  shirt's red-hue pixels were approximately 111--155.
+- Raised only the red/blue *qualification* saturation threshold from 55 to 170.
+  The broad dim candidate detector remains unchanged, so this targets false
+  green flash proof rather than silently changing production-style screen
+  recall.
+- Added a unit regression that rejects HSV saturation 155 and retains 207.
+  Focused boxing tests passed (9) and worker Ruff passed.
+- Reprocessing the exact 1080p clip completed with 424 frames, 4 logical
+  detections and 804 green-box frames. At the inspected 5.5-second frame the
+  pink shirt is not green, the oversized handoff box remains absent, and the
+  visible red phone has a tight green box. No full gate was run.

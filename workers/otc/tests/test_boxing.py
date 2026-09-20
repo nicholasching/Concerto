@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 from otc.boxing import (
@@ -124,6 +125,16 @@ def test_dim_red_candidate_can_start_without_a_blue_core():
     detections = detect_screens(rgb, 0, np.zeros(rgb.shape[:2], dtype=np.uint8))
 
     assert any(sample.width >= 15 and sample.height >= 20 for sample in detections)
+
+
+def test_palette_mask_excludes_dim_pink_but_retains_saturated_phone_red():
+    hsv = np.array([[[0, 155, 180], [0, 207, 255]]], dtype=np.uint8)
+    rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+
+    red, _blue = palette_masks(rgb, opening_kernel=1)
+
+    assert red[0, 0] == 0
+    assert red[0, 1] == 255
 
 
 def test_one_confirmed_session_recovers_one_short_unambiguous_track_fragment():
