@@ -54,19 +54,23 @@ test("a lost steady-state pair is retried before a ready clock expires", () => {
   clock.start("a"); advance(2000); expect(clock.quality().ready).toBe(true);
   dropGroup = clock.estimator.stats().probeGroupsStarted;
   const before = clock.estimator.stats().pairsPure;
-  advance(2600);
+  for (let elapsed = 0; elapsed < 3750 && clock.estimator.stats().pairsPure === before; elapsed += 25) {
+    advance(25);
+    expect(clock.quality().ready).toBe(true);
+  }
   expect(clock.estimator.stats().pairsPure).toBeGreaterThan(before);
   expect(clock.quality().ready).toBe(true);
   clock.stop();
 });
 
-function delayedNetwork(profile: "strict" | "internet", roundTripMs: number) {
+function delayedNetwork(profile: "strict" | "internet", roundTripMs: number, pureEvery = 1) {
   let now = 1_000_000, next = 0, drop = false;
   const queue = new Map<number, { at: number; callback: () => void }>();
   const timers = { setTimeout(callback: () => void, ms: number) { const id = ++next; queue.set(id, { at: now + ms, callback }); return id; }, clearTimeout(id: unknown) { queue.delete(id as number); } };
   const clock = new ClockSync({ profile, now: () => now, timers, random: () => 0, send(probe) {
     if (drop) return;
-    timers.setTimeout(() => clock.accept({ ...probe, serverEpoch: "a", t1: probe.t0 + 500 + roundTripMs / 2, t2: probe.t0 + 500 + roundTripMs / 2 }), roundTripMs);
+    const queued = probe.probeGroupIndex === 1 && probe.probeGroupId % pureEvery !== 0 ? 10 : 0;
+    timers.setTimeout(() => clock.accept({ ...probe, serverEpoch: "a", t1: probe.t0 + 500 + roundTripMs / 2 + queued, t2: probe.t0 + 500 + roundTripMs / 2 + queued }), roundTripMs);
   } });
   const advance = (ms: number) => { const end = now + ms; for (;;) {
     const first = [...queue].sort((a, b) => a[1].at - b[1].at)[0];
@@ -113,12 +117,25 @@ test("stable unready paths use bounded traffic after warmup", () => {
   network.clock.stop();
 });
 
-test("a slow reply does not start overlapping pairs after 50 milliseconds", () => {
+test("slow replies use a bounded pipeline rather than a 50 millisecond retry storm", () => {
   const network = delayedNetwork("internet", 750);
   network.advance(749);
-  expect(network.clock.estimator.stats().probeGroupsStarted).toBe(1);
+  expect(network.clock.estimator.stats().probeGroupsStarted).toBe(3);
   network.advance(15000);
   expect(network.clock.quality().ready).toBe(true);
+  network.clock.stop();
+});
+
+test("750 ms RTT with five of six impure pairs maintains fresh accepted samples", () => {
+  const network = delayedNetwork("internet", 750, 6);
+  network.advance(60000);
+  expect(network.clock.quality().ready).toBe(true);
+  for (let elapsed = 0; elapsed < 60000; elapsed += 50) {
+    network.advance(50);
+    expect(network.clock.quality().ready).toBe(true);
+  }
+  expect(network.clock.estimator.stats().probeGroupsStarted).toBeLessThan(600);
+  expect(network.clock.estimator.stats().pairsImpure).toBeGreaterThan(100);
   network.clock.stop();
 });
 

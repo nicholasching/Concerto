@@ -19,10 +19,21 @@ assert(secret, "Set OPERATOR_SECRET in the environment");
 assert(Number.isInteger(count) && count >= 2 && count <= 250, "2..250 clients required");
 const runKey = `stage-load-${Date.now()}`;
 const httpMs: Record<string, number[]> = {};
+let httpReadRetries = 0;
 async function request(path: string, init?: RequestInit, operator = false) {
   const start = performance.now();
-  const response = await fetch((operator ? control : base) + path, { ...init, signal: AbortSignal.timeout(120000),
-    headers: { ...(operator ? { "x-operator-secret": secret! } : {}), ...init?.headers } });
+  let response: Response | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      response = await fetch((operator ? control : base) + path, { ...init, signal: AbortSignal.timeout(120000),
+        headers: { ...(operator ? { "x-operator-secret": secret! } : {}), ...init?.headers } });
+      break;
+    } catch (cause) {
+      if ((init?.method ?? "GET") !== "GET" || attempt === 2) throw cause;
+      httpReadRetries++; await Bun.sleep(250 * (attempt + 1));
+    }
+  }
+  assert(response, "No HTTP response");
   (httpMs[path.split("?")[0]] ??= []).push(performance.now() - start);
   assert(response.ok, `HTTP ${response.status} on ${path.split("?")[0]}`);
   return response;
@@ -244,11 +255,16 @@ try {
   const operatorDelayAndResponseMs = performance.now() - armStarted;
   const downloadsActiveAtArmResponse = activeDownloads;
   deadlineAt = armed.effectiveServerMs;
-  assert.equal(armed.ready, eligibleCount);
-  await waitFor(async () => eligible.every(client => client.acceptedArms === 1), 15000, "future arm delivery");
+  // Readiness may change during the deliberately delayed HTTP command. Verify the
+  // authoritative ready subset, rather than requiring a phone that just withdrew.
+  const excludedIds = new Set<number>(armed.excluded.map((item: { deviceId: number }) => item.deviceId));
+  const recipients = eligible.filter(client => !excludedIds.has(client.id));
+  assert.equal(armed.ready, recipients.length);
+  assert(armed.ready >= Math.ceil(eligibleCount * 0.99), "Fewer than 99% of modeled eligible clients ready at arm");
+  await waitFor(async () => recipients.every(client => client.acceptedArms === 1), 15000, "future arm delivery");
   await waitFor(async () => {
     assert(clients.every(client => client.patternsInterrupted === 0), "Clock lost during simulated pattern");
-    return eligible.every(client => client.patternsCompleted === 1);
+    return recipients.every(client => client.patternsCompleted === 1);
   }, 30000, "full pattern completion");
   await Promise.all(downloads);
   const after = await snapshot();
@@ -256,10 +272,12 @@ try {
   assert.equal(JSON.stringify(after.show), showBefore, "Load test changed saved show");
   assert(margins.every(value => value > 0), "A client received its arm late");
   assert(ineligible.every(client => !client.clock.quality().ready && client.receivedArms === 0), "Ineligible phones must remain excluded");
+  assert(clients.filter(client => excludedIds.has(client.id)).every(client => client.receivedArms === 0), "A withdrawn phone received an arm");
   assert.equal(errors.length, 0, `Server/client errors: ${errors.slice(0, 5)}`);
   const report = { date: new Date().toISOString(), target: base, clients: count, serverEpoch: info.serverEpoch,
     injection: "245 eligible clients (at 250 total): 80/135/190/245 ms each way; 5 deliberate exclusions: 450 ms each way; 0..30 ms shared pair jitter, 0..8 ms per-probe jitter; 4% +300 ms uplink pair spikes; 2% +1000 ms downlink spikes",
     eligibleCount, deliberatelyExcluded: ineligibleCount,
+    transientExclusionsAtArm: eligibleCount - armed.ready,
     seed: 20261028, recoveryCount: recovering.length, reconnectCount: reconnecting.length,
     readyAtArm: armed.ready, armsReceived: clients.filter(c => c.receivedArms === 1).length,
     armsAccepted: clients.filter(c => c.acceptedArms === 1).length, cueMarginMs: summarize(margins), minimumCueMarginMs: Math.min(...margins),
@@ -271,7 +289,7 @@ try {
     ineligibleUncertaintyMs: summarize(ineligible.map(c => c.clock.quality().uncertaintyMs ?? Infinity)),
     probes: clients.reduce((sum, c) => sum + c.probes, 0),
     httpResponseHeadersMs: Object.fromEntries(Object.entries(httpMs).map(([path, times]) => [path, summarize(times)])),
-    errors, savedShowUnchanged: true,
+    errors, httpReadRetries, savedShowUnchanged: true,
     diagnosticsBefore: diagnosticsBefore.diagnostics, diagnosticsAfter: diagnosticsAfter.diagnostics,
     limitations: "One load generator/public WAN path; injected timers, not independent Wi-Fi radios; original tone when show is empty; verifies media bytes and scheduling, not decode/audio/optical performance. Test device IDs remain allocated." };
   await mkdir("runtime", { recursive: true });

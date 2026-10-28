@@ -88,8 +88,7 @@ export class ClockEstimator implements SynchronizedClock {
   private readonly maxSampleAgeMs: number;
 
   private measurements: ClockMeasurement[] = [];
-  private pendingFirst: ClockMeasurement | null = null;
-  private pendingGroupId: number | null = null;
+  private pendingFirst = new Map<number, ClockMeasurement>();
   private probeGroupCounter = 0;
   private pairsPure = 0;
   private pairsImpure = 0;
@@ -127,15 +126,13 @@ export class ClockEstimator implements SynchronizedClock {
     };
 
     if (reply.probeGroupIndex === 0) {
-      this.pendingFirst = measurement;
-      this.pendingGroupId = reply.probeGroupId;
+      this.pendingFirst.set(reply.probeGroupId, measurement);
       return null;
     }
 
-    const first = this.pendingFirst;
-    if (!first || this.pendingGroupId !== reply.probeGroupId) return null;
-    this.pendingFirst = null;
-    this.pendingGroupId = null;
+    const first = this.pendingFirst.get(reply.probeGroupId);
+    if (!first) return null;
+    this.pendingFirst.delete(reply.probeGroupId);
 
     const pure = isProbeGapPure({
       t0First: first.t0,
@@ -161,8 +158,7 @@ export class ClockEstimator implements SynchronizedClock {
 
   reset(): void {
     this.measurements = [];
-    this.pendingFirst = null;
-    this.pendingGroupId = null;
+    this.pendingFirst.clear();
     this.pairsPure = 0;
     this.pairsImpure = 0;
     this.offsetMs = 0;
@@ -170,6 +166,8 @@ export class ClockEstimator implements SynchronizedClock {
     this.lastAcceptedAtMs = null;
     this.serverEpoch = null;
   }
+
+  discardProbeGroup(probeGroupId: number): void { this.pendingFirst.delete(probeGroupId); }
 
   nowServerMs(): number {
     return this.now() + this.offsetMs;
