@@ -14,7 +14,6 @@ type LocationData = z.infer<typeof Location>;
 type AudienceMapData = z.infer<typeof AudienceMap>;
 type PendingActionData = z.infer<typeof PendingAction>;
 const MANUAL_ASSIGNMENT_LEAD_MS = 2000;
-const MANUAL_PARTS = { left: "Melody", center: "Vocals", right: "Percussion" } as const;
 
 interface PendingAssignment {
   commandId: string;
@@ -396,6 +395,7 @@ export class SessionState {
   }
 
   private routeManualColumns(effectiveServerMs: number, reschedulePeers = false): void {
+    const defaults = sectionChannelsFor({ channels: this.show.channels });
     for (const column of ["left", "center", "right"] as const) {
       const followers = [...this.manualRouting].filter(id => this.locations.get(id)?.column === column);
       if (!followers.length) continue;
@@ -412,7 +412,7 @@ export class SessionState {
       }
       const ranked = [...votes].sort((a, b) => b[1] - a[1]);
       const channelId = ranked.length && ranked[0][1] > (ranked[1]?.[1] ?? 0) ? ranked[0][0]
-        : this.show.channels.find(channel => channel.label.trim().toLowerCase() === MANUAL_PARTS[column].toLowerCase())?.channelId ?? null;
+        : defaults[column === "center" ? "center-left" : column];
       const atServerMs = Math.max(effectiveServerMs, peerEffectiveServerMs);
       const changes = followers.filter(id => {
         const pending = this.pendingAssignments.get(id);

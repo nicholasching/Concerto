@@ -2,6 +2,8 @@
 
 Status: verified for local software; physical rehearsal not started. Owner: captain and all human leads. Base: foundation-v1; all four branches merged on main through 5eb08ab.
 
+Latest naming follow-up (2026-09-20): the three requested lane renames preserve audio/routing and update the saved local show. See [verification and handoff](../teams/integration/journal/20260920-track-labels.md).
+
 ## Local implementation checkpoint — 2026-09-19
 
 The user clarified the immediate milestone: get the app working locally, then handle Railway. The operator and participant now use real authenticated HTTP/WebSocket services, a shared clock, verified audio assets, preparation barriers, calibration flashing and uploads, the real Python worker, reviewed map commits, selection/routing, common transport, mix, panic and restart recovery. No runtime dependency on the BeatSync reference tree exists.

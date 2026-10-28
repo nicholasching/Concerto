@@ -29,9 +29,12 @@ test("ties use y then ID; coarse and unknown phones never enter optical quartile
   expect(splitAudience([...points].reverse())).toEqual(splitAudience(points));
 });
 
-test("section presets resolve old musical IDs by label and respect explicit silence", () => {
-  const channels = ["Melody", "Vocals", "Percussion"].map((label, i) => ({ channelId: `old-${i}`, label, color: "#ffffff", gain: 1, mute: false, solo: false }));
-  expect(sectionChannelsFor({ channels })).toEqual({ left: "old-0", "center-left": "old-1", "center-right": "old-1", right: "old-2" });
-  const sectionChannels = { left: null, "center-left": "old-2", "center-right": "old-0", right: null };
-  expect(sectionChannelsFor({ channels, sectionChannels })).toEqual(sectionChannels);
+test("section presets preserve musical IDs across legacy and renamed labels, and respect explicit silence", () => {
+  for (const labels of [["Melody", "Vocals", "Percussion"], ["Melody", "Vocals", "Percussion", "Percussion 2"],
+    ["Melody", "Vocals", "Percussion", "Vocals Right"], ["Melody", "Percussion", "Vocals Left", "Vocals Right"]]) {
+    const channels = labels.map((label, i) => ({ channelId: `old-${i}`, label, color: "#ffffff", gain: 1, mute: false, solo: false })).reverse();
+    expect(sectionChannelsFor({ channels })).toEqual({ left: "old-0", "center-left": "old-1", "center-right": "old-1", right: "old-2" });
+    const sectionChannels = { left: null, "center-left": "old-2", "center-right": "old-0", right: null };
+    expect(sectionChannelsFor({ channels, sectionChannels })).toEqual(sectionChannels);
+  }
 });

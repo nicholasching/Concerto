@@ -1,5 +1,7 @@
 # Local integrated concert handoff
 
+Latest naming update (2026-09-20): lanes are Melody, Percussion, Vocals Left and Vocals Right. Channel IDs/audio/routing are retained, including label-based fallback compatibility. See [verification and local saved-show handoff](journal/20260920-track-labels.md). Earlier track names below are historical.
+
 Latest (2026-09-20): **Percussion 2** is the fourth musical lane, after Melody, Vocals and Percussion. Existing shows can append it using **Add Percussion 2**; the live local show has already been saved at revision 6 with its three audio clips and section presets preserved. Upload the fourth stem and choose its audience section in the editor. See [checks and handoff](journal/20260920-four-tracks.md).
 
 Latest UI (2026-09-20): [Concerto metal design and verification](journal/20260920-concerto-metal-ui.md). Refresh `/` and `/present`; audience copy is minimal with expandable readiness details. Product branding is updated across the four routes. Client/admin gates and production smoke pass; real-phone/QR-distance checks remain separate. No live backend restart or saved-show change was required.

@@ -6,7 +6,7 @@ Integration update (2026-09-19): all four development branches are merged into m
 
 ## Team handoff: start here
 
-Current concert scope (user update, 2026-09-20): four musical channels, **Melody, Vocals, Percussion and Percussion 2**. The four development teams/branches remain unchanged. See the [four-track decision](.devcontext/decisions/20260920-four-musical-tracks.md).
+Current concert scope (user update, 2026-09-20): four musical channels, **Melody, Percussion, Vocals Left and Vocals Right**. The four development teams/branches remain unchanged. See the [four-track decision](.devcontext/decisions/20260920-four-musical-tracks.md) and [lane rename](.devcontext/decisions/20260920-track-labels.md).
 
 Stage UI update (user requests, 2026-09-19/20): one public origin serves audience `/`, operator `/admin`, projector QR/counts `/present`, and camera-crew `/upload`. The admin uses one page with Reset, Calibration, Sections and Performance. Audience joins, clock sync and asset verification are automatic; sound is attempted automatically with one gesture only when the browser requires it. Committing reviewed calibration automatically divides localized phones by horizontal rank into balanced Left, Center left, Center right and Right sections, then applies saved section-to-music presets. Unmapped phones may choose one of those four sections. The four musical lanes and three camera columns remain independent of the four audience sections. See the [stage guide](docs/stage-dashboard.md), [accepted workflow decision](.devcontext/decisions/20260919-single-domain-stage-workflow.md) and [automatic section decision](.devcontext/decisions/20260920-automatic-audience-quartiles.md).
 
@@ -32,7 +32,7 @@ The baseline and four branches are created locally. Remote publication is a sepa
 
 Build a browser-based concert in which audience phones play different, synchronized musical parts according to their position in the auditorium. An operator calibrates the audience from three uploaded camera recordings, reviews a device map, selects regions, assigns channels, and conducts a prepared set from a multitrack timeline.
 
-The first complete demonstration must work with 12-30 real phones, three camera views, and four prepared stems (Melody, Vocals, Percussion and Percussion 2). The system must also be exercised with 1,500 simulated connections. A simulated load test does **not** establish that the venue Wi-Fi, optical coverage, or 1,000 physical phone speakers will work; those need a venue rehearsal.
+The first complete demonstration must work with 12-30 real phones, three camera views, and four prepared stems (Melody, Percussion, Vocals Left and Vocals Right). The system must also be exercised with 1,500 simulated connections. A simulated load test does **not** establish that the venue Wi-Fi, optical coverage, or 1,000 physical phone speakers will work; those need a venue rehearsal.
 
 The four workstreams are:
 
@@ -54,7 +54,7 @@ The four workstreams are:
 | --- | --- | --- |
 | Position | An approximate 2D audience map relative to the stage; no GPS or metric 3D reconstruction | Check ordering against known seats in the venue |
 | Audio | Preloaded assets, a common show timeline, and scheduled Web Audio playback | Physical iOS/Android rehearsal |
-| Routing | One active logical channel per phone; many simultaneous channels across the crowd | Four channels: Melody, Vocals, Percussion and Percussion 2 |
+| Routing | One active logical channel per phone; many simultaneous channels across the crowd | Four channels: Melody, Percussion, Vocals Left and Vocals Right |
 | Music | Prepared, compatible stems with explicit timeline offsets | Musical rehearsal; no automatic separation or beat matching |
 | Calibration | An error-checked temporal packet lasting about 11 seconds initially | Shorten only after camera, decoding, and flash-pattern validation |
 | Cameras | Three fixed 4K phones, one primarily covering each audience column, with overlap | Back-row visibility and actual codec/frame timing tests |
@@ -66,7 +66,7 @@ Do not promise one-second calibration or perfect acoustic alignment across the h
 
 ### MVP boundary
 
-Include QR join, resume after reconnect, audio unlock, reusable clock synchronization, four channels (Melody, Vocals, Percussion and Percussion 2), calibration capture/upload, device localization with explicit unknowns, manual column fallback, rectangle/lasso selection, scheduled reassignment, prepared multitrack playback, readiness counts, and an emergency mute.
+Include QR join, resume after reconnect, audio unlock, reusable clock synchronization, four channels (Melody, Percussion, Vocals Left and Vocals Right), calibration capture/upload, device localization with explicit unknowns, manual column fallback, rectangle/lasso selection, scheduled reassignment, prepared multitrack playback, readiness counts, and an emergency mute.
 
 Defer automatic stem separation, live audio streaming, full DAW editing, time stretching, arbitrary audio effects, metric 3D seating reconstruction, continuous camera tracking during music, native apps, and distributed server infrastructure. A DaVinci-style timeline is the interaction reference, not a request to recreate DaVinci Resolve.
 
@@ -261,7 +261,7 @@ Canonical map: stage at the top, `y=0` nearest the stage, `y=1` at the back; `x=
 
 Column names `left`, `center`, and `right` always use that audience convention. A selection resolves to an explicit ID set and `mapRevision`; later camera processing cannot silently change its membership. Reject a stale-map assignment and ask the operator to reselect. Last committed assignment wins for overlapping selections at the same effective time; server revisions determine order. Unassigned/unlocalized devices remain silent unless explicitly put into a manual fallback channel.
 
-**Manual fallback update (user-confirmed 2026-09-20):** choosing a manual column requests server-owned audio routing, defaulting left → Melody, center → Vocals, right → Percussion. Existing section assignments take precedence; ready manual phones can join the current shared playhead after synchronization and audio checks. Explicit operator overrides remain authoritative. See [manual routing semantics](.devcontext/decisions/20260920-manual-section-audio-routing.md).
+**Manual fallback update (user-confirmed 2026-09-20):** choosing a manual column requests server-owned audio routing, defaulting left → Melody, center → Percussion, right → Vocals Left. Existing section assignments take precedence; ready manual phones can join the current shared playhead after synchronization and audio checks. Explicit operator overrides remain authoritative. See [manual routing semantics](.devcontext/decisions/20260920-manual-section-audio-routing.md).
 
 ## 5. Optical calibration: Team 3's critical path
 

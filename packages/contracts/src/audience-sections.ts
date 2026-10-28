@@ -32,5 +32,8 @@ export function splitAudience(locations: z.infer<typeof Location>[]) {
 export function sectionChannelsFor(show: Pick<z.infer<typeof Show>, "channels" | "sectionChannels">): z.infer<typeof SectionChannels> {
   if (show.sectionChannels) return show.sectionChannels;
   const channel = (label: string) => show.channels.find(item => item.label.trim().toLowerCase() === label)?.channelId ?? null;
-  return { left: channel("melody"), "center-left": channel("vocals"), "center-right": channel("vocals"), right: channel("percussion") };
+  // Keep the same musical lanes after renaming Vocals/Percussion/Percussion 2.
+  const renamed = channel("vocals") === null && (channel("vocals left") !== null || channel("vocals right") !== null);
+  const center = channel(renamed ? "percussion" : "vocals");
+  return { left: channel("melody"), "center-left": center, "center-right": center, right: channel(renamed ? "vocals left" : "percussion") };
 }

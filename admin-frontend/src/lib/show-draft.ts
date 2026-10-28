@@ -1,6 +1,6 @@
 import { DEFAULT_SHOW_CHANNELS, Show, type ShowData } from "@orchestra/contracts";
 
-export function addPercussion2(show: ShowData): ShowData {
+export function addVocalsRight(show: ShowData): ShowData {
   const channel = DEFAULT_SHOW_CHANNELS[3];
   if (show.channels.some(item => item.label.trim().toLowerCase() === channel.label.toLowerCase())) return show;
   const channelId = show.channels.some(item => item.channelId === channel.channelId) ? crypto.randomUUID() : channel.channelId;

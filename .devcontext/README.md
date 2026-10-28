@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Musical lane rename
+
+Current lane names are **Melody, Percussion, Vocals Left and Vocals Right**. The user renamed the former Vocals/Percussion/Percussion 2 lanes while retaining audio and routing. Read the [decision](decisions/20260920-track-labels.md) and [checks/saved-show handoff](teams/integration/journal/20260920-track-labels.md); earlier lane names below are historical.
+
 ### Fourth musical track
 
 Shows now support **Melody, Vocals, Percussion and Percussion 2**. The live show has the fourth empty lane, preserving its existing audio and routing. See the [decision](decisions/20260920-four-musical-tracks.md) and [checks/handoff](teams/integration/journal/20260920-four-tracks.md). Upload a prepared Percussion 2 stem and select its section preset before playback.

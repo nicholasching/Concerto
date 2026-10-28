@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { AUDIENCE_SECTIONS, DECODED_AUDIO_BUDGET_BYTES, DEFAULT_SHOW_CHANNELS, sectionChannelsFor, type AdminSnapshotData, type ShowData } from "@orchestra/contracts";
 import { useAdapter } from "../lib/useSnapshot";
-import { addPercussion2, forgetShowDraft, recoverShowDraft, rememberShowDraft } from "../lib/show-draft";
+import { addVocalsRight, forgetShowDraft, recoverShowDraft, rememberShowDraft } from "../lib/show-draft";
 
 export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData; refresh: () => void }) {
   const adapter = useAdapter();
@@ -51,8 +51,8 @@ export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData;
       </label>)}</div>
       {draft.clips.length === 0 && <button onClick={() => edit({ showId: crypto.randomUUID(), showRevision: snapshot.show.showRevision, label: "Concerto", tracks: [], clips: [],
         channels: DEFAULT_SHOW_CHANNELS.map(channel => ({ ...channel, gain: 0.5, mute: false, solo: false })) })}>Set up four channels</button>}
-      {!draft.channels.some(channel => channel.label.trim().toLowerCase() === "percussion 2") &&
-        <button onClick={() => edit(addPercussion2(draft))}>Add Percussion 2</button>}
+      {!draft.channels.some(channel => channel.label.trim().toLowerCase() === DEFAULT_SHOW_CHANNELS[3].label.toLowerCase()) &&
+        <button onClick={() => edit(addVocalsRight(draft))}>Add {DEFAULT_SHOW_CHANNELS[3].label}</button>}
       {draft.channels.map(channel => <div key={channel.channelId}><h3><span className="swatch" style={{ background: channel.color }} aria-hidden="true" />{channel.label}</h3>
         <label>Add prepared audio <input type="file" accept="audio/*" aria-label={`Upload ${channel.label} audio`} onChange={e => void upload(e.target.files?.[0], channel.channelId)} /></label>
         {draft.clips.filter(clip => clip.channelId === channel.channelId).map(clip => <div key={clip.clipId} className="clip-editor">

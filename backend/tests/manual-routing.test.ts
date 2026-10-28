@@ -69,13 +69,16 @@ test("late manual phone remains silent until ready, then sees the existing commo
   state.panic(); expect(state.participantSnapshot(0, clock)?.transport.status).toBe("stopped");
 });
 
-test("legacy and reordered channel IDs resolve by musical part, not array index", () => {
-  const { state, choose, advance } = setup();
-  const show = structuredClone(state.show);
-  show.channels = [...show.channels].reverse().map(channel => ({ ...channel, channelId: `legacy-${channel.label}` }));
-  show.clips = []; state.saveShow(show);
-  choose(0, "left"); choose(1, "center"); choose(2, "right"); advance();
-  expect([0, 1, 2].map(id => state.assignmentOf(id)?.channelId)).toEqual(["legacy-Melody", "legacy-Vocals", "legacy-Percussion"]);
+test("legacy and renamed channels resolve by musical part with reordered custom IDs", () => {
+  for (const labels of [["Melody", "Vocals", "Percussion", "Percussion 2"], ["Melody", "Vocals", "Percussion", "Vocals Right"],
+    ["Melody", "Percussion", "Vocals Left", "Vocals Right"]]) {
+    const { state, choose, advance } = setup();
+    const show = structuredClone(state.show);
+    show.channels = show.channels.map((channel, index) => ({ ...channel, label: labels[index], channelId: `legacy-${index}` })).reverse();
+    show.clips = []; state.saveShow(show);
+    choose(0, "left"); choose(1, "center"); choose(2, "right"); advance();
+    expect([0, 1, 2].map(id => state.assignmentOf(id)?.channelId)).toEqual(["legacy-0", "legacy-1", "legacy-2"]);
+  }
 });
 
 test("manual followers track later section assignments; explicit operator clears stay cleared", () => {

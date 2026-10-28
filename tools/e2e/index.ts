@@ -159,8 +159,8 @@ try {
   await request("/api/transport", { expectedRevision: current.transport.transportRevision, action: "play", showRevision: current.show.showRevision, positionMs: 0, effectiveServerMs: current.serverMs + 2000 });
   await until(snapshot, s => s.transport.status === "playing");
   await until(() => phones.every(phone => phone.calls.some(call => call.startsWith("transport:playing:"))), Boolean);
-  assert.deepEqual(show.channels.map(channel => channel.label), ["Melody", "Vocals", "Percussion", "Percussion 2"]);
-  check("decoded map selections route four intended phones across Melody, Vocals, Percussion and Percussion 2 and schedule a prepared common cue");
+  assert.deepEqual(show.channels.map(channel => channel.label), ["Melody", "Percussion", "Vocals Left", "Vocals Right"]);
+  check("decoded map selections route four intended phones across Melody, Percussion, Vocals Left and Vocals Right and schedule a prepared common cue");
   const latePhone = new Phone(); latePhone.audioReady = false; phones.push(latePhone);
   await latePhone.connect();
   assert.equal(latePhone.snapshot!.transport.status, "stopped");
@@ -177,7 +177,7 @@ try {
   assert.ok(latePhone.control.view().positionMs > 2000, "A late manual phone joins the current playhead, not zero");
   assert.ok(latePhone.calls.includes("load"));
   const finalMapRevision = current.audienceMap.mapRevision;
-  check("a fifth phone manually selects center, waits for audio readiness, and joins Vocals at the existing shared playhead");
+  check("a fifth phone manually selects center, waits for audio readiness, and joins Percussion at the existing shared playhead");
   phones[1].audioReady = false; phones[1].status();
   current = await snapshot();
   const assignment = { expectedRevision: current.assignmentRevision, mapRevision: current.audienceMap.mapRevision, deviceIds: phones.slice(0, 2).map(phone => phone.id), channelId: show.channels[2].channelId, effectiveServerMs: current.serverMs + 6000 };

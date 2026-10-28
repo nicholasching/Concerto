@@ -24,4 +24,4 @@ const response = await fetch(`${baseUrl}/api/show`, { method: "PUT", headers: { 
 }) });
 if (!response.ok) throw new Error(await response.text());
 CommandAccepted.parse(await response.json());
-console.log("Uploaded four original 8-second tones for Melody, Vocals, Percussion and Percussion 2 and saved the real show. Join phones, enable sound, choose sections, assign channels, prepare, then play.");
+console.log("Uploaded four original 8-second tones for Melody, Percussion, Vocals Left and Vocals Right and saved the real show. Join phones, enable sound, choose sections, assign channels, prepare, then play.");
