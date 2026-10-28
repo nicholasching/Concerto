@@ -9824,8 +9824,7 @@
       "commandId",
       "expectedRevision",
       "runId",
-      "preparationId",
-      "effectiveServerMs"
+      "preparationId"
     ],
     "additionalProperties": false
   },

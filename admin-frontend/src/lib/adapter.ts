@@ -110,8 +110,8 @@ export function createAdapter(baseUrl: string, fetcher: Fetcher = fetch) {
     async createCalibration(participantIds: number[], palette: { zero: string; one: string; neutral: string }, paletteVersion: string) {
       return submit("/api/calibrations", { participantIds, palette, paletteVersion }, "calibration", value => CalibrationCreated.parse(value));
     },
-    async armCalibration(runId: string, preparationId: string, effectiveServerMs: number) {
-      return submit(`/api/calibrations/${runId}/arm`, { runId, preparationId, effectiveServerMs }, "calibration", value => CommandAccepted.parse(value));
+    async armCalibration(runId: string, preparationId: string) {
+      return submit(`/api/calibrations/${runId}/arm`, { runId, preparationId }, "calibration", value => CommandAccepted.parse(value));
     },
     async getCalibration(runId: string) { return CalibrationResource.parse(await (await check(await safeFetch(`/api/calibrations/${runId}`))).json()); },
     async discardCalibration(runId: string) { await check(await safeFetch(`/api/calibrations/${runId}`, { method: "DELETE" })); },

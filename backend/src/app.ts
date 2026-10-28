@@ -32,6 +32,7 @@ import { registerStageRoutes } from "./stage-routes";
 // Operator schedules two seconds ahead; allow 500 ms for the HTTP command to reach us.
 // Commands delayed beyond this still fail instead of silently starting phones late.
 export const DEFAULT_LEAD_TIME_MS = 1500;
+export const CALIBRATION_LEAD_TIME_MS = 5000;
 
 const numeric = z.coerce.number();
 const CameraUploadQuery = z.object({
@@ -492,19 +493,18 @@ export function createApp(deps: AppDeps) {
     if (barrier.readyDevices().length === 0) {
       return c.json(apiError("NOBODY_READY", "No device has acknowledged this calibration."), 409);
     }
-    const leadTime = leadTimeError(deps, request.effectiveServerMs, deps.clock.nowServerMs());
-    if (leadTime) return c.json(leadTime.body, leadTime.status);
-
-    deps.calibrations.arm(run.plan.runId, request.effectiveServerMs);
-    const armed = CalibrationRun.parse({ ...run.plan, startServerMs: request.effectiveServerMs });
+    // HTTP transit and operator clock quality must not consume the phone delivery margin.
+    const effectiveServerMs = deps.clock.nowServerMs() + CALIBRATION_LEAD_TIME_MS;
+    deps.calibrations.arm(run.plan.runId, effectiveServerMs);
+    const armed = CalibrationRun.parse({ ...run.plan, startServerMs: effectiveServerMs });
     deps.connections.sendToParticipants(barrier.readyDevices(), JSON.stringify({
       ...envelope(deps.clock), type: "calibration.arm", revision: deps.state.revision,
-      effectiveServerMs: request.effectiveServerMs,
+      effectiveServerMs,
       payload: { preparationId: barrier.preparationId, run: armed },
     }));
 
     const ack = accepted(deps.clock, request.commandId, deps.state.revision);
-    const result = { ...ack, effectiveServerMs: request.effectiveServerMs, excluded: barrier.excludedDevices(), ready: barrier.readyDevices().length };
+    const result = { ...ack, effectiveServerMs, excluded: barrier.excludedDevices(), ready: barrier.readyDevices().length };
     deps.commands.remember(request.commandId, result);
     return c.json(result);
   });

@@ -18,7 +18,7 @@ export const READY_UNCERTAINTY_MS = 20;
 // timing rehearsals; internet participants can use a slower but stable network path.
 export const CLOCK_PROFILES = {
   strict: { readyUncertaintyMs: READY_UNCERTAINTY_MS, maxSampleAgeMs: PROBE_CONSTANTS.RESPONSE_TIMEOUT_MS },
-  internet: { readyUncertaintyMs: 150, maxSampleAgeMs: 10000 },
+  internet: { readyUncertaintyMs: 375, maxSampleAgeMs: 10000 },
 } as const;
 export type ClockProfile = keyof typeof CLOCK_PROFILES;
 

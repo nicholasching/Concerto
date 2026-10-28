@@ -95,8 +95,8 @@ test("strict profile still refuses the same high-latency path", () => {
   network.clock.stop();
 });
 
-test("internet latency admission is bounded at 300 ms round trip", () => {
-  for (const [rtt, ready] of [[300, true], [302, false]] as const) {
+test("internet latency admission is bounded at 750 ms round trip", () => {
+  for (const [rtt, ready] of [[300, true], [600, true], [750, true], [752, false]] as const) {
     const network = delayedNetwork("internet", rtt);
     network.advance(5000);
     expect(network.clock.quality()).toMatchObject({ ready, uncertaintyMs: rtt / 2 });

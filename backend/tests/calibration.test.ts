@@ -6,7 +6,7 @@ import { join as joinPath } from "node:path";
 import {
   ApiError, CalibrationPlan, CalibrationRun, ClientMessage, PROTOCOL_VERSION, ServerMessage,
 } from "@orchestra/contracts";
-import { createApp, DEFAULT_LEAD_TIME_MS } from "../src/app";
+import { createApp, CALIBRATION_LEAD_TIME_MS } from "../src/app";
 import { AssetStore } from "../src/assets";
 import { CalibrationRuns, MAX_CAMERAS } from "../src/calibration";
 import { JobRunner } from "../src/jobs";
@@ -117,7 +117,7 @@ const arm = (context: Harness, options: {
       protocolVersion: PROTOCOL_VERSION, sessionId: SESSION, serverEpoch: EPOCH,
       commandId: options.commandId ?? "arm-1", expectedRevision: 0,
       runId: options.runId, preparationId: options.preparationId,
-      effectiveServerMs: options.effectiveServerMs ?? serverMs + DEFAULT_LEAD_TIME_MS,
+      ...(options.effectiveServerMs === undefined ? {} : { effectiveServerMs: options.effectiveServerMs }),
     }),
   });
 
@@ -268,17 +268,33 @@ describe("arming a run", () => {
     expect(ApiError.parse(await response.json()).error.code).toBe("NOBODY_READY");
   });
 
-  test("refuses a start that leaves no time to schedule it", async () => {
+  test("ignores stale operator timestamps and chooses a full lead from server receipt time", async () => {
     const context = harness();
     const plan = await planOf(await createRun(context));
     const preparationId = context.preparations.current("calibration")!.preparationId;
     acknowledge(context, 0, { preparationId, runId: plan.runId });
 
     const response = await arm(context, {
-      runId: plan.runId, preparationId, effectiveServerMs: serverMs + DEFAULT_LEAD_TIME_MS - 1,
+      runId: plan.runId, preparationId, effectiveServerMs: 1,
     });
-    expect(response.status).toBe(409);
-    expect(ApiError.parse(await response.json()).error.code).toBe("INSUFFICIENT_LEAD_TIME");
+    expect(response.status).toBe(200);
+    expect((await response.json()).effectiveServerMs).toBe(serverMs + CALIBRATION_LEAD_TIME_MS);
+  });
+
+  test("accepts no operator timestamp and replays the original server schedule exactly once", async () => {
+    const context = harness();
+    const plan = await planOf(await createRun(context));
+    const preparationId = context.preparations.current("calibration")!.preparationId;
+    acknowledge(context, 0, { preparationId, runId: plan.runId });
+    serverMs += 3000; // Operator command spent three seconds in transit.
+    const response = await arm(context, { runId: plan.runId, preparationId });
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.effectiveServerMs).toBe(serverMs + CALIBRATION_LEAD_TIME_MS);
+    serverMs += 2000;
+    expect(await (await arm(context, { runId: plan.runId, preparationId })).json()).toEqual(body);
+    expect(context.sockets.get(0)!.typed("calibration.arm")).toHaveLength(1);
+    expect(acknowledge(context, 0, { preparationId, runId: plan.runId }).type).toBe("error");
   });
 
   test("refuses an unknown run", async () => {
@@ -288,6 +304,70 @@ describe("arming a run", () => {
 
     const response = await arm(context, { runId: "0191d4aa-0000-7000-8000-000000000000", preparationId });
     expect(response.status).toBe(404);
+  });
+});
+
+describe("calibration readiness recovery", () => {
+  const report = (context: Harness, deviceId: number, clockReady: boolean, foreground = true) => handleClientMessage({
+    raw: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: EPOCH, messageId: crypto.randomUUID(),
+      type: "device.status", payload: { deviceId, connected: true, foreground, clockReady, clockUncertaintyMs: 100,
+        clockSampleAgeMs: 0, audioUnlocked: false, decodedTrackHashes: {} } }),
+    receivedServerMs: serverMs, clock: context.clock, deviceId, state: context.state,
+    preparations: context.preparations, calibrations: context.calibrations,
+  });
+  test("clock/foreground recovery replays preparation and restores the actual ACK", async () => {
+    const context = harness();
+    const plan = await planOf(await createRun(context));
+    const preparationId = context.preparations.current("calibration")!.preparationId;
+    acknowledge(context, 0, { preparationId, runId: plan.runId });
+    report(context, 0, false);
+    expect(context.preparations.current("calibration")!.counts().ready).toBe(0);
+    expect(report(context, 0, true, false).type).toBe("state.snapshot");
+    const replay = report(context, 0, true);
+    expect(replay).toMatchObject({ type: "calibration.prepare", payload: { preparationId, plan } });
+    // A status is not an ACK; only the exact replay acknowledgement restores readiness.
+    expect(context.preparations.current("calibration")!.counts().ready).toBe(0);
+    acknowledge(context, 0, { preparationId, runId: plan.runId });
+    expect(context.preparations.current("calibration")!.readyDevices()).toEqual([0]);
+    expect(report(context, 0, true).type).toBe("state.snapshot");
+  });
+  test("reconnect replays only to frozen participants while the run is created", async () => {
+    const context = harness();
+    const plan = await planOf(await createRun(context, { participantIds: [0] }));
+    const preparationId = context.preparations.current("calibration")!.preparationId;
+    acknowledge(context, 0, { preparationId, runId: plan.runId });
+    context.preparations.excludeEverywhere(0, "disconnected before acknowledging");
+    expect(report(context, 0, true).type).toBe("calibration.prepare");
+    expect(report(context, 1, true).type).toBe("state.snapshot");
+    acknowledge(context, 0, { preparationId, runId: plan.runId });
+    await arm(context, { runId: plan.runId, preparationId });
+    report(context, 0, false);
+    expect(report(context, 0, true).type).toBe("state.snapshot");
+  });
+  test("opt-out survives disconnect and later clock recovery", async () => {
+    const context = harness();
+    const plan = await planOf(await createRun(context));
+    const preparationId = context.preparations.current("calibration")!.preparationId;
+    handleClientMessage({ raw: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: EPOCH,
+      messageId: "opt-out", type: "calibration.ready",
+      payload: { preparationId, runId: plan.runId, ready: false, reason: "opted-out" } }),
+      receivedServerMs: serverMs, clock: context.clock, deviceId: 0, state: context.state,
+      preparations: context.preparations, calibrations: context.calibrations });
+    context.preparations.excludeEverywhere(0, "disconnected");
+    report(context, 0, false);
+    expect(report(context, 0, true).type).toBe("state.snapshot");
+    expect(acknowledge(context, 0, { preparationId, runId: plan.runId }).type).toBe("error");
+    expect(context.preparations.current("calibration")!.counts().ready).toBe(0);
+  });
+  test("an invalid preparation cannot opt a phone out of the current run", async () => {
+    const context = harness();
+    const plan = await planOf(await createRun(context));
+    handleClientMessage({ raw: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: EPOCH,
+      messageId: "stale-opt-out", type: "calibration.ready",
+      payload: { preparationId: "stale", runId: plan.runId, ready: false, reason: "opted-out" } }),
+      receivedServerMs: serverMs, clock: context.clock, deviceId: 0, state: context.state,
+      preparations: context.preparations, calibrations: context.calibrations });
+    expect(report(context, 0, true).type).toBe("calibration.prepare");
   });
 });
 

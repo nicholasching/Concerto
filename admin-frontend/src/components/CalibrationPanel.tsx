@@ -2,7 +2,7 @@
 import { calibrationDurationMs } from "@orchestra/contracts/otc";
 import { useEffect, useState } from "react";
 import { useAdapter } from "../lib/useSnapshot";
-import { clockReady, futureServerMs, nowServerMs } from "../lib/clock";
+import { calibrationStartDisabledReason } from "../lib/calibration-start";
 import type { Column, Geometry } from "../lib/adapter";
 import { DEFAULT_CALIBRATION_PALETTE, type AdminSnapshotData, type OtcResultData } from "@orchestra/contracts";
 import { MapPanel } from "./MapPanel";
@@ -29,14 +29,13 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   const [busy, setBusy] = useState(false);
   const [targetIds, setTargetIds] = useState("");
   const [checked, setChecked] = useState(false);
-  const [tick, setTick] = useState(0);
   const [previews, setPreviews] = useState<string[]>([]);
   const [excludedUploads, setExcludedUploads] = useState<string[]>([]);
   const selectedUploads = run?.uploads.filter(upload => !excludedUploads.includes(upload.uploadId)) ?? [];
   const repeatedRecording = new Set(selectedUploads.map(upload => upload.sha256)).size !== selectedUploads.length;
   const decodedCount = new Set(candidate?.observations.filter(item => item.status === "accepted" && item.deviceId !== null).map(item => item.deviceId)).size;
   const barrier = snapshot?.preparations.find(item => item.domain === "calibration" && item.preparationId === run?.preparationId);
-  useEffect(() => { const timer = setInterval(() => setTick(value => value + 1), 250); return () => clearInterval(timer); }, []);
+  const startDisabledReason = calibrationStartDisabledReason(busy, barrier);
   useEffect(() => {
     setSlots(emptySlots());
     setCandidate(null); setProgress(null); setDiagnostics([]); setChecked(false); setJobId(null); setExcludedUploads([]);
@@ -119,7 +118,9 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
     return slot.column !== uploaded.primaryColumn || !sameGeometry(slot.geometry, uploaded);
   });
   const activeJob = progress && !["complete", "failed", "cancelled"].includes(progress.stage);
-  const now = tick >= 0 && clockReady() ? nowServerMs() : null;
+  // Server snapshots drive calibration countdown/upload eligibility even when the
+  // operator cannot meet the strict clock policy used by other console controls.
+  const now = snapshot?.serverMs ?? null;
   const finishedCapture = run?.startServerMs !== null && run?.startServerMs !== undefined && now !== null && now >= run.startServerMs + calibrationDurationMs(run.plan);
   return <section>
     <div className="stage-heading"><span className="stage-number">01</span><h2>Calibration</h2><span className="stage-badge">{run ? run.status : "Ready"}</span></div>
@@ -132,7 +133,10 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
       {run.reports.filter(report => !report.completed).map(report => <p key={report.deviceId}>Device {report.deviceId}: {report.reason ?? "pattern interrupted"}</p>)}
       {barrier && <p>{barrier.readyIds.length}/{barrier.expectedIds.length} ready; {barrier.excluded.length} excluded; {barrier.expectedIds.length - barrier.readyIds.length - barrier.excluded.length} pending.</p>}
       {barrier?.excluded.map(item => <p key={item.deviceId}>Device {item.deviceId}: {item.reason}</p>)}
-      {run.status === "created" && <button className="primary large" disabled={busy || !barrier?.readyIds.length || !clockReady()} onClick={() => void act(() => adapter.armCalibration(run.plan.runId, run.preparationId, futureServerMs(4)))}>Cameras recording — start pattern</button>}
+      {run.status === "created" && <>
+        <button className="primary large" disabled={startDisabledReason !== null} aria-describedby="calibration-start-status" onClick={() => void act(() => adapter.armCalibration(run.plan.runId, run.preparationId))}>Cameras recording — start pattern</button>
+        <p id="calibration-start-status" role="status">{startDisabledReason ?? "Ready to start. The server will schedule the pattern five seconds after receiving your command."}</p>
+      </>}
       {run.startServerMs !== null && now !== null && <p role="status">{now < run.startServerMs ? `Starts in ${((run.startServerMs - now) / 1000).toFixed(1)} s` : !finishedCapture ? `Pattern running · ${Math.max(0, (run.startServerMs + calibrationDurationMs(run.plan) - now) / 1000).toFixed(1)} s remaining` : "Pattern finished. Stop recordings after the trailing margin, then upload."}</p>}
       <button disabled={busy || !!activeJob} onClick={() => void act(() => adapter.discardCalibration(run.plan.runId))}>Discard run and retry</button>
       <div className="slots">{slots.map((_, index) => {

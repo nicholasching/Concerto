@@ -110,6 +110,17 @@ export const handleClientMessage = (input: {
     }
     const snapshot = state.participantSnapshot(deviceId, clock);
     if (!snapshot) return error(clock, "UNKNOWN_DEVICE", "This device is not registered in the current session.");
+    const run = calibrations?.activeRun;
+    const barrier = preparations?.current("calibration");
+    // Reconnect/clock recovery must restore the exact preparation ACK, not merely the
+    // projector's aggregate clock-ready count. Do not re-admit a deliberate opt-out.
+    if (status.foreground && status.clockReady && run?.status === "created"
+      && barrier?.preparationId === run.preparationId && run.plan.participantIds.includes(deviceId)
+      && !barrier.readyDevices().includes(deviceId)
+      && !run.optedOutIds.has(deviceId)) {
+      return { ...envelope(clock), type: "calibration.prepare", revision: state.revision,
+        payload: { preparationId: run.preparationId, plan: run.plan } };
+    }
     return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };
   }
 
@@ -146,12 +157,15 @@ export const handleClientMessage = (input: {
   if (message.data.type === "calibration.ready") {
     const payload = message.data.payload;
     const barrier = preparations?.current("calibration");
-    const activeRunId = calibrations?.activeRun?.plan.runId;
+    const run = calibrations?.activeRun;
     // Naming a different run means this phone is answering a calibration that is no longer the
     // one being prepared; counting it would put a stale device in the ready set.
-    if (!barrier || payload.runId !== activeRunId) {
+    if (!barrier || !run || payload.runId !== run.plan.runId || run.status !== "created"
+      || payload.preparationId !== barrier.preparationId || !run.plan.participantIds.includes(deviceId)) {
       return error(clock, "STALE_PREPARATION", "This acknowledgement does not match the current calibration run.");
     }
+    if (!payload.ready && payload.reason === "opted-out") run.optedOutIds.add(deviceId);
+    if (payload.ready && run.optedOutIds.has(deviceId)) return error(clock, "CALIBRATION_OPTED_OUT", "This phone opted out of the current calibration.");
     if (!barrier.acknowledgePreparation({ deviceId, preparationId: payload.preparationId, ready: payload.ready, reason: payload.reason })) {
       return error(clock, "STALE_PREPARATION", "This acknowledgement does not match the current preparation.");
     }

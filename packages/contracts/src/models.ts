@@ -193,6 +193,7 @@ export const MixRequest = z.strictObject({
 export const SaveShowRequest = z.strictObject({ ...CommandContext, show: Show });
 export const PanicRequest = z.strictObject(CommandContext);
 export const CalibrationCreateRequest = z.strictObject({ ...CommandContext, participantIds: ParticipantIds.min(1), palette: Palette, paletteVersion: Id });
-export const CalibrationArmRequest = z.strictObject({ ...CommandContext, runId: Id, preparationId: Id, effectiveServerMs: Milliseconds });
+// Legacy dashboards may send a timestamp; calibration is always scheduled by the server.
+export const CalibrationArmRequest = z.strictObject({ ...CommandContext, runId: Id, preparationId: Id, effectiveServerMs: Milliseconds.optional() });
 export const CommitMapRequest = z.strictObject({ ...CommandContext, runId: Id, expectedMapRevision: Revision, jobId: Id });
 export const CreateJobRequest = z.strictObject({ ...CommandContext, runId: Id, uploadIds: z.array(Id).min(1).max(3), evidence: z.enum(["physical", "synthetic"]).default("physical") });

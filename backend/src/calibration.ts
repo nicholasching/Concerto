@@ -35,6 +35,7 @@ export interface CalibrationRunRecord {
   startServerMs: number | null;
   uploads: Map<string, CameraUpload>;
   preparationId: string;
+  optedOutIds: Set<number>;
   reports: Map<number, { deviceId: number; completed: boolean; maxFrameLatenessMs: number; reason: string | null }>;
 }
 
@@ -73,7 +74,7 @@ export class CalibrationRuns {
       packetVersion: PACKET_VERSION, codebookVersion: "hamming16-11-v1",
       paletteVersion: input.paletteVersion, palette: input.palette, symbolMs: SYMBOL_MS,
     });
-    const run: CalibrationRunRecord = { plan, status: "created", startServerMs: null, uploads: new Map(), preparationId: "pending", reports: new Map() };
+    const run: CalibrationRunRecord = { plan, status: "created", startServerMs: null, uploads: new Map(), preparationId: "pending", optedOutIds: new Set(), reports: new Map() };
     this.runs.set(plan.runId, run);
     return { ok: true, run };
   }
