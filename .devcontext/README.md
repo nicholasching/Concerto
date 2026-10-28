@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Stage calibration reliability, 2026-10-28
+
+Calibration start is scheduled five seconds ahead by the server, independent of operator clock quality. Audience internet admission is 750 ms best RTT; recovered eligible phones can re-acknowledge the current preparation, with explicit opt-outs retained. The dashboard explains disabled start conditions. Probe pacing is bounded for congested networks. Read the [decision](decisions/20261028-server-calibration-scheduling.md), [implementation/release journal](teams/integration/journal/20261028-stage-calibration-fix.md) and [public load procedure](../tools/load/CALIBRATION.md). Physical venue/audio/camera rehearsal remains separate from software and simulated-load verification.
+
 ### Musical lane rename
 
 Current lane names are **Melody, Percussion, Vocals Left and Vocals Right**. The user renamed the former Vocals/Percussion/Percussion 2 lanes while retaining audio and routing. Read the [decision](decisions/20260920-track-labels.md) and [checks/saved-show handoff](teams/integration/journal/20260920-track-labels.md); earlier lane names below are historical.

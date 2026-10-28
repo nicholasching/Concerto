@@ -1,0 +1,148 @@
+{
+  "date": "2026-10-28T21:58:04.987Z",
+  "target": "https://htnlive.nicholasching.ca",
+  "clients": 250,
+  "serverEpoch": "86ec25a3-0891-45d1-8215-a118e39672f9",
+  "injection": "245 eligible clients (at 250 total): 80/135/190/245 ms each way; 5 deliberate exclusions: 450 ms each way; 0..30 ms shared pair jitter, 0..8 ms per-probe jitter; 4% +300 ms uplink pair spikes; 2% +1000 ms downlink spikes",
+  "eligibleCount": 245,
+  "deliberatelyExcluded": 5,
+  "transientExclusionsAtArm": 0,
+  "seed": 20261028,
+  "recoveryCount": 25,
+  "reconnectCount": 5,
+  "readyAtArm": 245,
+  "armsReceived": 245,
+  "armsAccepted": 245,
+  "cueMarginMs": {
+    "count": 245,
+    "p50": 4728.87451171875,
+    "p95": 4849.732177734375,
+    "p99": 4858.84521484375,
+    "max": 4861.43701171875
+  },
+  "minimumCueMarginMs": 3683.63818359375,
+  "patternsCompleted": 245,
+  "patternsInterrupted": 0,
+  "totalSeconds": 76.26046090000001,
+  "operatorDelayAndResponseMs": 3092.628499999999,
+  "downloadsActiveAtArmResponse": 250,
+  "serverChosenStart": 1793224658257.1772,
+  "bytesDownloaded": 512022000,
+  "downloads": 500,
+  "maxConcurrentDownloads": 250,
+  "downloadMs": {
+    "count": 500,
+    "p50": 32594.8016,
+    "p95": 33713.683300000004,
+    "p99": 33776.324199999995,
+    "max": 33796.769
+  },
+  "uncertaintyMs": {
+    "count": 250,
+    "p50": 215.6546630859375,
+    "p95": 278.892578125,
+    "p99": 479.911376953125,
+    "max": 481.7279052734375
+  },
+  "eligibleUncertaintyMs": {
+    "count": 245,
+    "p50": 175.1510009765625,
+    "p95": 278.0601806640625,
+    "p99": 279.845703125,
+    "max": 285.648681640625
+  },
+  "ineligibleUncertaintyMs": {
+    "count": 5,
+    "p50": 479.911376953125,
+    "p95": 481.7279052734375,
+    "p99": 481.7279052734375,
+    "max": 481.7279052734375
+  },
+  "probes": 82921,
+  "httpResponseHeadersMs": {
+    "/api/session": {
+      "count": 1,
+      "p50": 91.16579999999999,
+      "p95": 91.16579999999999,
+      "p99": 91.16579999999999,
+      "max": 91.16579999999999
+    },
+    "/api/sessions/prod-session/snapshot": {
+      "count": 37,
+      "p50": 46.59110000000146,
+      "p95": 63.475399999995716,
+      "p99": 68.14609999999811,
+      "max": 68.14609999999811
+    },
+    "/api/foundation": {
+      "count": 2,
+      "p50": 50.18379999999996,
+      "p95": 50.18379999999996,
+      "p99": 50.18379999999996,
+      "max": 50.18379999999996
+    },
+    "/api/assets": {
+      "count": 1,
+      "p50": 327.71880000000004,
+      "p95": 327.71880000000004,
+      "p99": 327.71880000000004,
+      "max": 327.71880000000004
+    },
+    "/api/sessions/prod-session/join": {
+      "count": 255,
+      "p50": 338.46749999999986,
+      "p95": 653.0658,
+      "p99": 719.0883,
+      "max": 730.1450000000001
+    },
+    "/api/assets/741952bb-bbc7-465c-b678-5b09dea0d5b3": {
+      "count": 500,
+      "p50": 1218.2188999999998,
+      "p95": 2285.3221,
+      "p99": 2378.8714,
+      "max": 2451.8219000000026
+    },
+    "/api/calibrations": {
+      "count": 1,
+      "p50": 56.26749999999811,
+      "p95": 56.26749999999811,
+      "p99": 56.26749999999811,
+      "max": 56.26749999999811
+    },
+    "/api/calibrations/1d0c2b4e-e775-4ae4-ace2-ca4cae3cb06d/arm": {
+      "count": 1,
+      "p50": 89.85190000000148,
+      "p95": 89.85190000000148,
+      "p99": 89.85190000000148,
+      "max": 89.85190000000148
+    }
+  },
+  "errors": [],
+  "httpReadRetries": 0,
+  "savedShowUnchanged": true,
+  "diagnosticsBefore": {
+    "devices": 759,
+    "connectedDevices": 0,
+    "revision": 759,
+    "eventLoopLagMs": {
+      "count": 619,
+      "p50": 0.1541540000034729,
+      "p95": 1.2147230000009586,
+      "p99": 2.243522999999186,
+      "max": 8.036244000002625
+    }
+  },
+  "diagnosticsAfter": {
+    "devices": 1009,
+    "connectedDevices": 250,
+    "revision": 38075,
+    "eventLoopLagMs": {
+      "count": 1381,
+      "p50": 0.10384799999883398,
+      "p95": 1.2626209999998537,
+      "p99": 3.4629790000035428,
+      "max": 68.97761400000309
+    }
+  },
+  "limitations": "One load generator/public WAN path; injected timers, not independent Wi-Fi radios; original tone when show is empty; verifies media bytes and scheduling, not decode/audio/optical performance. Test device IDs remain allocated."
+}

@@ -1,4 +1,4 @@
-# Deploy Resonance to Railway
+# Deploy Concerto to Railway
 
 Production: **https://htnlive.nicholasching.ca**. Development remains **https://htn.nicholasching.ca**, served by the existing local reverse proxy.
 
@@ -6,8 +6,8 @@ The root Dockerfile installs Bun 1.3.14, Node 22, Python 3.13 and the locked rec
 
 ## First deployment
 
-1. Open [Resonance on Railway](https://railway.com/project/74a8b8f8-48eb-45de-9070-9b2643b5f423) and select **production**.
-2. Add a service connected to GitHub repository **nicholasching/HackTheNorth**, branch **main**. Leave Root Directory at the repository root. Railway detects the root **Dockerfile**. Leave custom Build Command and Start Command empty; the image defines both. Do not use the development launcher.
+1. Open [Concerto on Railway](https://railway.com/project/65a7cae3-5ca5-4e45-adec-a7b7e520926c) and select **production**. This replaces the shut-down project `74a8b8f8-48eb-45de-9070-9b2643b5f423`.
+2. Add a service connected to GitHub repository **nicholasching/Concerto** (formerly `nicholasching/HackTheNorth`), branch **main**. Leave Root Directory at the repository root and select the **Dockerfile** builder. Leave custom Build Command and Start Command empty; the image defines both. Do not use the development launcher.
 3. In the project canvas choose **Add → Volume**, attach it to this service and enter mount path **`/data`**. This holds `checkpoint.json`, `assets/`, `uploads/` and `jobs/` across deployments. Build-time files do not populate a volume; never bake local runtime data into the image.
 4. Open service **Variables** and add the values below. Enter the production `OPERATOR_SECRET` directly in Railway. Never put its value in Git or screenshots. `SESSION_ID` is used during both the frontend build and backend startup; changing it requires rebuilding and a separate checkpoint/volume.
 
@@ -17,11 +17,13 @@ The root Dockerfile installs Bun 1.3.14, Node 22, Python 3.13 and the locked rec
    | `NODE_ENV` | `production` |
    | `SESSION_ID` | `prod-session` |
    | `DATA_DIR` | `/data` |
-   | `ALLOWED_ORIGINS` | `https://htnlive.nicholasching.ca` |
+   | `ALLOWED_ORIGINS` | `https://concerto-production-02db.up.railway.app,https://htnlive.nicholasching.ca` |
    | `OPERATOR_SECRET` | Your production operator password |
    | `OTC_CPU_BUDGET` | `22` for the current 24-vCPU allocation; reduce this if the service limit is lower |
 
    The image supplies loopback `BACKEND_INTERNAL_URL=http://127.0.0.1:8080`, `ADMIN_INTERNAL_URL=http://127.0.0.1:3001` and its Python interpreter. It also caps `OPENBLAS_NUM_THREADS`, `OMP_NUM_THREADS` and `MKL_NUM_THREADS` to `1` so native libraries cannot multiply the 22 analysis processes into thousands of threads. Keep these defaults. Leave `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL` and mock settings unset. The projector derives the join URL from its own origin.
+
+   List both actual public origins explicitly. Railway's `RAILWAY_PUBLIC_DOMAIN` switches to the custom hostname when it becomes primary, so using that reference alone can omit the generated hostname.
 
 5. In **Settings**, set Healthcheck Path to **`/api/health`** and timeout to **300 seconds**. Keep **one replica**, **Serverless off**, and **On Failure** restart policy. Choose the nearest available region to the venue. Keep enough CPU/memory headroom for control and audio serving alongside recognition.
 6. Apply the staged changes with **Deploy**. Verify the build uses the Dockerfile, installs the Python worker and builds both Next apps. Logs must show all three application processes starting. Wait for the deployment to be healthy.

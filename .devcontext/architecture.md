@@ -1,6 +1,6 @@
 # Architecture checkpoint
 
-Status: integrated local software on main; physical acceptance pending. Baseline: four feature branches merged through 5eb08ab plus captain integration.
+Status: deployed integrated software on Railway; physical venue acceptance pending. Baseline: four feature branches merged through 5eb08ab plus subsequent integration. Current calibration/load evidence is in the [2026-10-28 release journal](teams/integration/journal/20261028-stage-calibration-fix.md).
 
 ## Implemented integration
 
@@ -10,7 +10,7 @@ Status: integrated local software on main; physical acceptance pending. Baseline
 - Camera geometry is editable from the original recording or a processed preview. One to three views map their primary columns independently. Explicit frame presets are approximate; four seating corners provide perspective calibration. Three camera columns remain separate from the four music sections; automatic boundaries depend on device counts, not camera coverage or equal physical width. The [earlier layout decision](decisions/20260919-seat-layout-and-regions.md) remains camera geometry history.
 - Python OTC receives an immutable manifest and produces candidate results. Job identity, input hashes and unchanged geometry are checked before commit. Worker cancellation stops the process tree. Generated recordings remain synthetic evidence.
 - Restart preserves ID allocation, hashed resume credentials, saved show/map/routing and next calibration tag. It creates a new clock epoch and stops playback. Pending runtime jobs/runs are not resumed; operators repeat capture after a restart.
-- Local dev defaults and tests are documented in root README. Railway deployment is explicitly deferred by the user.
+- Local dev defaults and tests are documented in root README. Railway production uses the root Dockerfile, persistent /data volume and shared public origin. Calibration timestamps are chosen by the server after receiving operator intent; client clock quality remains a phone-side admission/execution check.
 - Cloudflare publishes the audience Next origin on port 3000. It now serves `/`, `/present`, `/upload`, and the separately built `/admin` Next zone. Explicit participant rewrites remain role restricted; `/control` authenticates operator HTTP/WSS and `/api/camera` uses expiring camera-only tokens with verified 8 MiB chunks. Reset rotates the epoch, revokes identities and clears audience/transient state while keeping the prepared show. Next runs with Node 22+ because Bun-hosted Next on Windows stalled at WebSocket upgrade. The [stage-workflow ADR](decisions/20260919-single-domain-stage-workflow.md) supersedes the earlier local-only-admin tunnel restriction.
 
 ## Historical foundation inventory

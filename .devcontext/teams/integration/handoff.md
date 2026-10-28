@@ -1,5 +1,7 @@
 # Local integrated concert handoff
 
+Current production follow-up (2026-10-28): [Railway calibration release](journal/20261028-stage-calibration-fix.md) and [250-client report](../../evidence/integration/railway-calibration-250.json). Server schedules calibration five seconds after receiving intent; operator clock quality no longer gates calibration. Internet RTT admission is 750 ms, recovery replays current preparation ACKs, explicit opt-outs stay excluded, and bounded pipelined probes keep accepted samples fresh under jitter. All 245 eligible simulated phones completed capture; five intentionally over-limit phones were excluded. Next: refresh operator/audience pages, save approved stems into the empty production show, then perform a real phone/camera/audio rehearsal. Test identities were retained; no audience reset or show replacement was performed.
+
 Latest naming update (2026-09-20): lanes are Melody, Percussion, Vocals Left and Vocals Right. Channel IDs/audio/routing are retained, including label-based fallback compatibility. See [verification and local saved-show handoff](journal/20260920-track-labels.md). Earlier track names below are historical.
 
 Latest (2026-09-20): **Percussion 2** is the fourth musical lane, after Melody, Vocals and Percussion. Existing shows can append it using **Add Percussion 2**; the live local show has already been saved at revision 6 with its three audio clips and section presets preserved. Upload the fourth stem and choose its audience section in the editor. See [checks and handoff](journal/20260920-four-tracks.md).

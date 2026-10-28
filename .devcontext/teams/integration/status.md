@@ -1,5 +1,7 @@
 # Integration status
 
+Latest (2026-10-28): Railway calibration reliability and the 750 ms internet RTT profile are deployed. Server-selected start time, explicit disabled reasons, recovered ACKs and bounded probe pipelines are implemented. Final public 250-client test passed: all 245 eligible simulated patterns completed, five deliberately over-limit clients excluded, 25 recoveries, five reconnects and 512 MB of verified audio transfers. Read the [release journal and limitations](journal/20261028-stage-calibration-fix.md). Physical venue/camera/audio rehearsal remains outstanding; refresh browser pages for the new code.
+
 Latest naming update (2026-09-20): lanes are Melody, Percussion, Vocals Left and Vocals Right. Channel IDs/audio/routing are retained, including label-based fallback compatibility. See [verification and local saved-show handoff](journal/20260920-track-labels.md). Earlier track names below are historical.
 
 Latest (2026-09-20): **Percussion 2** is the fourth musical lane, after Melody, Vocals and Percussion. Existing shows can append it using **Add Percussion 2**; the live local show has already been saved at revision 6 with its three audio clips and section presets preserved. Upload the fourth stem and choose its audience section in the editor. See [checks and handoff](journal/20260920-four-tracks.md).
