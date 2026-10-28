@@ -98,10 +98,28 @@ test("strict profile still refuses the same high-latency path", () => {
 test("internet latency admission is bounded at 750 ms round trip", () => {
   for (const [rtt, ready] of [[300, true], [600, true], [750, true], [752, false]] as const) {
     const network = delayedNetwork("internet", rtt);
-    network.advance(5000);
+    network.advance(15000);
     expect(network.clock.quality()).toMatchObject({ ready, uncertaintyMs: rtt / 2 });
     network.clock.stop();
   }
+});
+
+test("stable unready paths use bounded traffic after warmup", () => {
+  const network = delayedNetwork("strict", 240);
+  network.advance(30000);
+  expect(network.clock.quality().ready).toBe(false);
+  expect(network.clock.estimator.stats().measurements).toBe(16);
+  expect(network.clock.estimator.stats().probeGroupsStarted).toBeLessThan(35);
+  network.clock.stop();
+});
+
+test("a slow reply does not start overlapping pairs after 50 milliseconds", () => {
+  const network = delayedNetwork("internet", 750);
+  network.advance(749);
+  expect(network.clock.estimator.stats().probeGroupsStarted).toBe(1);
+  network.advance(15000);
+  expect(network.clock.quality().ready).toBe(true);
+  network.clock.stop();
 });
 
 test("internet profile bridges a brief probe gap but still expires after ten seconds", () => {

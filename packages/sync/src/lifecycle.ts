@@ -13,6 +13,9 @@ export class ClockSync implements SynchronizedClock {
   private readonly sent = new Map<string, number>();
   private handles: unknown[] = [];
   private generation = 0;
+  private group: { id: number; startedAt: number; acceptedBefore: number; timeout: unknown } | null = null;
+  private lastRttMs: number | null = null;
+  private failures = 0;
 
   constructor(private readonly options: {
     send: (probe: Probe) => void; timers?: ProbeTimers; now?: () => number;
@@ -36,6 +39,9 @@ export class ClockSync implements SynchronizedClock {
     for (const handle of this.handles) this.timers.clearTimeout(handle);
     this.handles = [];
     this.sent.clear();
+    this.group = null;
+    this.lastRttMs = null;
+    this.failures = 0;
     this.epoch = null;
     this.estimator.reset();
   }
@@ -46,26 +52,29 @@ export class ClockSync implements SynchronizedClock {
     this.sent.delete(key);
     if (reply.t2 < reply.t1 || this.now() - reply.t0 < reply.t2 - reply.t1) return;
     this.estimator.accept(reply);
+    const elapsed = this.now() - reply.t0;
+    this.lastRttMs = this.lastRttMs === null ? elapsed : this.lastRttMs * 0.8 + elapsed * 0.2;
+    if (reply.probeGroupIndex === 1 && this.group?.id === reply.probeGroupId) this.finishPair();
   }
 
   nowServerMs(): number { return this.estimator.nowServerMs(); }
   toLocalPerformanceMs(serverMs: number): number { return this.estimator.toLocalPerformanceMs(serverMs); }
   quality(): ClockQuality { return this.estimator.quality(); }
 
-  private later(callback: () => void, ms: number): void {
+  private later(callback: () => void, ms: number): unknown {
     const generation = this.generation;
     const handle = this.timers.setTimeout(() => {
       this.handles = this.handles.filter(item => item !== handle);
       if (generation === this.generation) callback();
     }, ms);
     this.handles.push(handle);
+    return handle;
   }
 
   private pair(): void {
-    if (!this.epoch) return;
-    for (const [key, t0] of this.sent) if (this.now() - t0 > PROBE_CONSTANTS.RESPONSE_TIMEOUT_MS) this.sent.delete(key);
+    if (!this.epoch || this.group) return;
     const probeGroupId = this.estimator.beginProbeGroup();
-    const acceptedBefore = this.estimator.stats().pairsPure;
+    this.group = { id: probeGroupId, startedAt: this.now(), acceptedBefore: this.estimator.stats().pairsPure, timeout: null };
     const send = (probeGroupIndex: 0 | 1) => {
       const t0 = this.now();
       this.sent.set(`${probeGroupId}:${probeGroupIndex}`, t0);
@@ -73,15 +82,32 @@ export class ClockSync implements SynchronizedClock {
     };
     send(0);
     this.later(() => {
+      if (this.group?.id !== probeGroupId) return;
       send(1);
-      // Give the reply a short window before choosing the cadence. A dropped/impure pair
-      // needs a rapid retry: another full steady interval would expire the clock sample.
-      this.later(() => {
-        const accepted = this.estimator.stats().pairsPure > acceptedBefore;
-        if (!accepted || !this.estimator.quality().ready) this.pair();
-        else this.later(() => this.pair(), (PROBE_CONSTANTS.STEADY_STATE_INTERVAL_MS - PROBE_CONSTANTS.INITIAL_INTERVAL_MS)
-          * (1 + (this.options.random ?? Math.random)() * 0.1));
-      }, PROBE_CONSTANTS.INITIAL_INTERVAL_MS);
+      if (this.group?.id === probeGroupId) {
+        const responseMs = Math.min(PROBE_CONSTANTS.RESPONSE_TIMEOUT_MS, Math.max(250, (this.lastRttMs ?? 450) * 2 + 100));
+        this.group.timeout = this.later(() => this.finishPair(), responseMs);
+      }
     }, PROBE_CONSTANTS.PROBE_GAP_MS);
+  }
+
+  private finishPair(): void {
+    const group = this.group;
+    if (!group) return;
+    this.group = null;
+    if (group.timeout !== null) {
+      this.timers.clearTimeout(group.timeout);
+      this.handles = this.handles.filter(handle => handle !== group.timeout);
+    }
+    this.sent.delete(`${group.id}:0`);
+    this.sent.delete(`${group.id}:1`);
+    const accepted = this.estimator.stats().pairsPure > group.acceptedBefore;
+    this.failures = accepted ? 0 : this.failures + 1;
+    // Readiness policy must not turn a stable but slow connection into a probe storm.
+    // Wait for this pair's response, then use steady pacing after the window is full.
+    const delay = accepted && this.estimator.stats().measurements >= PROBE_CONSTANTS.MAX_MEASUREMENTS
+      ? Math.max(PROBE_CONSTANTS.INITIAL_INTERVAL_MS, PROBE_CONSTANTS.STEADY_STATE_INTERVAL_MS - (this.now() - group.startedAt))
+      : Math.min(500, PROBE_CONSTANTS.INITIAL_INTERVAL_MS * 2 ** Math.min(this.failures, 4));
+    this.later(() => this.pair(), delay * (1 + (this.options.random ?? Math.random)() * 0.1));
   }
 }

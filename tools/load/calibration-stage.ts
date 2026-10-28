@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { ClientMessage, ServerMessage, DEFAULT_CALIBRATION_PALETTE, type ServerMessageData } from "@orchestra/contracts";
 import { ClockSync } from "../../packages/sync/src";
 import { CalibrationSession } from "../../client-frontend/src/lib/calibration";
+import { FlashRenderer } from "../../client-frontend/src/lib/flash-renderer";
 import { summarize } from "./metrics";
 
 // Public-origin control/media test, using actual clock + calibration client implementations.
@@ -11,14 +12,16 @@ import { summarize } from "./metrics";
 const base = (process.env.LOAD_BASE_URL ?? "http://127.0.0.1:8080").replace(/\/$/, "");
 const control = process.env.LOAD_CONTROL_URL ?? base;
 const count = Number(process.env.LOAD_CLIENTS ?? 250);
+const ineligibleCount = count >= 50 ? 5 : 1;
+const eligibleCount = count - ineligibleCount;
 const secret = process.env.OPERATOR_SECRET;
 assert(secret, "Set OPERATOR_SECRET in the environment");
-assert(Number.isInteger(count) && count > 0 && count <= 250, "1..250 clients required");
+assert(Number.isInteger(count) && count >= 2 && count <= 250, "2..250 clients required");
 const runKey = `stage-load-${Date.now()}`;
 const httpMs: Record<string, number[]> = {};
 async function request(path: string, init?: RequestInit, operator = false) {
   const start = performance.now();
-  const response = await fetch((operator ? control : base) + path, { ...init, signal: AbortSignal.timeout(60000),
+  const response = await fetch((operator ? control : base) + path, { ...init, signal: AbortSignal.timeout(120000),
     headers: { ...(operator ? { "x-operator-secret": secret! } : {}), ...init?.headers } });
   (httpMs[path.split("?")[0]] ??= []).push(performance.now() - start);
   assert(response.ok, `HTTP ${response.status} on ${path.split("?")[0]}`);
@@ -27,6 +30,7 @@ async function request(path: string, init?: RequestInit, operator = false) {
 const info = await (await request("/api/session")).json();
 const snapshot = async () => (await request(`/api/sessions/${info.sessionId}/snapshot`, undefined, true)).json();
 const before = await snapshot();
+const diagnosticsBefore = await (await request("/api/foundation", undefined, true)).json();
 assert(!before.calibration, "An existing calibration is active; leave it untouched");
 assert.equal(before.transport.status, "stopped", "Do not load-test an active performance");
 const showBefore = JSON.stringify(before.show);
@@ -41,7 +45,6 @@ const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; ret
 const clients: Phone[] = [];
 let ownedRunId: string | null = null;
 let downloads: Promise<void>[] = [];
-let sustainedDownloads = false;
 let bytesDownloaded = 0, maxConcurrentDownloads = 0, activeDownloads = 0;
 const downloadMs: number[] = [], margins: number[] = [], errors: string[] = [];
 let deadlineAt = 0;
@@ -54,6 +57,9 @@ class Phone {
   forceUnready = false;
   receivedArms = 0;
   acceptedArms = 0;
+  patternsCompleted = 0;
+  patternsInterrupted = 0;
+  private renderer: FlashRenderer | null = null;
   probes = 0;
   private statusTimer: ReturnType<typeof setInterval> | null = null;
   private timers = new Set<ReturnType<typeof setTimeout>>();
@@ -65,6 +71,8 @@ class Phone {
     sessionId: info.sessionId, serverEpoch: info.serverEpoch, deviceId: this.id,
   }));
   constructor(readonly index: number) {}
+  get expectedReady() { return this.index < eligibleCount; }
+  private get oneWayMs() { return this.expectedReady ? 80 + (this.index % 4) * 55 : 450; }
   private later(callback: () => void, at: number) {
     const timer = setTimeout(() => { this.timers.delete(timer); callback(); }, Math.max(0, at - performance.now()));
     this.timers.add(timer);
@@ -82,7 +90,7 @@ class Phone {
       socket.onerror = () => { clearTimeout(timeout); reject(new Error("Socket connect failed")); };
       socket.onmessage = event => {
         const raw = String(event.data);
-        const at = Math.max(this.lastDown, performance.now() + 80 + (this.index % 4) * 80 + random() * 30
+        const at = Math.max(this.lastDown, performance.now() + this.oneWayMs + random() * 30
           + (random() < 0.02 ? 1000 : 0));
         this.lastDown = at;
         this.later(() => { if (this.socket === socket) this.receive(raw); }, at);
@@ -104,7 +112,7 @@ class Phone {
       jitter = this.groupJitter.get(group)! + random() * 8;
       if (this.groupJitter.size > 200) this.groupJitter.delete(this.groupJitter.keys().next().value!);
     }
-    const at = Math.max(this.lastUp, performance.now() + 80 + (this.index % 4) * 80 + jitter);
+    const at = Math.max(this.lastUp, performance.now() + this.oneWayMs + jitter);
     this.lastUp = at;
     const socket = this.socket;
     this.later(() => { if (this.socket === socket && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }, at);
@@ -126,11 +134,25 @@ class Phone {
       this.receivedArms++;
       margins.push(message.effectiveServerMs - this.clock.nowServerMs());
       if (this.clock.quality().ready) this.calibration.onArm(message, this.clock.nowServerMs());
-      if (this.calibration.phase.kind === "armed") this.acceptedArms++;
+      const phase = this.calibration.phase;
+      if (phase.kind === "armed") {
+        this.acceptedArms++;
+        this.renderer = new FlashRenderer({ clock: this.clock, clockUsable: () => this.clock.quality().ready,
+          run: phase.run, packet: phase.packet,
+          frames: { request: callback => setTimeout(callback, 16), cancel: handle => clearTimeout(handle as ReturnType<typeof setTimeout>) },
+          paint: () => {}, // Execute the real timing/eligibility path without a physical screen.
+          onDone: lateness => { this.patternsCompleted++; this.calibration.complete(lateness); },
+          onClockLost: () => {
+            console.log(JSON.stringify({ clockLost: this.index, quality: this.clock.quality(), stats: this.clock.estimator.stats() }));
+            this.patternsInterrupted++; this.calibration.abort("clock");
+          } });
+        this.renderer.start();
+      }
     }
     if (message.type === "error") errors.push(message.payload.error.code);
   }
   disconnect() {
+    this.renderer?.stop();
     this.clock.stop();
     if (this.statusTimer) clearInterval(this.statusTimer);
     this.statusTimer = null;
@@ -141,19 +163,33 @@ class Phone {
   }
 }
 
-async function waitFor(check: () => Promise<boolean>, timeoutMs = 90000) {
+async function waitFor(check: () => Promise<boolean>, timeoutMs = 90000, label = "condition") {
+  console.log(`Waiting for ${label}`);
   const end = performance.now() + timeoutMs;
   while (performance.now() < end) { if (await check()) return; await Bun.sleep(500); }
-  throw new Error("Timed out waiting for load-test condition");
+  const current = await snapshot();
+  console.log(JSON.stringify({ waitingFor: label, clockReady: clients.filter(c => c.clock.quality().ready).length,
+    preparations: current.preparations.map((p: { readyIds: number[]; excluded: unknown[] }) => ({ ready: p.readyIds.length, excluded: p.excluded.length })),
+    slowClients: clients.filter(c => !c.clock.quality().ready).slice(0, 10).map(c => ({ index: c.index, quality: c.clock.quality(), stats: c.clock.estimator.stats() })) }));
+  throw new Error(`Timed out waiting for ${label}`);
 }
 async function download(url: string, hash: string, expectedSize: number) {
   const started = performance.now(); activeDownloads++; maxConcurrentDownloads = Math.max(maxConcurrentDownloads, activeDownloads);
   try {
     const response = await request(url, { cache: "no-store" });
-    const data = new Uint8Array(await response.arrayBuffer());
-    assert.equal(data.byteLength, expectedSize);
-    assert.equal(new Bun.CryptoHasher("sha256").update(data).digest("hex"), hash);
-    bytesDownloaded += data.byteLength; downloadMs.push(performance.now() - started);
+    const reader = response.body!.getReader(), hasher = new Bun.CryptoHasher("sha256");
+    let size = 0;
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength; hasher.update(chunk.value);
+      // Finite stem transfers at 256 kbit/s per phone; keep realistic downloads
+      // overlapping the pattern without repeatedly refetching a tiny cached tone.
+      await Bun.sleep(chunk.value.byteLength / 32768 * 1000);
+    }
+    assert.equal(size, expectedSize);
+    assert.equal(hasher.digest("hex"), hash);
+    bytesDownloaded += size; downloadMs.push(performance.now() - started);
   } finally { activeDownloads--; }
 }
 
@@ -161,17 +197,25 @@ try {
   // No show change: upload an original fixture tone only when no saved stems exist.
   let tracks = before.show.tracks;
   if (!tracks.length) {
-    const data = await Bun.file(new URL("../../fixtures/media/tone-0.wav", import.meta.url)).arrayBuffer();
+    const original = new Uint8Array(await Bun.file(new URL("../../fixtures/media/tone-0.wav", import.meta.url)).arrayBuffer());
+    const data = new Uint8Array(44 + (original.length - 44) * 4);
+    data.set(original.subarray(0, 44));
+    for (let i = 0; i < 4; i++) data.set(original.subarray(44), 44 + i * (original.length - 44));
+    const header = new DataView(data.buffer);
+    header.setUint32(4, data.length - 8, true); header.setUint32(40, data.length - 44, true);
     const query = new URLSearchParams({ commandId: runKey, label: "Synthetic load-test original tone",
-      byteSize: String(data.byteLength), durationMs: "8000", sampleRateHz: "48000", channels: "1" });
-    tracks = [await (await request(`/api/assets?${query}`, { method: "POST", body: data }, true)).json()];
+      byteSize: String(data.byteLength), durationMs: "32000", sampleRateHz: String(header.getUint32(24, true)), channels: "1" });
+    tracks = [await (await request(`/api/assets?${query}`, { method: "POST", body: data.buffer }, true)).json()];
   }
-  console.log(`Joining ${count} public clients; injected one-way base 80/160/240/320 ms + jitter and queue spikes.`);
+  console.log(`Joining ${count} public clients; ${eligibleCount} with one-way base 80/135/190/245 ms, ${ineligibleCount} deliberately at 450 ms each way; plus jitter/spikes.`);
   const started = performance.now();
   clients.push(...Array.from({ length: count }, (_, index) => new Phone(index)));
   await Promise.all(clients.map(client => client.connect()));
   downloads = clients.map(async () => { for (const track of tracks) await download(track.url, track.sha256, track.byteSize); });
-  await waitFor(async () => clients.every(client => client.clock.quality().ready));
+  const eligible = clients.filter(client => client.expectedReady);
+  const ineligible = clients.filter(client => !client.expectedReady);
+  await waitFor(async () => eligible.every(client => client.clock.quality().ready)
+    && ineligible.every(client => client.clock.estimator.stats().measurements === 16 && !client.clock.quality().ready), 90000, "clock eligibility and deliberate exclusions");
   console.log(`All clocks ready after ${((performance.now() - started) / 1000).toFixed(1)}s; ${activeDownloads} downloads still active.`);
   const created = await operator("/api/calibrations", { participantIds: clients.map(client => client.id),
     ...DEFAULT_CALIBRATION_PALETTE });
@@ -180,25 +224,19 @@ try {
     const current = await snapshot();
     return current.preparations.find((item: { preparationId: string }) => item.preparationId === created.preparationId)?.readyIds.length ?? 0;
   };
-  await waitFor(async () => await readyCount() === count);
-  const recovering = clients.slice(0, Math.min(25, count));
+  await waitFor(async () => await readyCount() === eligibleCount, 90000, "initial calibration acknowledgements");
+  const recovering = eligible.slice(0, Math.min(25, eligibleCount));
   for (const client of recovering) { client.forceUnready = true; client.status(); }
-  await waitFor(async () => await readyCount() <= count - recovering.length);
+  await waitFor(async () => await readyCount() <= eligibleCount - recovering.length, 90000, "readiness withdrawal");
   for (const client of recovering) { client.forceUnready = false; client.status(); }
-  await waitFor(async () => await readyCount() === count);
-  const reconnecting = clients.slice(25, Math.min(30, count));
+  await waitFor(async () => await readyCount() === eligibleCount, 90000, "readiness recovery");
+  const reconnecting = eligible.slice(25, Math.min(30, eligibleCount));
   for (const client of reconnecting) client.disconnect();
   await Promise.all(reconnecting.map(client => client.connect()));
-  await waitFor(async () => await readyCount() === count && clients.every(client => client.clock.quality().ready));
+  await waitFor(async () => await readyCount() === eligibleCount && eligible.every(client => client.clock.quality().ready), 90000, "reconnect recovery");
   // Re-download while arming so media and timing traffic overlap at the critical moment.
   await Promise.all(downloads);
-  sustainedDownloads = true;
-  downloads = clients.map(async () => {
-    do {
-      for (const track of tracks) await download(track.url, track.sha256, track.byteSize);
-      await Bun.sleep(100);
-    } while (sustainedDownloads);
-  });
+  downloads = clients.map(async () => { for (const track of tracks) await download(track.url, track.sha256, track.byteSize); });
   const armStarted = performance.now();
   const armed = await operator(`/api/calibrations/${ownedRunId}/arm`, {
     runId: ownedRunId, preparationId: created.preparationId,
@@ -206,31 +244,40 @@ try {
   const operatorDelayAndResponseMs = performance.now() - armStarted;
   const downloadsActiveAtArmResponse = activeDownloads;
   deadlineAt = armed.effectiveServerMs;
-  assert.equal(armed.ready, count);
-  await waitFor(async () => clients.every(client => client.acceptedArms === 1), 15000);
-  sustainedDownloads = false;
+  assert.equal(armed.ready, eligibleCount);
+  await waitFor(async () => eligible.every(client => client.acceptedArms === 1), 15000, "future arm delivery");
+  await waitFor(async () => {
+    assert(clients.every(client => client.patternsInterrupted === 0), "Clock lost during simulated pattern");
+    return eligible.every(client => client.patternsCompleted === 1);
+  }, 30000, "full pattern completion");
   await Promise.all(downloads);
   const after = await snapshot();
+  const diagnosticsAfter = await (await request("/api/foundation", undefined, true)).json();
   assert.equal(JSON.stringify(after.show), showBefore, "Load test changed saved show");
   assert(margins.every(value => value > 0), "A client received its arm late");
+  assert(ineligible.every(client => !client.clock.quality().ready && client.receivedArms === 0), "Ineligible phones must remain excluded");
   assert.equal(errors.length, 0, `Server/client errors: ${errors.slice(0, 5)}`);
   const report = { date: new Date().toISOString(), target: base, clients: count, serverEpoch: info.serverEpoch,
-    injection: "Ordered application delays: 80/160/240/320 ms each way; 0..30 ms shared pair jitter, 0..8 ms per-probe jitter; 4% +300 ms uplink pair spikes; 2% +1000 ms downlink spikes",
+    injection: "245 eligible clients (at 250 total): 80/135/190/245 ms each way; 5 deliberate exclusions: 450 ms each way; 0..30 ms shared pair jitter, 0..8 ms per-probe jitter; 4% +300 ms uplink pair spikes; 2% +1000 ms downlink spikes",
+    eligibleCount, deliberatelyExcluded: ineligibleCount,
     seed: 20261028, recoveryCount: recovering.length, reconnectCount: reconnecting.length,
     readyAtArm: armed.ready, armsReceived: clients.filter(c => c.receivedArms === 1).length,
     armsAccepted: clients.filter(c => c.acceptedArms === 1).length, cueMarginMs: summarize(margins), minimumCueMarginMs: Math.min(...margins),
+    patternsCompleted: clients.filter(c => c.patternsCompleted === 1).length, patternsInterrupted: clients.reduce((sum, c) => sum + c.patternsInterrupted, 0),
     totalSeconds: (performance.now() - started) / 1000, operatorDelayAndResponseMs, downloadsActiveAtArmResponse,
     serverChosenStart: deadlineAt, bytesDownloaded, downloads: downloadMs.length, maxConcurrentDownloads,
     downloadMs: summarize(downloadMs), uncertaintyMs: summarize(clients.map(c => c.clock.quality().uncertaintyMs ?? Infinity)),
+    eligibleUncertaintyMs: summarize(eligible.map(c => c.clock.quality().uncertaintyMs ?? Infinity)),
+    ineligibleUncertaintyMs: summarize(ineligible.map(c => c.clock.quality().uncertaintyMs ?? Infinity)),
     probes: clients.reduce((sum, c) => sum + c.probes, 0),
     httpResponseHeadersMs: Object.fromEntries(Object.entries(httpMs).map(([path, times]) => [path, summarize(times)])),
     errors, savedShowUnchanged: true,
+    diagnosticsBefore: diagnosticsBefore.diagnostics, diagnosticsAfter: diagnosticsAfter.diagnostics,
     limitations: "One load generator/public WAN path; injected timers, not independent Wi-Fi radios; original tone when show is empty; verifies media bytes and scheduling, not decode/audio/optical performance. Test device IDs remain allocated." };
   await mkdir("runtime", { recursive: true });
   await writeFile(process.env.LOAD_REPORT ?? "runtime/calibration-stage-load.json", JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  sustainedDownloads = false;
   for (const client of clients) client.disconnect();
   await Promise.allSettled(downloads);
   if (ownedRunId) {

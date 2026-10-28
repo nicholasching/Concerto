@@ -110,9 +110,8 @@ try {
   assert.deepEqual(created.plan.palette, { zero: "#FF0000", one: "#0066FF", neutral: "#111111" });
   assert.equal(created.plan.paletteVersion, "red-blue-v1");
   await until(snapshot, s => s.preparations.find(p => p.domain === "calibration")?.readyIds.length === 4);
-  current = await snapshot();
-  const startServerMs = current.serverMs + 4000;
-  await request(`/api/calibrations/${created.plan.runId}/arm`, { runId: created.plan.runId, preparationId: created.preparationId, effectiveServerMs: startServerMs });
+  const armed = await request(`/api/calibrations/${created.plan.runId}/arm`, { runId: created.plan.runId, preparationId: created.preparationId });
+  const startServerMs = armed.effectiveServerMs;
   const template = await Bun.file("fixtures/otc/clean-30/manifest.json").json();
   const manifestPath = `${directory}/generator-input.json`;
   await writeFile(manifestPath, JSON.stringify({ ...template, ...created.plan, startServerMs }));
