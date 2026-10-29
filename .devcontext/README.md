@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### BuildAtMac production hostname, 2026-10-29
+
+Production is **https://buildatmac.nicholasching.ca**; the old htnlive hostname remains an alias. Railway DNS/TLS, allowed origins and canonical projector QR are configured. Deployment a8811529 uses unchanged application commit 84b4edd; the saved four-stem show is preserved. Small six-group smoke and asset HEAD checks pass; no load tests or music downloads were run. See [migration journal](teams/integration/journal/20261029-buildatmac-domain.md) and [deployment guide](../docs/railway-deployment.md). Prior performance-test findings remain unresolved and separate.
+
 ### Performance intent and download recovery, 2026-10-29
 
 Deployed to Railway as **84b4edd**: operator controls send intent with server-owned five-second timestamps; operator clock is display-only (internet profile). Current transport/assignment/assets preparation ACKs recover with revision/membership guards. Music loads use two-track concurrency, four attempts, jittered backoff, idle timeouts, cancellation and failure cooldown. See [decision](decisions/20261029-performance-intent-and-recovery.md), [local checks](teams/integration/journal/20261029-performance-recovery.md) and [release evidence](teams/integration/journal/20261029-performance-release.md). Corrected local 250-client scenario passed; corrected public 250-client scenario failed with 244/245 eligible clocks ready and one abnormal socket close. Production scale sign-off remains incomplete; optical audit failures and physical rehearsal remain separate.

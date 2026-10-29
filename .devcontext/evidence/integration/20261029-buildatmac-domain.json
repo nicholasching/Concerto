@@ -1,0 +1,35 @@
+{
+  "health": {
+    "service": "audience-orchestra-control",
+    "protocolVersion": 1,
+    "implementation": "sync-control",
+    "deploymentCommit": "84b4edd25c94b8997e753effda74514db31270aa",
+    "deploymentId": "a8811529-f995-4fde-8be6-d0d673d47851"
+  },
+  "showPreserved": true,
+  "showRevision": 1,
+  "tracks": 4,
+  "assetHeads": [
+    {
+      "trackId": "2390933a-ec94-406c-be3f-0c725faf6081",
+      "status": 200
+    },
+    {
+      "trackId": "a50e145e-ab42-41a5-8bce-e02d9b387d14",
+      "status": 200
+    },
+    {
+      "trackId": "246f2e7d-e643-48bc-b0c3-56d0a920e4e7",
+      "status": 200
+    },
+    {
+      "trackId": "8f13e9f1-9c02-4e2d-93ce-9d3f9778e8b8",
+      "status": 200
+    }
+  ],
+  "connected": 0,
+  "transport": "stopped",
+  "pending": 0,
+  "calibration": false,
+  "oldAliasHealthy": true
+}

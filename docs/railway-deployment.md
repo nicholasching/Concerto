@@ -1,6 +1,6 @@
 # Deploy Concerto to Railway
 
-Production: **https://htnlive.nicholasching.ca**. Development remains **https://htn.nicholasching.ca**, served by the existing local reverse proxy.
+Production: **https://buildatmac.nicholasching.ca**. The previous **https://htnlive.nicholasching.ca** remains an alias during migration. Development remains **https://htn.nicholasching.ca**, served by the existing local reverse proxy.
 
 The root Dockerfile installs Bun 1.3.14, Node 22, Python 3.13 and the locked recognition dependencies, builds both Next apps and the backend, then runs `bun run start`. One public port serves audience `/`, operator `/admin`, projector `/present` and camera crew `/upload`. The admin/backend ports stay inside the container. Use **one service, one replica, one volume**; the current concert state is authoritative in one backend process.
 
@@ -17,19 +17,20 @@ The root Dockerfile installs Bun 1.3.14, Node 22, Python 3.13 and the locked rec
    | `NODE_ENV` | `production` |
    | `SESSION_ID` | `prod-session` |
    | `DATA_DIR` | `/data` |
-   | `ALLOWED_ORIGINS` | `https://concerto-production-02db.up.railway.app,https://htnlive.nicholasching.ca` |
+   | `ALLOWED_ORIGINS` | `https://concerto-production-02db.up.railway.app,https://htnlive.nicholasching.ca,https://buildatmac.nicholasching.ca` |
+   | `NEXT_PUBLIC_PARTICIPANT_URL` | `https://buildatmac.nicholasching.ca` |
    | `OPERATOR_SECRET` | Your production operator password |
    | `OTC_CPU_BUDGET` | `22` for the current 24-vCPU allocation; reduce this if the service limit is lower |
 
-   The image supplies loopback `BACKEND_INTERNAL_URL=http://127.0.0.1:8080`, `ADMIN_INTERNAL_URL=http://127.0.0.1:3001` and its Python interpreter. It also caps `OPENBLAS_NUM_THREADS`, `OMP_NUM_THREADS` and `MKL_NUM_THREADS` to `1` so native libraries cannot multiply the 22 analysis processes into thousands of threads. Keep these defaults. Leave `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL` and mock settings unset. The projector derives the join URL from its own origin.
+   The image supplies loopback `BACKEND_INTERNAL_URL=http://127.0.0.1:8080`, `ADMIN_INTERNAL_URL=http://127.0.0.1:3001` and its Python interpreter. It also caps `OPENBLAS_NUM_THREADS`, `OMP_NUM_THREADS` and `MKL_NUM_THREADS` to `1` so native libraries cannot multiply the 22 analysis processes into thousands of threads. Keep these defaults. Leave `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL` and mock settings unset. The projector uses the canonical participant URL above, falling back to its own origin if unset.
 
-   List both actual public origins explicitly. Railway's `RAILWAY_PUBLIC_DOMAIN` switches to the custom hostname when it becomes primary, so using that reference alone can omit the generated hostname.
+   List all actual public origins explicitly. Railway's `RAILWAY_PUBLIC_DOMAIN` switches to the custom hostname when it becomes primary, so using that reference alone can omit the generated hostname. The participant URL is a frontend build argument; redeploy after changing it so projector QR links use the new canonical hostname.
 
 5. In **Settings**, set Healthcheck Path to **`/api/health`** and timeout to **300 seconds**. Keep **one replica**, **Serverless off**, and **On Failure** restart policy. Choose the nearest available region to the venue. Keep enough CPU/memory headroom for control and audio serving alongside recognition.
 6. Apply the staged changes with **Deploy**. Verify the build uses the Dockerfile, installs the Python worker and builds both Next apps. Logs must show all three application processes starting. Wait for the deployment to be healthy.
 7. Under **Settings → Networking**, select **Generate Domain** targeting **port 3000**. Open its HTTPS URL and verify `/api/health`, `/admin`, `/present` and `/upload`. The admin should require the production password; an audience phone should join and synchronize. This isolates app startup from DNS setup.
-8. Add custom domain **`htnlive.nicholasching.ca`**, targeting port **3000**. Railway displays the exact DNS records for this deployment. In the authoritative DNS provider add its **CNAME** for `htnlive` and its ownership **TXT** record exactly as shown. If DNS is managed by Cloudflare, start with the new CNAME **DNS only**. Leave the existing `htn` tunnel record intact. Wait for Railway domain verification and its TLS certificate.
-9. Open **https://htnlive.nicholasching.ca/admin** and sign in. Copy the approved saved show/audio to this fresh production session using authenticated uploads and show save. Do not copy development device tokens, mappings or camera recordings. Verify downloaded audio hashes and the four section presets.
+8. Add custom domain **`buildatmac.nicholasching.ca`**, targeting port **3000**. Railway displays the exact DNS records for this deployment. In the authoritative DNS provider add its **CNAME** for `buildatmac` and its ownership **TXT** record exactly as shown. If DNS is managed by Cloudflare, start with the new CNAME **DNS only**. Leave the existing `htn` tunnel record intact. Wait for Railway domain verification and its TLS certificate.
+9. Open **https://buildatmac.nicholasching.ca/admin** and sign in. Copy the approved saved show/audio to this fresh production session using authenticated uploads and show save. Do not copy development device tokens, mappings or camera recordings. Verify downloaded audio hashes and the four section presets.
 10. Join with real audience phones, verify music and sound readiness, perform a fresh calibration, commit automatic sections and rehearse playback. A server restart preserves the saved show/media/identities but stops playback and requires repeating an unfinished calibration. Avoid deployment during a performance.
 
 Railway's current documentation covers [Dockerfile builds](https://docs.railway.com/builds/dockerfiles), [persistent volumes](https://docs.railway.com/volumes), [healthchecks](https://docs.railway.com/deployments/healthchecks) and [domain setup](https://docs.railway.com/networking/domains). The dashboard's generated DNS values are authoritative; do not guess a Railway CNAME or TXT token.
