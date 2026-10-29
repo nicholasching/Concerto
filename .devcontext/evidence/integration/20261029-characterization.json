@@ -1,0 +1,43 @@
+{
+  "baseline": "3d08a6d",
+  "productionRequests": 0,
+  "findings": {
+    "transportReadyNotRestoredAfterRecovery": {
+      "status": 409,
+      "body": {
+        "protocolVersion": 1,
+        "error": {
+          "code": "NOBODY_READY",
+          "message": "No device has acknowledged this preparation.",
+          "retryable": false,
+          "owner": "sync-control"
+        }
+      }
+    },
+    "operatorDelay501Ms": {
+      "status": 409,
+      "body": {
+        "protocolVersion": 1,
+        "error": {
+          "code": "INSUFFICIENT_LEAD_TIME",
+          "message": "A scheduled change must be at least 1500 ms in the future; phones need time to schedule it.",
+          "retryable": false,
+          "owner": "sync-control"
+        }
+      }
+    },
+    "transientMediaFailureNeedsExplicitSecondPreload": {
+      "firstFailures": 1,
+      "requests": 2,
+      "recoveredOnSecondCall": true
+    }
+  },
+  "snapshot": {
+    "registered": 1262,
+    "encodedBytes": 501562,
+    "builds": 200,
+    "p50Ms": 3.465299999999985,
+    "p99Ms": 10.295099999999934,
+    "maxMs": 14.088599999999985
+  }
+}
