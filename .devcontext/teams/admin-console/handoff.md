@@ -1,5 +1,7 @@
 # admin-console handoff
 
+Latest integrated-main update (2026-10-29): stop transport, open Performance → Prepare show and stems, edit Track name, then Save prepared show. This changes saved channel labels across audience/admin surfaces without changing lane IDs/audio/routes; inferred legacy routes are frozen into existing ID presets before rename. Do not reintroduce name-only fourth-lane detection or strip presets in legacy column fallback. Admin/sync/client gates and browser propagation pass. Source publication is user-authorized; deployment remains separate. [Exact files, checks and next action](../integration/journal/20261029-configurable-track-labels.md).
+
 Latest integrated-main mapping update (2026-09-19): camera geometry now works from saved previews, with stage-facing approximate presets and dirty-geometry commit protection. Maps show labeled dots and explicit column-only fallback devices; Assign supports click/box/lasso plus movable left/center/right dividers. Final admin gate passes 24 tests and production build. Four physical-file devices were mapped and committed locally, then selected with a verified 2/1/1 region split. Read the [current integration journal](../integration/journal/20260919-seat-map-selection.md) and [operator guide](../../../docs/audience-mapping.md). The branch-era scaffold/integration instructions below are historical.
 
 Read [stage brief](../../stages/04-admin-console.md), root rules/masterplan, [subplot](subplot.md)

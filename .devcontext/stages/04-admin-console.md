@@ -1,5 +1,7 @@
 # Stage 04 - Admin and DJ console
 
+Integrated-main update (2026-10-29): configurable Track name inputs use the existing stopped-only prepared-show save/recovery flow. Confirmed names propagate across admin and audience; audio/IDs/routing are preserved. Admin/sync/client gates and isolated real-browser checks pass. [Implementation, files, checks and consumer handoff](../teams/integration/journal/20261029-configurable-track-labels.md). The foundation status below is historical; physical rehearsal remains separate.
+
 Status: not started (read-only fixture preview provided). Owner: Team 4 lead. Branch: feat/admin-console. Base: foundation-v1.
 
 ## Agent assignment

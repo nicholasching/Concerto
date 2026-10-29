@@ -96,7 +96,7 @@ section section { border-radius: 12px; }
 .ruler { position: relative; height: 20px; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .playhead { position: absolute; top: -2px; bottom: -2px; width: 1px; background: #454d58; pointer-events: none; z-index: 1; }
 .lane-row { align-items: center; border-top: 1px solid #a3a5a850; }
-.lane-label { display: flex; align-items: center; font-size: 13px; font-weight: 500; color: var(--ink); }
+.lane-label { display: flex; align-items: center; font-size: 13px; font-weight: 500; color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
 .lane-label .swatch { flex-shrink: 0; width: 8px; height: 8px; }
 .lane-track { height: 64px; position: relative; border-radius: 5px; background: #ffffff20; }
 .clip { position: absolute; top: 3px; bottom: 3px; border: 1px solid; border-radius: 5px; padding: 4px 8px; font-size: 10px; color: #3f4751; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

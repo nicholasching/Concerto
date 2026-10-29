@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Configurable track names, 2026-10-29
+
+Local update: Performance → Prepare show and stems now edits each lane's Track name. Saving propagates names to audience phones, timeline/mix controls and section summaries/options while retaining IDs/audio/routes. Legacy manual-column clients honor saved presets after a rename. Admin/sync/client gates and isolated browser edit/save/audience checks pass; no deployment or physical rehearsal is claimed. See [verification and handoff](teams/integration/journal/20261029-configurable-track-labels.md).
+
 ### Stage-facing camera upload labels, 2026-10-29
 
 `/upload` Left/Center/Right now describe the camera crew's view from the stage toward the audience. Left sends canonical audience-right; Right sends audience-left. Received labels use the same stage perspective, while audience music choices and admin map coordinates retain their audience-facing-stage convention. See [decision](decisions/20261029-stage-camera-upload-perspective.md) and [verification/release journal](teams/integration/journal/20261029-stage-camera-labels.md).

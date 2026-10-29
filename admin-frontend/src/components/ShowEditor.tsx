@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { AUDIENCE_SECTIONS, DECODED_AUDIO_BUDGET_BYTES, DEFAULT_SHOW_CHANNELS, sectionChannelsFor, type AdminSnapshotData, type ShowData } from "@orchestra/contracts";
 import { useAdapter } from "../lib/useSnapshot";
-import { addVocalsRight, forgetShowDraft, recoverShowDraft, rememberShowDraft } from "../lib/show-draft";
+import { addVocalsRight, forgetShowDraft, recoverShowDraft, rememberShowDraft, renameChannel } from "../lib/show-draft";
 
 export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData; refresh: () => void }) {
   const adapter = useAdapter();
@@ -35,6 +35,7 @@ export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData;
   const decodedMb = draft.tracks.reduce((sum, track) => sum + track.durationMs / 1000 * track.sampleRateHz * track.channels * 4, 0) / 1024 / 1024;
   const budgetMb = DECODED_AUDIO_BUDGET_BYTES / 1024 / 1024;
   const sectionChannels = sectionChannelsFor(draft);
+  const validNames = draft.channels.every(channel => channel.label.trim().length > 0);
   return <details id="show-configuration" open={snapshot.show.clips.length === 0}><summary>Prepare show and stems</summary>
     <p className="muted">Align stems to the same start. Save while stopped to preload phones.</p>
     {!editable && <p>Stop transport and wait for pending changes before editing.</p>}
@@ -51,9 +52,11 @@ export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData;
       </label>)}</div>
       {draft.clips.length === 0 && <button onClick={() => edit({ showId: crypto.randomUUID(), showRevision: snapshot.show.showRevision, label: "Concerto", tracks: [], clips: [],
         channels: DEFAULT_SHOW_CHANNELS.map(channel => ({ ...channel, gain: 0.5, mute: false, solo: false })) })}>Set up four channels</button>}
-      {!draft.channels.some(channel => channel.label.trim().toLowerCase() === DEFAULT_SHOW_CHANNELS[3].label.toLowerCase()) &&
+      {draft.channels.length < 4 && !draft.channels.some(channel => channel.label.trim().toLowerCase() === DEFAULT_SHOW_CHANNELS[3].label.toLowerCase()) &&
         <button onClick={() => edit(addVocalsRight(draft))}>Add {DEFAULT_SHOW_CHANNELS[3].label}</button>}
-      {draft.channels.map(channel => <div key={channel.channelId}><h3><span className="swatch" style={{ background: channel.color }} aria-hidden="true" />{channel.label}</h3>
+      <p className="muted">Track names appear on the audience screen and throughout the dashboard after saving.</p>
+      {draft.channels.map((channel, index) => <div key={channel.channelId}><h3><span className="swatch" style={{ background: channel.color }} aria-hidden="true" />{channel.label || `Track ${index + 1}`}</h3>
+        <label>Track name <input aria-label={`Track ${index + 1} name`} value={channel.label} required aria-invalid={!channel.label.trim()} onChange={e => edit(renameChannel(draft, channel.channelId, e.target.value))} /></label>
         <label>Add prepared audio <input type="file" accept="audio/*" aria-label={`Upload ${channel.label} audio`} onChange={e => void upload(e.target.files?.[0], channel.channelId)} /></label>
         {draft.clips.filter(clip => clip.channelId === channel.channelId).map(clip => <div key={clip.clipId} className="clip-editor">
           <strong>{draft.tracks.find(track => track.trackId === clip.trackId)?.label}</strong>
@@ -71,7 +74,8 @@ export function ShowEditor({ snapshot, refresh }: { snapshot: AdminSnapshotData;
         <button onClick={() => edit({ ...draft, cueMarkers: draft.cueMarkers?.filter(item => item.cueId !== cue.cueId) })}>Remove cue</button>
       </div>)}
       <button onClick={() => edit({ ...draft, cueMarkers: [...(draft.cueMarkers ?? []), { cueId: crypto.randomUUID(), label: "New cue", positionMs: 0 }] })}>Add cue marker</button>
-      <button disabled={(!dirty && !!snapshot.show.sectionChannels) || decodedMb > budgetMb} onClick={() => { setBusy(true); setError(null); rememberShowDraft(snapshot.sessionId, snapshot.show, { ...draft, sectionChannels }); void adapter.saveShow({ ...draft, sectionChannels }).then(() => { forgetShowDraft(snapshot.sessionId); setDirty(false); refresh(); }, cause => setError(String(cause))).finally(() => setBusy(false)); }}>Save prepared show</button>
+      {!validNames && <p role="alert" className="error">Enter a name for every track before saving.</p>}
+      <button disabled={!validNames || (!dirty && !!snapshot.show.sectionChannels) || decodedMb > budgetMb} onClick={() => { const show = { ...draft, sectionChannels, channels: draft.channels.map(channel => ({ ...channel, label: channel.label.trim() })) }; setBusy(true); setError(null); rememberShowDraft(snapshot.sessionId, snapshot.show, show); void adapter.saveShow(show).then(() => { forgetShowDraft(snapshot.sessionId); setDirty(false); refresh(); }, cause => setError(String(cause))).finally(() => setBusy(false)); }}>Save prepared show</button>
     </fieldset>
   </details>;
 }

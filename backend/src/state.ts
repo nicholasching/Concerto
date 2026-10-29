@@ -395,7 +395,7 @@ export class SessionState {
   }
 
   private routeManualColumns(effectiveServerMs: number, reschedulePeers = false): void {
-    const defaults = sectionChannelsFor({ channels: this.show.channels });
+    const defaults = sectionChannelsFor(this.show);
     for (const column of ["left", "center", "right"] as const) {
       const followers = [...this.manualRouting].filter(id => this.locations.get(id)?.column === column);
       if (!followers.length) continue;

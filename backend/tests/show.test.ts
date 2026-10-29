@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join as joinPath } from "node:path";
-import { AdminSnapshot, ApiError, CommandAccepted, PROTOCOL_VERSION, type ShowData } from "@orchestra/contracts";
+import { AdminSnapshot, ApiError, CommandAccepted, PROTOCOL_VERSION, Show, sectionChannelsFor, type ShowData } from "@orchestra/contracts";
+import fixture from "../../fixtures/show.json";
 import { createApp } from "../src/app";
 import { AssetStore } from "../src/assets";
 import { CalibrationRuns } from "../src/calibration";
@@ -75,6 +76,43 @@ const save = (app: ReturnType<typeof createApp>, options: {
   });
 
 describe("saving a show", () => {
+  test("custom lane names reach both snapshot roles and persist without changing music or section routing", async () => {
+    const { app, state, store } = harness();
+    const existing = Show.parse(fixture);
+    await save(app, { commandId: "original", expectedRevision: 0, preparedShow: existing });
+    for (let id = 0; id < 7; id++) state.register(id);
+    for (const [id, section] of (["left", "center-left", "center-right", "right"] as const).entries()) state.chooseSection(id, section, serverMs);
+    for (const [index, column] of (["left", "center", "right"] as const).entries()) state.chooseColumn(index + 4, column, serverMs);
+    state.applyDue(serverMs + 2000);
+    const assignments = Array.from({ length: 7 }, (_, id) => state.assignmentOf(id)?.channelId);
+    const names = ["Guitar", "Bass", "Drums", "Harmony"];
+    const renamed = { ...state.show, sectionChannels: sectionChannelsFor(state.show),
+      channels: state.show.channels.map((channel, index) => ({ ...channel, label: names[index] })) };
+    const response = await save(app, { commandId: "rename", expectedRevision: 1, preparedShow: renamed });
+    expect(response.status).toBe(200);
+    expect(state.show.channels.map(channel => channel.label)).toEqual(names);
+    expect(state.show.tracks).toEqual(existing.tracks);
+    expect(state.show.clips).toEqual(existing.clips);
+    expect(Array.from({ length: 7 }, (_, id) => state.assignmentOf(id)?.channelId)).toEqual(assignments);
+    const admin = AdminSnapshot.parse(await (await app.request(`/api/sessions/${SESSION}/snapshot`, { headers: { "x-operator-secret": SECRET } })).json());
+    expect(admin.show.channels).toEqual(renamed.channels);
+    for (let id = 0; id < 7; id++) {
+      const participant = state.participantSnapshot(id, clock)!;
+      expect(participant.show.channels).toEqual(admin.show.channels);
+      expect(participant.show.channels.find(channel => channel.channelId === participant.assignment.channelId)?.label).toBe(names[existing.channels.findIndex(channel => channel.channelId === assignments[id])]);
+    }
+    const restored = new SessionState();
+    const checkpoint = await store.read();
+    restored.restoreShow(checkpoint!.show!);
+    restored.register(0);
+    restored.chooseColumn(0, "right", serverMs);
+    restored.applyDue(serverMs + 2000);
+    expect(restored.show).toEqual(state.show);
+    expect(restored.assignmentOf(0)?.channelId).toBe(renamed.sectionChannels.right);
+    state.register(7); state.chooseSection(7, "right", serverMs); state.applyDue(serverMs + 2000);
+    expect(state.assignmentOf(7)?.channelId).toBe(renamed.sectionChannels.right);
+  });
+
   test("saves four long stereo tracks within the expanded decoded budget", async () => {
     const { app, state } = harness();
     const preparedShow = show("Long prepared show");

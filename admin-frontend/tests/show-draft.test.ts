@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { DEFAULT_SHOW_CHANNELS, Show, type ShowData } from "@orchestra/contracts";
-import { addVocalsRight, forgetShowDraft, recoverShowDraft, rememberShowDraft } from "../src/lib/show-draft";
+import { DEFAULT_SHOW_CHANNELS, Show, sectionChannelsFor, type ShowData } from "@orchestra/contracts";
+import { addVocalsRight, forgetShowDraft, recoverShowDraft, rememberShowDraft, renameChannel } from "../src/lib/show-draft";
 import fixture from "../../fixtures/show.json";
 
 function memoryStorage() {
@@ -11,6 +11,36 @@ function memoryStorage() {
 }
 const saved: ShowData = { showId: "show", showRevision: 3, label: "Sound check", tracks: [], clips: [],
   channels: [{ channelId: "percussion", label: "Percussion", color: "#abcdef", gain: 1, mute: false, solo: false }] };
+
+test("renaming all lanes preserves audio, IDs, mix and inferred section routes in a recoverable draft", () => {
+  for (const labels of [["Melody", "Percussion", "Vocals Left", "Vocals Right"], ["Melody", "Vocals", "Percussion", "Percussion 2"]]) {
+    const existing = Show.parse(fixture);
+    existing.channels.forEach((channel, index) => { channel.label = labels[index]; });
+    delete existing.sectionChannels;
+    const before = structuredClone(existing);
+    const routes = sectionChannelsFor(existing);
+    const names = ["Guitar", "Bass", "Drums", "Harmony"];
+    const draft = existing.channels.reduce((show, channel, index) => renameChannel(show, channel.channelId, names[index]), existing);
+    expect(draft.channels.map(channel => channel.label)).toEqual(names);
+    expect({ ...draft, channels: draft.channels.map((channel, index) => ({ ...channel, label: labels[index] })), sectionChannels: undefined })
+      .toEqual({ ...before, sectionChannels: undefined });
+    expect(sectionChannelsFor(draft)).toEqual(routes);
+    expect(existing).toEqual(before);
+    const storage = memoryStorage();
+    rememberShowDraft("session", existing, draft, storage);
+    expect(recoverShowDraft("session", existing, storage)).toEqual(draft);
+    expect(addVocalsRight(draft)).toBe(draft);
+  }
+});
+
+test("renaming retains explicit silent and shared section presets, even for duplicate labels", () => {
+  const existing: ShowData = { ...Show.parse(fixture), sectionChannels: {
+    left: null, "center-left": "channel-3", "center-right": "channel-3", right: "channel-0",
+  } };
+  const draft = renameChannel(renameChannel(existing, "channel-0", "Synth"), "channel-3", "Synth");
+  expect(sectionChannelsFor(draft)).toEqual(sectionChannelsFor(existing));
+  expect(draft.channels[0].channelId).not.toBe(draft.channels[3].channelId);
+});
 
 test("adding Vocals Right preserves an existing three-lane show and its recoverable draft", () => {
   const existing: ShowData = { ...Show.parse(fixture), channels: DEFAULT_SHOW_CHANNELS.slice(0, 3).map(channel => ({ ...channel, gain: 0.7, mute: false, solo: false })),

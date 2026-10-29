@@ -1,5 +1,7 @@
 # admin-console checkpoint
 
+Integrated-main update (2026-10-29): configurable track names are verified locally in Prepare show and stems, with draft recovery, nonblank validation and authoritative propagation to audience/admin views. Admin gate: 35 focused tests; sync/client gates and real-browser save/reload/audience checks pass. Ready for normal release; not deployed. [Files, evidence and limitations](../integration/journal/20261029-configurable-track-labels.md).
+
 Concerto UI (2026-09-20): product labels/new-show default and neutral metal theme updated under the cross-application request. Admin gate passes 25 focused tests plus 19 contract tests and build. [Evidence](../integration/journal/20260920-concerto-metal-ui.md).
 
 Status: in progress (review remediation; producer contract blockers remain).
