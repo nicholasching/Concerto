@@ -9197,8 +9197,7 @@
       "expectedRevision",
       "mapRevision",
       "deviceIds",
-      "channelId",
-      "effectiveServerMs"
+      "channelId"
     ],
     "additionalProperties": false
   },
@@ -9262,8 +9261,7 @@
       "expectedRevision",
       "action",
       "showRevision",
-      "positionMs",
-      "effectiveServerMs"
+      "positionMs"
     ],
     "additionalProperties": false
   },
@@ -9351,7 +9349,6 @@
       "serverEpoch",
       "commandId",
       "expectedRevision",
-      "effectiveServerMs",
       "masterGain",
       "channels"
     ],

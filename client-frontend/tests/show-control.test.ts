@@ -85,6 +85,15 @@ test("assets.prepare preloads, then reports only verified hashes", async () => {
   expect(Object.keys((lastReply().payload as { trackHashes: object }).trackHashes)).toEqual(["tone-0"]);
 });
 
+test("a stale assets preparation cannot replace the show or issue fresh downloads", async () => {
+  let preloads=0;
+  const guarded = new ShowControl({send:message => sent.push(message), identity:() => me, facts:() => facts,
+    now:() => now, preload:async () => {preloads++;}});
+  guarded.applySnapshot({...base,show:{...base.show,showRevision:2}});
+  guarded.handle({...envelope,type:"assets.prepare",payload:{preparationId:"old",show:base.show}});
+  await Bun.sleep(0); expect(preloads).toBe(0); expect(sent).toHaveLength(0);
+});
+
 test("commits apply once, in revision order; older or repeated revisions are ignored", () => {
   control.handle(transportCommit(playing(2, T0 + 1000), T0 + 1000));
   control.handle(transportCommit(playing(2, T0 + 1000), T0 + 1000));

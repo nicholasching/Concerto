@@ -107,7 +107,7 @@ describe("assets", () => {
   });
 
   test("rejects a wrong byte size and an HTTP failure", async () => {
-    const options = { ctx: asAudioContext(new FakeAudioContext()), budget: new DecodedBudget(), baseUrl: "http://mock" };
+    const options = { ctx: asAudioContext(new FakeAudioContext()), budget: new DecodedBudget(), baseUrl: "http://mock", sleep: async () => {} };
     const short = (await toneBytes()).slice(0, 100);
     expect((await loadTrack(track, { ...options, fetch: serve(short) }).catch(e => e)).code).toBe("size");
     expect((await loadTrack(track, { ...options, fetch: async () => new Response("", { status: 404 }) }).catch(e => e)).code).toBe("http");

@@ -29,10 +29,10 @@ import { nextTransport, positionAt } from "./transport";
 import { validateShow } from "./show-validation";
 import { registerStageRoutes } from "./stage-routes";
 
-// Operator schedules two seconds ahead; allow 500 ms for the HTTP command to reach us.
-// Commands delayed beyond this still fail instead of silently starting phones late.
+// Explicit scheduled API calls retain their minimum lead; dashboard intent uses server time.
 export const DEFAULT_LEAD_TIME_MS = 1500;
 export const CALIBRATION_LEAD_TIME_MS = 5000;
+export const PERFORMANCE_LEAD_TIME_MS = 5000;
 
 const numeric = z.coerce.number();
 const CameraUploadQuery = z.object({
@@ -164,6 +164,8 @@ export function createApp(deps: AppDeps) {
   });
   app.get("/api/health", c => c.json({
     service: "audience-orchestra-control", protocolVersion: 1, implementation: "sync-control",
+    deploymentCommit: process.env.RAILWAY_GIT_COMMIT_SHA ?? null,
+    deploymentId: process.env.RAILWAY_DEPLOYMENT_ID ?? null,
   }));
   registerStageRoutes(app, deps, persist);
   app.get("/api/foundation", c => c.json({
@@ -320,7 +322,8 @@ export function createApp(deps: AppDeps) {
       return c.json(ack);
     }
 
-    const leadTime = leadTimeError(deps, request.effectiveServerMs, now);
+    const effectiveServerMs = request.effectiveServerMs ?? deps.clock.nowServerMs() + PERFORMANCE_LEAD_TIME_MS;
+    const leadTime = leadTimeError(deps, effectiveServerMs, deps.clock.nowServerMs());
     if (leadTime) return c.json(leadTime.body, leadTime.status);
 
     // Starting playback is the only action gated on readiness. Stopping or pausing must never
@@ -340,8 +343,8 @@ export function createApp(deps: AppDeps) {
       current: deps.state.transport, action: request.action, showRevision: deps.state.showRevision,
       positionMs: request.action === "play" || request.action === "seek"
         ? request.positionMs
-        : positionAt(deps.state.transport, request.effectiveServerMs),
-      effectiveServerMs: request.effectiveServerMs,
+        : positionAt(deps.state.transport, effectiveServerMs),
+      effectiveServerMs,
     }), transportRevision: deps.state.transportRevision + 1 };
 
     // A deliberate transport command is how an operator comes back from a panic.
@@ -349,16 +352,16 @@ export function createApp(deps: AppDeps) {
     const recipients = request.action === "play" && barrier ? barrier.readyDevices()
       : transport.status === "playing" ? deps.state.playbackDeviceIds() : deps.state.connectedDeviceIds();
     const superseded = deps.state.scheduleTransport({
-      domain: "transport", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
+      domain: "transport", commandId: request.commandId, effectiveServerMs,
       supersedesCommandId: null, transport,
     }, recipients);
     deps.connections.sendToParticipants(recipients, JSON.stringify({
       ...envelope(deps.clock), type: "transport.commit", revision: deps.state.revision,
-      effectiveServerMs: request.effectiveServerMs,
-      payload: { domain: "transport", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs, supersedesCommandId: superseded, transport },
+      effectiveServerMs,
+      payload: { domain: "transport", commandId: request.commandId, effectiveServerMs, supersedesCommandId: superseded, transport },
     }));
     if (request.action !== "play") deps.preparations.clear("transport");
-    const ack = { ...accepted(deps.clock, request.commandId, transport.transportRevision), effectiveServerMs: request.effectiveServerMs,
+    const ack = { ...accepted(deps.clock, request.commandId, transport.transportRevision), effectiveServerMs,
       ready: recipients.length, excluded: request.action === "play" && barrier ? barrier.expectedDevices().filter(id => !recipients.includes(id)).map(deviceId => ({ deviceId, reason: barrier.excludedDevices().find(item => item.deviceId === deviceId)?.reason ?? "not acknowledged" })) : [] };
     deps.commands.remember(request.commandId, ack);
     return c.json(ack);
@@ -799,6 +802,7 @@ export function createApp(deps: AppDeps) {
     deps.state.panic();
     deps.lease.suspend(now);
     deps.preparations.clear("transport");
+    deps.preparations.clear("assignment");
 
     const recipients = deps.state.connectedDeviceIds();
     deps.connections.sendToParticipants(recipients, JSON.stringify({
@@ -848,7 +852,8 @@ export function createApp(deps: AppDeps) {
     if (unknown.length > 0) {
       return c.json(apiError("UNKNOWN_DEVICE", `Not registered in this session: ${unknown.join(", ")}.`), 409);
     }
-    const leadTime = leadTimeError(deps, request.effectiveServerMs, now);
+    const effectiveServerMs = request.effectiveServerMs ?? deps.clock.nowServerMs() + PERFORMANCE_LEAD_TIME_MS;
+    const leadTime = leadTimeError(deps, effectiveServerMs, deps.clock.nowServerMs());
     if (leadTime) return c.json(leadTime.body, leadTime.status);
 
     const assignmentRevision = deps.state.assignmentRevision + 1;
@@ -887,7 +892,7 @@ export function createApp(deps: AppDeps) {
       deviceId, channelId: request.channelId, assignmentRevision, mapRevision: request.mapRevision,
     }));
     const superseded = deps.state.scheduleAssignments({
-      commandId: request.commandId, effectiveServerMs: request.effectiveServerMs, assignments,
+      commandId: request.commandId, effectiveServerMs, assignments,
     });
     await persist();
 
@@ -896,15 +901,15 @@ export function createApp(deps: AppDeps) {
     const byDevice = new Map(assignments.map(assignment => [assignment.deviceId, assignment]));
     void deps.connections.sendEachToParticipants(recipients, deviceId => JSON.stringify({
       ...envelope(deps.clock), type: "assignment.commit", revision: deps.state.revision,
-      effectiveServerMs: request.effectiveServerMs,
+      effectiveServerMs,
       payload: {
-        domain: "assignment", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
+        domain: "assignment", commandId: request.commandId, effectiveServerMs,
         supersedesCommandId: deps.state.pendingAssignmentFor(deviceId)?.supersedesCommandId ?? null,
         assignments: [byDevice.get(deviceId)],
       },
     }));
 
-    const ack = { ...accepted(deps.clock, request.commandId, assignmentRevision), effectiveServerMs: request.effectiveServerMs,
+    const ack = { ...accepted(deps.clock, request.commandId, assignmentRevision), effectiveServerMs,
       ready: recipients.length, excluded, supersededCommandIds: superseded };
     deps.commands.remember(request.commandId, ack);
     return c.json(ack);
@@ -933,24 +938,25 @@ export function createApp(deps: AppDeps) {
       || deps.state.show.channels.some(channel => !channelIds.includes(channel.channelId))) {
       return c.json(apiError("INVALID_MIX", "A mix must contain each current show channel exactly once."), 400);
     }
-    const leadTime = leadTimeError(deps, request.effectiveServerMs, now);
+    const effectiveServerMs = request.effectiveServerMs ?? deps.clock.nowServerMs() + PERFORMANCE_LEAD_TIME_MS;
+    const leadTime = leadTimeError(deps, effectiveServerMs, deps.clock.nowServerMs());
     if (leadTime) return c.json(leadTime.body, leadTime.status);
 
     const mixRevision = deps.state.mixRevision + 1;
     const superseded = deps.state.scheduleMix({
-      domain: "mix", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
+      domain: "mix", commandId: request.commandId, effectiveServerMs,
       supersedesCommandId: null, mixRevision, masterGain: request.masterGain, channels: request.channels,
     });
     deps.connections.sendToParticipants(deps.state.connectedDeviceIds(), JSON.stringify({
       ...envelope(deps.clock), type: "mix.commit", revision: deps.state.revision,
-      effectiveServerMs: request.effectiveServerMs,
+      effectiveServerMs,
       payload: {
-        domain: "mix", commandId: request.commandId, effectiveServerMs: request.effectiveServerMs,
+        domain: "mix", commandId: request.commandId, effectiveServerMs,
         supersedesCommandId: superseded, mixRevision, masterGain: request.masterGain, channels: request.channels,
       },
     }));
 
-    const ack = accepted(deps.clock, request.commandId, mixRevision);
+    const ack = { ...accepted(deps.clock, request.commandId, mixRevision), effectiveServerMs };
     deps.commands.remember(request.commandId, ack);
     return c.json(ack);
   });

@@ -119,7 +119,7 @@ export function CalibrationPanel({ refresh, snapshot }: { refresh: () => void; s
   });
   const activeJob = progress && !["complete", "failed", "cancelled"].includes(progress.stage);
   // Server snapshots drive calibration countdown/upload eligibility even when the
-  // operator cannot meet the strict clock policy used by other console controls.
+  // operator has no usable display-clock estimate.
   const now = snapshot?.serverMs ?? null;
   const finishedCapture = run?.startServerMs !== null && run?.startServerMs !== undefined && now !== null && now >= run.startServerMs + calibrationDurationMs(run.plan);
   return <section>

@@ -20,6 +20,7 @@ export class Preparations {
 
   clear(domain: PreparationDomain): void {
     this.active.delete(domain);
+    if (domain === "assignment") this.assignment = null;
   }
 
   snapshot() {

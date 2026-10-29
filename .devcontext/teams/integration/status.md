@@ -1,5 +1,7 @@
 # Integration status
 
+Latest local follow-up (2026-10-29), **not deployed**: server-owned performance timestamps, removal of operator command clock gates, guarded transport/assignment/assets ACK recovery and bounded cancellable music retries are implemented and locally verified. Three JS gates/builds (478 unique tests), 33 Python consumers and full clean real-worker E2E pass. Read [verification/handoff](journal/20261029-performance-recovery.md). Railway testing remains stopped; the separate optical audit has nine unresolved failures. Next: release review/deployment in a deliberate window, then physical venue rehearsal.
+
 Latest (2026-10-28): Railway calibration reliability and the 750 ms internet RTT profile are deployed. Server-selected start time, explicit disabled reasons, recovered ACKs and bounded probe pipelines are implemented. Final public 250-client test passed: all 245 eligible simulated patterns completed, five deliberately over-limit clients excluded, 25 recoveries, five reconnects and 512 MB of verified audio transfers. Read the [release journal and limitations](journal/20261028-stage-calibration-fix.md). Physical venue/camera/audio rehearsal remains outstanding; refresh browser pages for the new code.
 
 Latest naming update (2026-09-20): lanes are Melody, Percussion, Vocals Left and Vocals Right. Channel IDs/audio/routing are retained, including label-based fallback compatibility. See [verification and local saved-show handoff](journal/20260920-track-labels.md). Earlier track names below are historical.

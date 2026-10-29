@@ -63,6 +63,9 @@ export class Barrier {
     return [...this.readyIds].sort((a, b) => a - b);
   }
 
+  expects(deviceId: number): boolean { return this.expectedIds.has(deviceId); }
+  isReady(deviceId: number): boolean { return this.readyIds.has(deviceId); }
+
   expectedDevices(): number[] { return [...this.expectedIds].sort((a, b) => a - b); }
 
   excludedDevices(): { deviceId: number; reason: string }[] {

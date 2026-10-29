@@ -12,7 +12,7 @@ export interface AudioEngineOptions { clock: SynchronizedClock }
 
 export { AudioContextHost, isAudioContextPaused, setPlaybackAudioSession } from "./context";
 export { OutputClockReadiness, perfToAudioTime, serverMsToAudioTime } from "./timing";
-export { AssetError, DecodedBudget, DEFAULT_DECODED_BUDGET_BYTES, decodedBytes, loadTrack, preloadTracks, sha256Hex, type LoadedTrack, type PreloadFailure, type TrackData } from "./assets";
+export { AssetError, DecodedBudget, DEFAULT_DECODED_BUDGET_BYTES, DOWNLOAD_POLICY, cancelPreloads, decodedBytes, loadTrack, preloadTracks, sha256Hex, type LoadedTrack, type PreloadFailure, type TrackData } from "./assets";
 export { scheduleClick, type ScheduledClick } from "./schedule";
 export { clipStarts, REJOIN_LEAD_MS, showPositionAt, type ClipStart, type TransportData } from "./timeline";
 export { channelLevel, PlaybackEngine, RAMP_MS, type ChannelMix, type MixState, type PlaybackEngineOptions } from "./playback";

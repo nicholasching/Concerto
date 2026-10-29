@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { AudioContextHost, DecodedBudget, PlaybackEngine, preloadTracks, type LoadedTrack } from "@orchestra/audio";
+import { AudioContextHost, DecodedBudget, PlaybackEngine, cancelPreloads, preloadTracks, type LoadedTrack } from "@orchestra/audio";
 import { AUDIENCE_SECTIONS, ClientMessage, type AudienceSectionId } from "@orchestra/contracts";
 import { ClockSync } from "@orchestra/sync";
 import { CalibrationSession, type CalibrationPhase } from "../lib/calibration";
@@ -52,6 +52,7 @@ export default function Page() {
   const [outputReady, setOutputReady] = useState(false);
   const [verifiedHashes, setVerifiedHashes] = useState<Record<string, string>>({});
   const [assetNote, setAssetNote] = useState<string | null>(null);
+  const [musicRetry, setMusicRetry] = useState(0);
   const [audioNote, setAudioNote] = useState<string | null>(null);
   const [phase, setPhase] = useState<CalibrationPhase>({ kind: "idle" });
   const calibration = useRef<CalibrationSession | null>(null);
@@ -145,6 +146,7 @@ export default function Page() {
       window.removeEventListener("online", onOnline);
       client.stop();
       serverClock.stop();
+      cancelPreloads(cache.current);
     };
   }, []);
 
@@ -195,7 +197,7 @@ export default function Page() {
       showControl.current?.refreshReadiness();
     });
     return () => { cancelled = true; };
-  }, [showKey, audioState]);
+  }, [showKey, audioState, musicRetry]);
 
   // ShowControl gates every engine call on fresh clock/output/assets. Keep the engine stable
   // across telemetry and asset reports; reconnect or context interruption gets a new graph.
@@ -323,7 +325,7 @@ export default function Page() {
     </details>}
     {!reset && audioState !== "running" && <div className="sound-prompt"><button className="primary" onClick={() => void enableSound()}>Enable sound</button></div>}
     {audioNote && <p role="alert" className="notice">{audioNote}</p>}
-    {assetNote?.startsWith("Failed:") && <p role="alert" className="notice">Music couldn’t load. Check your connection.</p>}
+    {assetNote?.startsWith("Failed:") && <div role="alert" className="notice"><p>Music couldn’t load after retries. Check your connection, then try again in a minute.</p><button onClick={() => setMusicRetry(value => value + 1)}>Retry music</button></div>}
     {needsSection && <div className="section-picker audience-four-sections">{AUDIENCE_SECTIONS.map(section => <button key={section.id} onClick={() => chooseSection(section.id)}>{section.label}</button>)}</div>}
     {(mapped || manual) && !holding && channel && <p className="your-part"><span style={{ background: channel.color }} /><strong>{channel.label}</strong></p>}
     {manual && !holding && !channel && <p className="your-part">{conn.snapshot?.pendingActions.some(action => action.domain === "assignment") ? "Joining your part…" : "Waiting for your part."}</p>}

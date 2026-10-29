@@ -4,7 +4,7 @@ import { ServerMessage } from "@orchestra/contracts";
 let socket: WebSocket | null = null;
 let identity: { sessionId: string; serverEpoch: string } | null = null;
 let closeCurrent: (() => void) | null = null;
-const clock = new ClockSync({ send: payload => {
+const clock = new ClockSync({ profile: "internet", send: payload => {
   if (socket?.readyState === WebSocket.OPEN && identity) socket.send(JSON.stringify({ protocolVersion: 1, ...identity,
     messageId: crypto.randomUUID(), type: "clock.probe", payload }));
 } });
@@ -40,10 +40,6 @@ export function connectClock(url: string): () => void {
 export const nowServerMs = () => clock.nowServerMs();
 export const clockReady = () => clock.quality().ready;
 export const lastSyncAgeMs = () => clock.quality().sampleAgeMs ?? Infinity;
-export function futureServerMs(seconds = 2): number {
-  if (!clockReady()) throw new Error("Wait for the operator clock to synchronize.");
-  return nowServerMs() + Math.max(2, seconds) * 1000;
-}
 export function showPositionMs(transport: { status: string; positionMs: number; startServerMs: number | null }): number {
   return transport.status === "playing" && transport.startServerMs !== null && clockReady()
     ? transport.positionMs + Math.max(0, nowServerMs() - transport.startServerMs) : transport.positionMs;

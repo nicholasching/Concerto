@@ -5,7 +5,7 @@ import { join as joinPath } from "node:path";
 import {
   AdminSnapshot, ApiError, ClientMessage, CommandAccepted, PROTOCOL_VERSION, ServerMessage, type ShowData,
 } from "@orchestra/contracts";
-import { createApp, DEFAULT_LEAD_TIME_MS } from "../src/app";
+import { createApp, DEFAULT_LEAD_TIME_MS, PERFORMANCE_LEAD_TIME_MS } from "../src/app";
 import { AssetStore } from "../src/assets";
 import { CalibrationRuns } from "../src/calibration";
 import { JobRunner } from "../src/jobs";
@@ -21,6 +21,7 @@ import { DeviceRegistry } from "../src/registry";
 import { RateLimiter } from "../src/rate-limit";
 import { SessionState } from "../src/state";
 import { positionAt } from "../src/transport";
+import { ShowControl } from "../../client-frontend/src/lib/show-control";
 
 const SESSION = "session-under-test";
 const SECRET = "operator-secret-for-tests";
@@ -131,6 +132,82 @@ const preparationIdOf = (context: Awaited<ReturnType<typeof prepared>>) => {
   if (!barrier) throw new Error("expected an active preparation");
   return barrier.preparationId;
 };
+
+test("timestamp-free delayed intent gets full server lead and idempotent retries keep the original time", async () => {
+  const context = await prepared();
+  await transport(context.app, { commandId: "intent-prep", action: "prepare", expectedRevision: 1, showRevision: 1 });
+  acknowledge(context, 0, { preparationId: preparationIdOf(context) });
+  serverMs += 3000; // Operator HTTP transit/queue delay is already behind us.
+  const body = { commandId: "intent-play", action: "play", expectedRevision: 1, showRevision: 1, positionMs: 123 };
+  const ack = CommandAccepted.parse(await (await command(context.app, "/api/transport", body)).json());
+  expect(ack.effectiveServerMs).toBe(serverMs + PERFORMANCE_LEAD_TIME_MS);
+  const broadcast = context.sockets.get(0)!.messagesOfType("transport.commit")[0];
+  expect(broadcast).toMatchObject({ effectiveServerMs: ack.effectiveServerMs, payload: { transport: { startServerMs: ack.effectiveServerMs, positionMs: 123 } } });
+  serverMs += 3000;
+  expect(CommandAccepted.parse(await (await command(context.app, "/api/transport", body)).json())).toEqual(ack);
+  expect(context.sockets.get(0)!.messagesOfType("transport.commit")).toHaveLength(1);
+});
+
+test("pause, seek and stop intent are scheduled without an operator clock", async () => {
+  const context = await prepared();
+  for (const action of ["seek", "pause", "stop"]) {
+    const ack = CommandAccepted.parse(await (await command(context.app, "/api/transport", { commandId: action, action,
+      expectedRevision: context.state.transportRevision, showRevision: 1, positionMs: 1000 })).json());
+    expect(ack.effectiveServerMs).toBe(serverMs + PERFORMANCE_LEAD_TIME_MS);
+    serverMs = ack.effectiveServerMs!; context.state.applyDue(serverMs);
+  }
+  expect(context.state.transport.status).toBe("stopped");
+});
+
+test("clock, audio, visibility and reconnect recovery re-ACK the same cue, but never replay a committed cue", async () => {
+  const context = await prepared();
+  const identity = { sessionId: SESSION, serverEpoch: EPOCH, deviceId: 0 };
+  let usable = false;
+  const dispatch = (type: string, payload: unknown) => handleClientMessage({ ...context, deviceId: 0, receivedServerMs: serverMs,
+    raw: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: EPOCH, messageId: crypto.randomUUID(), type, payload }) });
+  const control = new ShowControl({ identity: () => identity, now: () => serverMs, preload: async () => {},
+    facts: () => ({ audioRunning: usable, audioOutputReady: usable, clockUsable: usable, verified: () => true }),
+    send: message => { dispatch(message.type, message.payload); } });
+  control.applySnapshot(context.state.participantSnapshot(0, context.clock)!);
+  await transport(context.app, { commandId: "prep-recovery", action: "prepare", expectedRevision: 1, showRevision: 1 });
+  control.handle(context.sockets.get(0)!.messagesOfType("transport.prepare")[0]);
+  const status = (patch = {}) => dispatch("device.status", { ...context.state.readinessOf(0)!,
+    connected: true, foreground: true, clockReady: true, audioUnlocked: true, ...patch });
+  for (const loss of [{ clockReady: false }, { audioUnlocked: false }, { foreground: false }]) {
+    usable = false; status(loss);
+    usable = true; const replay = status();
+    expect(replay.type).toBe("transport.prepare"); control.handle(replay);
+    expect(context.preparations.current("transport")!.readyDevices()).toEqual([0]);
+    expect(status().type).toBe("state.snapshot");
+  }
+  context.preparations.excludeEverywhere(0, "disconnected");
+  control.disconnected(); control.applySnapshot(context.state.participantSnapshot(0, context.clock)!);
+  control.handle(status());
+  expect(context.preparations.current("transport")!.readyDevices()).toEqual([0]);
+  const oldId = preparationIdOf(context);
+  await command(context.app, "/api/transport", { commandId: "play-recovered", action: "play", expectedRevision: 1, showRevision: 1, positionMs: 0 });
+  expect(status().type).toBe("state.snapshot");
+  expect(acknowledge(context, 0, { preparationId: oldId }).type).toBe("error");
+});
+
+test("asset ACK recovery waits for verified hashes and does not replay a stale show", async () => {
+  const context = await prepared();
+  const barrier = new Barrier("assets-recovery", 1, 1, [0]); context.preparations.start("assets", barrier);
+  const status = (decodedTrackHashes = {}) => handleClientMessage({ ...context, deviceId: 0, receivedServerMs: serverMs,
+    raw: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: EPOCH, messageId: "status", type: "device.status",
+      payload: { ...context.state.readinessOf(0)!, connected: true, foreground: true, clockReady: true, audioUnlocked: true, decodedTrackHashes } }) });
+  expect(status().type).toBe("state.snapshot");
+  expect(status({ "track-1": "a".repeat(64) }).type).toBe("assets.prepare");
+  handleClientMessage({ ...context, deviceId: 0, receivedServerMs: serverMs,
+    raw: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: EPOCH, messageId: "asset-ack", type: "assets.ready",
+      payload: { preparationId: "assets-recovery", showRevision: 1, ready: true, reason: null, trackHashes: { "track-1": "a".repeat(64) } } }) });
+  expect(barrier.readyDevices()).toEqual([0]);
+  expect(status({ "track-1": "a".repeat(64) }).type).toBe("state.snapshot");
+  barrier.exclude(0, "disconnected");
+  expect(status({ "track-1": "a".repeat(64) }).type).toBe("assets.prepare");
+  context.state.saveShow(show());
+  expect(status({ "track-1": "a".repeat(64) }).type).toBe("state.snapshot");
+});
 
 describe("preparation barriers", () => {
   test("only phones that acknowledge this preparation are counted ready", async () => {

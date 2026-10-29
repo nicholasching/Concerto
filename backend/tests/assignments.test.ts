@@ -18,6 +18,54 @@ import { RateLimiter } from "../src/rate-limit";
 import { SessionState } from "../src/state";
 import { handleClientMessage } from "../src/messages";
 
+test("assignment and mix intent use the server's future timestamp", async () => {
+  const context = await prepared();
+  const request = async (path: string, body: object) => context.app.request(path, { method: "POST",
+    headers: { "content-type": "application/json", "x-operator-secret": SECRET },
+    body: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: EPOCH, expectedRevision: 0,
+      commandId: crypto.randomUUID(), ...body }) });
+  const assignment = CommandAccepted.parse(await (await request("/api/assignments", { mapRevision: 0, deviceIds: [0], channelId: "melody" })).json());
+  expect(assignment.effectiveServerMs).toBe(serverMs + 5000);
+  const mixed = CommandAccepted.parse(await (await request("/api/mix", { masterGain: 0.2, channels: show().channels })).json());
+  expect(mixed.effectiveServerMs).toBe(serverMs + 5000);
+  expect(context.sockets.get(0)!.typed("mix.commit")[0]).toMatchObject({ effectiveServerMs: mixed.effectiveServerMs });
+});
+
+test("missing assignment ACK replays only the current selection before commit", async () => {
+  const context = await prepared();
+  const response = await context.app.request("/api/assignments/prepare", { method: "POST",
+    headers: { "content-type": "application/json", "x-operator-secret": SECRET },
+    body: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: EPOCH, commandId: "prepare-recover",
+      expectedRevision: 0, mapRevision: 0, deviceIds: [0], channelId: "melody" }) });
+  const prep = CommandAccepted.parse(await response.json());
+  const message = (type: string, payload: unknown, deviceId = 0) => handleClientMessage({ ...context, deviceId, receivedServerMs: serverMs,
+    raw: JSON.stringify({ protocolVersion: 1, sessionId: SESSION, serverEpoch: EPOCH, messageId: crypto.randomUUID(), type, payload }) });
+  const status = (deviceId = 0) => message("device.status", { ...context.state.readinessOf(deviceId)!, connected: true,
+    foreground: true, clockReady: true, audioUnlocked: true, decodedTrackHashes: { "track-1": "a".repeat(64) } }, deviceId);
+  const ready = { preparationId: prep.preparationId, assignmentRevision: 1, ready: true, reason: null };
+  message("assignment.ready", ready);
+  context.preparations.excludeEverywhere(0, "disconnected");
+  expect(status()).toMatchObject({ type: "assignment.prepare", payload: { preparationId: prep.preparationId, assignment: { assignmentRevision: 1 } } });
+  expect(status(1).type).toBe("state.snapshot"); // Never add a new selection member.
+  message("assignment.ready", ready);
+  expect(status().type).toBe("state.snapshot");
+  await assign(context.app, { commandId: "commit-recovered", expectedRevision: 0, deviceIds: [0], channelId: "melody", preparationId: prep.preparationId });
+  expect(status().type).toBe("state.snapshot");
+  expect(message("assignment.ready", ready).type).toBe("error");
+});
+
+test("panic invalidates an uncommitted assignment preparation before recovery", async () => {
+  const context = await prepared();
+  await context.app.request("/api/assignments/prepare", {method:"POST", headers:{"content-type":"application/json","x-operator-secret":SECRET},
+    body:JSON.stringify({protocolVersion:1,sessionId:SESSION,serverEpoch:EPOCH,commandId:"before-panic",expectedRevision:0,
+      mapRevision:0, deviceIds:[0], channelId:"melody"})});
+  expect(context.preparations.assignment).not.toBeNull();
+  await context.app.request("/api/panic", {method:"POST", headers:{"content-type":"application/json","x-operator-secret":SECRET},
+    body:JSON.stringify({protocolVersion:1,sessionId:SESSION,serverEpoch:EPOCH,commandId:"panic",expectedRevision:0})});
+  expect(context.preparations.current("assignment")).toBeUndefined();
+  expect(context.preparations.assignment).toBeNull();
+});
+
 const SESSION = "session-under-test";
 const SECRET = "operator-secret-for-tests";
 const EPOCH = "epoch-a";

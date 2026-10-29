@@ -1,0 +1,9 @@
+# Performance recovery release
+
+User explicitly authorizes commit/push/deploy and bounded Railway testing on 2026-10-29. This supersedes the earlier no-production-testing constraint for this release run only. Baseline 3d08a6d; existing audit and implementation work preserved. Separate audit documentation commit from runtime recovery implementation.
+
+Preflight: custom public origin healthy at prior epoch 0a63ec7f-1382-45b7-8018-3748a61c4903; 0 connected /1012 registered, no calibration/pending actions, stopped placeholder show with no tracks. No audience reset or show replacement authorized/needed. Bounded target: 250 simulated clients, two finite original-tone transfer waves (~512 MB), clock jitter/latency, calibration and server-timed performance controls, readiness recovery, finite injected media faults. Stop all clients and restore transport/mix/test routing at completion.
+
+Railway browser binding still times out at Emulation.setFocusEmulationEnabled. Verify deploy using read-only health commit/deployment metadata from Railway's documented RAILWAY_GIT_COMMIT_SHA / RAILWAY_DEPLOYMENT_ID environment variables instead of relying on an epoch change alone: https://docs.railway.com/variables/reference. No credentials exposed through health. Snapshot/health preflight only; no load started before deploy verification.
+
+Local bounded release preflight (8 simulated sockets) PASS: actual preload/hash/retry code with injected 503, two finite transfer waves, calibration, playback/assignment ACK recovery, server-selected Play/mix and stopped/mix/routing restoration. Fresh sync gate PASS (256 tests /4114 assertions plus contracts/shared checks/backend build), typecheck and lint PASS. Earlier client/admin gates and Python/E2E evidence remains applicable to unchanged runtime code. The harness now also requires every assignment phone to receive a replay after its initial exclusion, and the total two-wave media budget is capped at 600 MB.

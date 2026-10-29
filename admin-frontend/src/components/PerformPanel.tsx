@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAdapter } from "../lib/useSnapshot";
-import { clockReady, futureServerMs, nowServerMs, showPositionMs } from "../lib/clock";
+import { clockReady, nowServerMs, showPositionMs } from "../lib/clock";
 import { ShowEditor } from "./ShowEditor";
 import { Waveform } from "./Waveform";
 import type { AdminSnapshotData } from "@orchestra/contracts";
@@ -21,7 +21,6 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
   const pendingMix = snapshot.pendingActions.find(item => item.domain === "mix");
   const mixChannels = pendingMix?.channels ?? show.channels;
   const masterGain = pendingMix?.masterGain ?? snapshot.mix.masterGain;
-  function futureMs(delaySeconds: number) { return futureServerMs(delaySeconds); }
 
   // Drive the playhead from the shared clock for playing state only.
   useEffect(() => {
@@ -36,7 +35,7 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
     setError(null); setStatus(null);
     try {
       const pos = action === "stop" ? 0 : (positionMsArg ?? (action === "play" ? cuePosition : null) ?? showPositionMs(transport));
-      await adapter.sendTransport({ action, showRevision: show.showRevision, positionMs: pos, effectiveServerMs: futureMs(2) });
+      await adapter.sendTransport({ action, showRevision: show.showRevision, positionMs: pos });
       setStatus(`${action} sent — pending.`);
       refresh();
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
@@ -46,21 +45,21 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
     setError(null);
     try {
       const channels = mixChannels.map(c => c.channelId === channelId ? { ...c, ...patch } : c);
-      await adapter.sendMix({ masterGain, channels, effectiveServerMs: futureMs(2) });
+      await adapter.sendMix({ masterGain, channels });
       refresh();
     } catch (e) { setError(String(e instanceof Error ? e.message : e)); }
   }
 
   async function setMaster(value: number) {
     setError(null);
-    try { await adapter.sendMix({ masterGain: value, channels: mixChannels, effectiveServerMs: futureMs(2) }); refresh(); }
+    try { await adapter.sendMix({ masterGain: value, channels: mixChannels }); refresh(); }
     catch (cause) { setError(String(cause)); }
   }
 
   const playheadPct = Math.min(100, (position / widthMs) * 100);
   const pendingTransport = snapshot.pendingActions.find(a => a.domain === "transport");
   const pendingCountdown = pendingTransport && transport.status !== "playing"
-    ? Math.max(0, (pendingTransport.effectiveServerMs - nowServerMs()) / 1000) : null;
+    ? Math.max(0, (pendingTransport.effectiveServerMs - (clockReady() ? nowServerMs() : snapshot.serverMs)) / 1000) : null;
 
   return (
     <section>
@@ -73,8 +72,8 @@ export function PerformPanel({ snapshot, refresh }: { snapshot: AdminSnapshotDat
       {pendingCountdown !== null && pendingCountdown > 0 && <p className="notice">Pending change in {pendingCountdown.toFixed(1)}s…</p>}
 
       <div className="actions transport-actions">
-        <button onClick={() => send("prepare")} disabled={!clockReady() || !show.clips.length}>Prepare cue</button>
-        <button className="primary large" onClick={() => send("play")} disabled={!clockReady() || !preparation?.readyIds.length || transport.status === "playing"}>▶ Start show</button>
+        <button onClick={() => send("prepare")} disabled={!show.clips.length}>Prepare cue</button>
+        <button className="primary large" onClick={() => send("play")} disabled={!preparation?.readyIds.length || transport.status === "playing"}>▶ Start show</button>
         <button onClick={() => send("pause")} disabled={transport.status === "stopped"}>Ⅱ Pause</button>
         <button onClick={() => send("stop")}>■ Stop</button>
         <span className="muted" aria-label="Playback position">{(position / 1000).toFixed(1)}s / {(widthMs / 1000).toFixed(1)}s</span>

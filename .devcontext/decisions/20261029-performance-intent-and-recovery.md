@@ -1,0 +1,9 @@
+# Server-owned performance intent and bounded recovery
+
+Date: 2026-10-29. Accepted by integration captain under explicit user instruction; affects sync/control, audio/client, admin and contracts.
+
+Transport, mix and assignment requests may omit effectiveServerMs: server chooses now +5000 ms after command identity/revision validation. Explicit scheduled API timestamps remain supported with the existing minimum-lead validation. Dashboard commands omit timestamps and never depend on operator clock quality; its internet-profile clock is display-only. Participant internet readiness stays <=750 ms RTT; strict profile remains an explicit diagnostic/rehearsal option. Panic stays immediate.
+
+Healthy status can replay missing current transport, assignment and assets preparations, in addition to calibration. Replay binds frozen membership and current show/transport/assignment/map revisions; no replay or late ACK after commit/supersession. Only replay assets once hashes already verify, preventing preparation retries from creating download loops. Local audio-output warmup still gates actual client ACK/execution. Already committed play recipients remain frozen; this change restores readiness before commit, not stale commands after it.
+
+Music downloads: at most two active track loads per phone/cache, four attempts per track campaign, jittered exponential backoff and bounded Retry-After, inactivity timeout covering headers/body. Retry transient network/HTTP/truncation failures, never hash/decode/budget errors. Concurrent preload callers share work; failed campaigns have a cooldown so status/gesture events cannot restart storms. Cancel obsolete tracks/unmount work. Keep successful buffers and hash verification. No production testing, deployment or changes to optical decoder/freshness policy authorized by this work.

@@ -12,9 +12,9 @@ export interface PendingCommand {
   status: "pending" | "accepted" | "scheduled" | "effective" | "cancelled" | "error" | "obsolete";
   error?: string; sentAt: number; sentRevision: number; effectiveServerMs?: number;
 }
-export interface AssignmentArgs { deviceIds: number[]; channelId: string | null; mapRevision: number; effectiveServerMs: number }
-export interface TransportArgs { action: "prepare" | "play" | "pause" | "seek" | "stop"; showRevision: number; positionMs: number; effectiveServerMs: number }
-export interface MixArgs { masterGain: number; channels: ShowData["channels"]; effectiveServerMs: number }
+export interface AssignmentArgs { deviceIds: number[]; channelId: string | null; mapRevision: number; effectiveServerMs?: number }
+export interface TransportArgs { action: "prepare" | "play" | "pause" | "seek" | "stop"; showRevision: number; positionMs: number; effectiveServerMs?: number }
+export interface MixArgs { masterGain: number; channels: ShowData["channels"]; effectiveServerMs?: number }
 export interface Geometry { rotationDegrees: 0 | 90 | 180 | 270; anchors: { x: number; y: number }[] | null; frameLayout?: "from-stage" | "from-back"; exclusionRois: { x: number; y: number }[][] }
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -150,7 +150,7 @@ export function createAdapter(baseUrl: string, fetcher: Fetcher = fetch) {
         if (barrier.readyIds.length + barrier.excluded.length === barrier.expectedIds.length) break;
         await new Promise(resolve => setTimeout(resolve, 100));
       } while (performance.now() - started < 1500);
-      return submit("/api/assignments", { ...args, preparationId, effectiveServerMs: args.effectiveServerMs + performance.now() - started }, "assignment", value => CommandAccepted.parse(value));
+      return submit("/api/assignments", { ...args, preparationId, ...(args.effectiveServerMs === undefined ? {} : { effectiveServerMs: args.effectiveServerMs + performance.now() - started }) }, "assignment", value => CommandAccepted.parse(value));
     },
     async sendTransport(args: TransportArgs) { return submit("/api/transport", args, "transport", value => CommandAccepted.parse(value)); },
     async sendMix(args: MixArgs) { return submit("/api/mix", args, "mix", value => CommandAccepted.parse(value)); },

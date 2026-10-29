@@ -181,14 +181,14 @@ export const Snapshot = z.discriminatedUnion("role", [AdminSnapshot, Participant
 
 export const AssignmentRequest = z.strictObject({
   ...CommandContext, mapRevision: Revision, deviceIds: ParticipantIds.min(1),
-  channelId: Id.nullable(), effectiveServerMs: Milliseconds, preparationId: Id.optional(),
+  channelId: Id.nullable(), effectiveServerMs: Milliseconds.optional(), preparationId: Id.optional(),
 });
 export const TransportRequest = z.strictObject({
   ...CommandContext, action: z.enum(["prepare", "play", "pause", "seek", "stop"]),
-  showRevision: Revision, positionMs: Milliseconds, effectiveServerMs: Milliseconds,
+  showRevision: Revision, positionMs: Milliseconds, effectiveServerMs: Milliseconds.optional(),
 });
 export const MixRequest = z.strictObject({
-  ...CommandContext, effectiveServerMs: Milliseconds, masterGain: z.number().min(0).max(1), channels: z.array(Channel),
+  ...CommandContext, effectiveServerMs: Milliseconds.optional(), masterGain: z.number().min(0).max(1), channels: z.array(Channel),
 });
 export const SaveShowRequest = z.strictObject({ ...CommandContext, show: Show });
 export const PanicRequest = z.strictObject(CommandContext);

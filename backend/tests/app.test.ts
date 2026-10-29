@@ -34,7 +34,11 @@ const app = () =>
 test("health identifies the sync-control implementation", async () => {
   const response = await app().request("/api/health");
   expect(response.status).toBe(200);
-  expect((await response.json()).implementation).toBe("sync-control");
+  const body = await response.json();
+  expect(body.implementation).toBe("sync-control");
+  expect(body.deploymentCommit).toBe(process.env.RAILWAY_GIT_COMMIT_SHA ?? null);
+  expect(body.deploymentId).toBe(process.env.RAILWAY_DEPLOYMENT_ID ?? null);
+  expect(Object.keys(body).sort()).toEqual(["deploymentCommit", "deploymentId", "implementation", "protocolVersion", "service"]);
 });
 // Every route the masterplan named is implemented now, so this covers the catch-all itself: an
 // unknown API path must fail as a structured protocol error, not as an HTML 404.

@@ -171,11 +171,14 @@ export class ShowControl {
 
   private async onAssetsPrepare(message: Message<"assets.prepare">): Promise<void> {
     const { preparationId, show } = message.payload;
+    if (this.show && show.showRevision < this.show.showRevision) return;
     if (this.show === null || show.showRevision >= this.show.showRevision) {
       this.show = show;
       this.reloadEngine();
     }
     await this.options.preload(show).catch(() => {});
+    const me = this.options.identity();
+    if (!me || me.serverEpoch !== message.serverEpoch || this.show?.showRevision !== show.showRevision || this.awaitingSnapshot) return;
     const facts = this.options.facts();
     const trackHashes = Object.fromEntries(show.tracks.filter(track => facts.verified(track.trackId, track.sha256)).map(track => [track.trackId, track.sha256]));
     const reason = !facts.audioRunning ? "audio-locked" : Object.keys(trackHashes).length < show.tracks.length ? "assets-missing" : null;

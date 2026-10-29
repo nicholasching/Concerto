@@ -121,6 +121,40 @@ export const handleClientMessage = (input: {
       return { ...envelope(clock), type: "calibration.prepare", revision: state.revision,
         payload: { preparationId: run.preparationId, plan: run.plan } };
     }
+    // Replay one missing current preparation per status report. A real client ACK, including
+    // output-clock readiness, is still required. Revision guards close replay after commit.
+    if (status.connected && status.foreground && status.clockReady && status.audioUnlocked) {
+      const channelVerified = (channelId: string | null) => state.show.clips.filter(clip => clip.channelId === channelId).every(clip => {
+        const track = state.show.tracks.find(track => track.trackId === clip.trackId);
+        return track && status.decodedTrackHashes[track.trackId] === track.sha256;
+      });
+      const transport = preparations?.current("transport");
+      if (transport?.expects(deviceId) && !transport.isReady(deviceId)
+        && transport.showRevision === state.showRevision && transport.transportRevision === state.transportRevision
+        && channelVerified((state.pendingAssignmentFor(deviceId)?.assignment ?? snapshot.assignment).channelId)) {
+        return { ...envelope(clock), type: "transport.prepare", revision: state.revision,
+          payload: { preparationId: transport.preparationId, showRevision: transport.showRevision,
+            transportRevision: transport.transportRevision } };
+      }
+      const assignment = preparations?.current("assignment");
+      const selection = preparations?.assignment;
+      if (assignment?.expects(deviceId) && !assignment.isReady(deviceId) && selection
+        && selection.preparationId === assignment.preparationId && assignment.showRevision === state.showRevision
+        && selection.mapRevision === state.mapRevision && selection.assignmentRevision === state.assignmentRevision + 1
+        && channelVerified(selection.channelId)) {
+        return { ...envelope(clock), type: "assignment.prepare", revision: state.revision,
+          payload: { preparationId: assignment.preparationId, assignment: { deviceId,
+            channelId: selection.channelId, assignmentRevision: selection.assignmentRevision, mapRevision: selection.mapRevision } } };
+      }
+    }
+    // Asset re-ACK must never start a new fetch/retry campaign from routine status traffic.
+    const assets = preparations?.current("assets");
+    if (status.audioUnlocked && assets?.expects(deviceId) && !assets.isReady(deviceId)
+      && assets.showRevision === state.showRevision
+      && state.show.tracks.every(track => status.decodedTrackHashes[track.trackId] === track.sha256)) {
+      return { ...envelope(clock), type: "assets.prepare", revision: state.revision,
+        payload: { preparationId: assets.preparationId, show: state.show } };
+    }
     return { ...envelope(clock), type: "state.snapshot", revision: snapshot.revision, payload: snapshot };
   }
 
@@ -129,14 +163,14 @@ export const handleClientMessage = (input: {
     const payload = message.data.payload;
     // An acknowledgement that names a superseded preparation, or revisions the barrier was not
     // issued for, is ignored. It must not be able to satisfy the current barrier late.
-    const counted = barrier?.acknowledge({
+    const counted = barrier?.showRevision === state.showRevision && barrier.transportRevision === state.transportRevision && barrier.acknowledge({
       deviceId,
       preparationId: payload.preparationId,
       ready: payload.ready,
       reason: payload.reason,
       showRevision: payload.showRevision,
       transportRevision: payload.transportRevision,
-    }) ?? false;
+    });
     if (!counted) return error(clock, "STALE_PREPARATION", "This acknowledgement does not match the current preparation.");
     const snapshot = state.participantSnapshot(deviceId, clock);
     if (!snapshot) return error(clock, "UNKNOWN_DEVICE", "This device is not registered in the current session.");
@@ -146,7 +180,8 @@ export const handleClientMessage = (input: {
   if (message.data.type === "assignment.ready") {
     const payload = message.data.payload;
     const barrier = preparations?.current("assignment");
-    if (!barrier || preparations?.assignment?.assignmentRevision !== payload.assignmentRevision
+    if (!barrier || barrier.showRevision !== state.showRevision || preparations?.assignment?.mapRevision !== state.mapRevision
+      || payload.assignmentRevision !== state.assignmentRevision + 1 || preparations?.assignment?.assignmentRevision !== payload.assignmentRevision
       || !barrier.acknowledgePreparation({ ...payload, deviceId })) {
       return error(clock, "STALE_PREPARATION", "This acknowledgement does not match the current assignment.");
     }

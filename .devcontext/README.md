@@ -4,6 +4,14 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Performance intent and download recovery, 2026-10-29
+
+Implemented locally: operator controls send intent with server-owned five-second timestamps; operator clock is display-only (internet profile). Current transport/assignment/assets preparation ACKs recover with revision/membership guards. Music loads use two-track concurrency, four attempts, jittered backoff, idle timeouts, cancellation and failure cooldown. See [decision](decisions/20261029-performance-intent-and-recovery.md) and [checks/handoff](teams/integration/journal/20261029-performance-recovery.md). No push/redeployment or Railway testing; the optical audit failures remain a separate issue.
+
+### 250-device demo audit, 2026-10-29
+
+[Readiness report](evidence/integration/20261029-demo-capacity-audit.md) and [journal](teams/integration/journal/20261029-demo-capacity-audit.md): fresh five-minute local 250-client control load and clean real-worker E2E pass, but the full optical gate has nine failures (two independently reproduced under production thread caps). Playback still depends on the operator's strict clock and a two-second client-selected cue, recovered playback ACKs need re-preparation, and actual music preload/phone memory are substantially larger than the public tone test. No unconditional stage sign-off. No new Railway test traffic or deployment; current resource/storage/quota settings could not be revalidated because computer use stopped. Production testing remains stopped.
+
 ### Stage calibration reliability, 2026-10-28
 
 Calibration start is scheduled five seconds ahead by the server, independent of operator clock quality. Audience internet admission is 750 ms best RTT; recovered eligible phones can re-acknowledge the current preparation, with explicit opt-outs retained. The dashboard explains disabled start conditions. Probe pacing is bounded for congested networks. Read the [decision](decisions/20261028-server-calibration-scheduling.md), [implementation/release journal](teams/integration/journal/20261028-stage-calibration-fix.md) and [public load procedure](../tools/load/CALIBRATION.md). Physical venue/audio/camera rehearsal remains separate from software and simulated-load verification.

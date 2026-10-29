@@ -155,11 +155,11 @@ try {
   await request("/api/transport", { expectedRevision: current.transport.transportRevision, action: "prepare", showRevision: current.show.showRevision, positionMs: 0, effectiveServerMs: 0 });
   await until(snapshot, s => s.preparations.find(p => p.domain === "transport")?.readyIds.length === 4);
   current = await snapshot();
-  await request("/api/transport", { expectedRevision: current.transport.transportRevision, action: "play", showRevision: current.show.showRevision, positionMs: 0, effectiveServerMs: current.serverMs + 2000 });
+  await request("/api/transport", { expectedRevision: current.transport.transportRevision, action: "play", showRevision: current.show.showRevision, positionMs: 0 });
   await until(snapshot, s => s.transport.status === "playing");
   await until(() => phones.every(phone => phone.calls.some(call => call.startsWith("transport:playing:"))), Boolean);
   assert.deepEqual(show.channels.map(channel => channel.label), ["Melody", "Percussion", "Vocals Left", "Vocals Right"]);
-  check("decoded map selections route four intended phones across Melody, Percussion, Vocals Left and Vocals Right and schedule a prepared common cue");
+  check("decoded map selections route four intended phones across Melody, Percussion, Vocals Left and Vocals Right and schedule a prepared server-timed common cue");
   const latePhone = new Phone(); latePhone.audioReady = false; phones.push(latePhone);
   await latePhone.connect();
   assert.equal(latePhone.snapshot!.transport.status, "stopped");
@@ -185,7 +185,7 @@ try {
   const switchAck = await request("/api/assignments", { ...assignment, preparationId: prep.preparationId });
   assert.equal(switchAck.ready, 1); assert.deepEqual(switchAck.excluded.map((item: { deviceId: number }) => item.deviceId), [phones[1].id]);
   current = await snapshot();
-  await request("/api/mix", { expectedRevision: current.mix.mixRevision, masterGain: 0.3, channels: current.show.channels, effectiveServerMs: current.serverMs + 2000 });
+  await request("/api/mix", { expectedRevision: current.mix.mixRevision, masterGain: 0.3, channels: current.show.channels });
   await until(snapshot, s => s.mix.masterGain === 0.3);
   phones[0].status(); await Bun.sleep(150);
   assert.ok(phones[0].calls.includes("mix:0.3"));
