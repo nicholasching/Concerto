@@ -1,0 +1,14 @@
+{
+  "service": "audience-orchestra-control",
+  "protocolVersion": 1,
+  "implementation": "sync-control",
+  "deploymentCommit": "0f2e04c83120152db4e1957978c97d8bbd85fe0b",
+  "deploymentId": "8dd5d0fe-7db8-4b07-9fc7-3ed7bb6f1ee2",
+  "showPreserved": true,
+  "showRevision": 1,
+  "tracks": 4,
+  "connected": 0,
+  "transport": "stopped",
+  "pending": 0,
+  "calibration": false
+}
