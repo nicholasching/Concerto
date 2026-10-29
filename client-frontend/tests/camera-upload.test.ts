@@ -1,5 +1,17 @@
 import { expect, test } from "bun:test";
-import { sendVideo } from "../src/lib/camera-upload";
+import { cameraRequest, sendVideo, STAGE_CAMERA_COLUMNS } from "../src/lib/camera-upload";
+
+test("stage-facing upload choices send the opposite audience column and retain received-side labels", async () => {
+  for (const [label, column] of [["Left", "right"], ["Center", "center"], ["Right", "left"]] as const) {
+    const option = STAGE_CAMERA_COLUMNS.find(option => option.label === label)!;
+    const request: typeof fetch = Object.assign(async (_input: string | URL | Request, init?: RequestInit) => {
+      expect(JSON.parse(String(init?.body)).column).toBe(column);
+      return Response.json({ column });
+    }, { preconnect() {} });
+    const received = await cameraRequest("/uploads", "camera-only", { method: "POST", body: JSON.stringify({ column: option.column }) }, request);
+    expect(STAGE_CAMERA_COLUMNS.find(option => option.column === received.column)?.label).toBe(label);
+  }
+});
 
 test("phone upload sends ordered hashed chunks then completes only after delivery", async () => {
   const chunks: string[] = []; const paths: string[] = []; const progress: number[] = [];

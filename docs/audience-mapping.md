@@ -4,7 +4,7 @@ The operator console supports one, two or three camera recordings. New uploads a
 
 ## Calibrate the camera views
 
-1. Record the calibration pattern with fixed cameras and upload the original clips. Include only the recordings you actually have, with one distinct recording per view. Set each camera's primary audience column.
+1. Record the calibration pattern with fixed cameras and upload the original clips. Include only the recordings you actually have, with one distinct recording per view. On `/upload`, Left/Center/Right are from the stage facing the audience; they are converted to the opposite canonical audience column automatically. When uploading directly in `/admin`, its **Audience column** still uses the audience-facing-stage perspective.
 2. Select **Process uploaded recordings** for automatic positions. The default camera direction is **From the stage toward the audience**. In **Camera layout**, rotate the picture upright if necessary or change the direction for a rear-facing camera. No corner selection is required.
 3. For optional perspective correction, open **Camera layout**. In the demo's stage-facing picture, audience-left is on the **right of the image**. Click known seating corners in order: audience **front-left, front-right, back-right, back-left**. Enclose the seats in that camera's primary column. The local video or processed preview supplies the image.
 4. **Use automatic frame layout** clears manual corners and restores approximate screen positions. The mode is recorded as `frame-layout`, distinct from manual anchors. A raised phone can appear farther back; this does not measure seat depth.

@@ -1,4 +1,10 @@
 export type UploadSession = { uploadId: string; chunkBytes: number };
+// Camera crews face the audience; the wire/decoder columns remain audience-facing-stage.
+export const STAGE_CAMERA_COLUMNS = [
+  { label: "Left", column: "right" },
+  { label: "Center", column: "center" },
+  { label: "Right", column: "left" },
+] as const;
 type Fetcher = typeof fetch;
 export class CameraRequestError extends Error { constructor(message: string, readonly status: number) { super(message); } }
 export async function cameraRequest(path: string, token: string, init: RequestInit = {}, request: Fetcher = fetch) {

@@ -4,6 +4,10 @@ Read root AGENTS/rules/masterplan, this index, architecture/glossary, your stage
 
 ## Current checkpoint
 
+### Stage-facing camera upload labels, 2026-10-29
+
+`/upload` Left/Center/Right now describe the camera crew's view from the stage toward the audience. Left sends canonical audience-right; Right sends audience-left. Received labels use the same stage perspective, while audience music choices and admin map coordinates retain their audience-facing-stage convention. See [decision](decisions/20261029-stage-camera-upload-perspective.md) and [verification/release journal](teams/integration/journal/20261029-stage-camera-labels.md).
+
 ### BuildAtMac production hostname, 2026-10-29
 
 Production is **https://buildatmac.nicholasching.ca**; the old htnlive hostname remains an alias. Railway DNS/TLS, allowed origins and canonical projector QR are configured. Deployment a8811529 uses unchanged application commit 84b4edd; the saved four-stem show is preserved. Small six-group smoke and asset HEAD checks pass; no load tests or music downloads were run. See [migration journal](teams/integration/journal/20261029-buildatmac-domain.md) and [deployment guide](../docs/railway-deployment.md). Prior performance-test findings remain unresolved and separate.

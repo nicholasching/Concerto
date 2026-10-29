@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CameraRequestError, cameraRequest, sendVideo, type UploadSession } from "../../lib/camera-upload";
+import { CameraRequestError, cameraRequest, sendVideo, STAGE_CAMERA_COLUMNS, type UploadSession } from "../../lib/camera-upload";
 import { ConcertoOrb } from "../concerto-orb";
 type CameraRun = { runId: string; status: string; canUpload: boolean; uploads: { column: string; label: string; byteSize: number }[] };
 
@@ -52,9 +52,9 @@ export default function UploadPage() {
     <div className="upload-heading">{!token && <ConcertoOrb paused={!busy} />}<h1>Camera upload.</h1><p className="audience-instruction">{token ? "Send the original recording." : "Sign in to send your recording."}</p></div>
     {!token ? <form className="upload-card" onSubmit={event => { event.preventDefault(); void login(); }}><label>Upload password<input type="password" value={password} autoComplete="current-password" onChange={event => setPassword(event.target.value)} /></label><button className="primary" disabled={busy || !password}>{busy ? "Connecting…" : "Sign in"}</button></form>
       : <section className="upload-card"><div className="upload-state" role="status"><i className={`status-dot ${!offline && (done || run?.canUpload) ? "ok" : ""}`} />{offline ? "Reconnecting…" : done ? "Recording received" : busy ? "Sending recording…" : run?.canUpload ? "Ready to upload" : run ? "Waiting for the pattern to finish" : "Waiting for calibration"}</div>
-        <fieldset disabled={busy || done}><legend>Camera column · audience facing the stage</legend><div className="section-picker">{["left", "center", "right"].map(value => <button type="button" aria-pressed={column === value} className={column === value ? "chosen" : ""} key={value} onClick={() => setColumn(value)}>{value}</button>)}</div>
+        <fieldset disabled={busy || done}><legend>Camera column · from the stage facing the audience</legend><div className="section-picker">{STAGE_CAMERA_COLUMNS.map(option => <button type="button" aria-pressed={column === option.column} className={column === option.column ? "chosen" : ""} key={option.column} onClick={() => setColumn(option.column)}>{option.label}</button>)}</div>
           <label className="file-drop"><span aria-hidden="true">↑</span><strong>{file?.name ?? "Choose your recording"}</strong><small>{file ? `${(file.size / 1024 / 1024).toFixed(1)} MiB` : "Original video · up to 1 GiB"}</small><input type="file" accept="video/*" aria-label="Camera recording" onChange={event => setFile(event.target.files?.[0] ?? null)} /></label>
-          <p className="muted">Record from the stage, facing the audience.</p>
+          <p className="muted">Record from the stage, facing the audience. Choose the side on your left or right.</p>
           <details><summary>Camera orientation</summary><label>Rotate clockwise<select value={rotation} onChange={event => setRotation(Number(event.target.value))}>{[0, 90, 180, 270].map(value => <option key={value} value={value}>{value}°</option>)}</select></label></details>
         </fieldset>
         {taken && !done && <p className="notice">This column’s recording is already uploaded.</p>}
@@ -63,7 +63,7 @@ export default function UploadPage() {
       </section>}
     {error && <p role="alert" className="notice">{error}</p>}
     {offline && <p role="status" className="notice">Connection interrupted. Your upload progress is saved.</p>}
-    {run?.uploads.length ? <div className="received-cameras"><p className="eyebrow">RECEIVED</p>{run.uploads.map(upload => <p key={upload.column}><strong>{upload.column}</strong><span>✓ Received</span></p>)}</div> : null}
+    {run?.uploads.length ? <div className="received-cameras"><p className="eyebrow">RECEIVED</p>{run.uploads.map(upload => <p key={upload.column}><strong>{STAGE_CAMERA_COLUMNS.find(option => option.column === upload.column)?.label ?? upload.column}</strong><span>✓ Received</span></p>)}</div> : null}
     <footer className="audience-footer"><span aria-hidden="true" className="speaker-grille" /></footer>
   </main>;
 }
