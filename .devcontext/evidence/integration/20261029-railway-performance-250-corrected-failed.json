@@ -1,0 +1,142 @@
+{
+  "commit": "84b4edd25c94b8997e753effda74514db31270aa",
+  "deploymentId": "5158285a-bf3e-405c-99b2-5fe38058ae44",
+  "target": "https://htnlive.nicholasching.ca",
+  "result": "failed",
+  "clients": 250,
+  "modeledEligible": 245,
+  "deliberatelyExcluded": 5,
+  "clockReady": 244,
+  "exitCode": 1,
+  "phase": "clock eligibility and deliberate exclusions",
+  "cleanupVerified": true,
+  "connectedAtCleanup": 0,
+  "transportAtCleanup": "stopped",
+  "calibrationAtCleanup": false,
+  "pendingAtCleanup": 0,
+  "diagnostics": {
+    "waitingFor": "clock eligibility and deliberate exclusions",
+    "clockReady": 244,
+    "preparations": [],
+    "serverConnected": 249,
+    "socketClosures": [
+      {
+        "index": 232,
+        "code": 1006,
+        "reason": "Connection ended"
+      }
+    ],
+    "errors": [],
+    "slowClients": [
+      {
+        "index": 232,
+        "socketState": 3,
+        "clockReplies": 6,
+        "lastReplyAgeMs": 89006.8944,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": null,
+          "sampleAgeMs": null
+        },
+        "stats": {
+          "probeGroupsStarted": 221,
+          "pairsPure": 0,
+          "pairsImpure": 3,
+          "measurements": 0,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 245,
+        "socketState": 1,
+        "clockReplies": 410,
+        "lastReplyAgeMs": 636.4210000000021,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": 497.8873291015625,
+          "sampleAgeMs": 1982.25
+        },
+        "stats": {
+          "probeGroupsStarted": 209,
+          "pairsPure": 49,
+          "pairsImpure": 64,
+          "measurements": 16,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 246,
+        "socketState": 1,
+        "clockReplies": 430,
+        "lastReplyAgeMs": 12.24649999999383,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": 494.6104736328125,
+          "sampleAgeMs": 1165.392822265625
+        },
+        "stats": {
+          "probeGroupsStarted": 218,
+          "pairsPure": 59,
+          "pairsImpure": 67,
+          "measurements": 16,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 247,
+        "socketState": 1,
+        "clockReplies": 414,
+        "lastReplyAgeMs": 635.9391999999934,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": 481.6080322265625,
+          "sampleAgeMs": 1593.118408203125
+        },
+        "stats": {
+          "probeGroupsStarted": 211,
+          "pairsPure": 48,
+          "pairsImpure": 65,
+          "measurements": 16,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 248,
+        "socketState": 1,
+        "clockReplies": 434,
+        "lastReplyAgeMs": 90.83140000001004,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": 490.447265625,
+          "sampleAgeMs": 1162.700439453125
+        },
+        "stats": {
+          "probeGroupsStarted": 221,
+          "pairsPure": 51,
+          "pairsImpure": 77,
+          "measurements": 16,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 249,
+        "socketState": 1,
+        "clockReplies": 468,
+        "lastReplyAgeMs": 10.898499999995693,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": 488.81591796875,
+          "sampleAgeMs": 10.896484375
+        },
+        "stats": {
+          "probeGroupsStarted": 237,
+          "pairsPure": 47,
+          "pairsImpure": 99,
+          "measurements": 16,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      }
+    ]
+  },
+  "limitation": "Native WebSocket simulator has no automatic reconnect. One abnormal close prevented admission; network/proxy/client origin of close not established. No calibration/playback started."
+}

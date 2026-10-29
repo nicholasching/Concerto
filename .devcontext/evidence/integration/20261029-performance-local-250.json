@@ -1,0 +1,217 @@
+{
+  "date": "2026-10-29T05:31:08.528Z",
+  "target": "http://127.0.0.1:18321",
+  "clients": 250,
+  "serverEpoch": "2029bf79-b8e6-42b4-8725-09c949f9b41a",
+  "injection": "245 eligible clients (at 250 total): 80/135/190/245 ms each way; 5 deliberate exclusions: 450 ms each way; 0..30 ms shared pair jitter, 0..8 ms per-probe jitter; 4% +300 ms uplink pair spikes; 2% +1000 ms downlink spikes",
+  "eligibleCount": 245,
+  "deliberatelyExcluded": 5,
+  "transientExclusionsAtArm": 0,
+  "seed": 20261028,
+  "recoveryCount": 25,
+  "reconnectCount": 5,
+  "readyAtArm": 245,
+  "armsReceived": 245,
+  "armsAccepted": 245,
+  "cueMarginMs": {
+    "count": 245,
+    "p50": 4773.611328125,
+    "p95": 4889.6796875,
+    "p99": 4894.1611328125,
+    "max": 4897.2138671875
+  },
+  "minimumCueMarginMs": 3759.60205078125,
+  "patternsCompleted": 245,
+  "patternsInterrupted": 0,
+  "totalSeconds": 113.862298,
+  "operatorDelayAndResponseMs": 3035.8505000000005,
+  "downloadsActiveAtArmResponse": 250,
+  "serverChosenStart": 1793251828359.2246,
+  "bytesDownloaded": 512022000,
+  "downloads": 500,
+  "maxConcurrentDownloads": 250,
+  "downloadMs": {
+    "count": 500,
+    "p50": 31555.506999999998,
+    "p95": 31752.391,
+    "p99": 31768.2882,
+    "max": 31769.713799999998
+  },
+  "uncertaintyMs": {
+    "count": 250,
+    "p50": 199.434814453125,
+    "p95": 261.8594970703125,
+    "p99": 463.962890625,
+    "max": 464.970703125
+  },
+  "eligibleUncertaintyMs": {
+    "count": 245,
+    "p50": 154.996826171875,
+    "p95": 261.7520751953125,
+    "p99": 262.30908203125,
+    "max": 263.0225830078125
+  },
+  "ineligibleUncertaintyMs": {
+    "count": 5,
+    "p50": 463.962890625,
+    "p95": 464.970703125,
+    "p99": 464.970703125,
+    "max": 464.970703125
+  },
+  "probes": 63400,
+  "httpResponseHeadersMs": {
+    "/api/session": {
+      "count": 1,
+      "p50": 6.309599999999989,
+      "p95": 6.309599999999989,
+      "p99": 6.309599999999989,
+      "max": 6.309599999999989
+    },
+    "/api/sessions/release-load/snapshot": {
+      "count": 82,
+      "p50": 3.858799999999974,
+      "p95": 6.41019999999844,
+      "p99": 9.680300000007264,
+      "max": 9.680300000007264
+    },
+    "/api/foundation": {
+      "count": 2,
+      "p50": 1.516300000002957,
+      "p95": 1.516300000002957,
+      "p99": 1.516300000002957,
+      "max": 1.516300000002957
+    },
+    "/api/assets": {
+      "count": 1,
+      "p50": 11.215699999999998,
+      "p95": 11.215699999999998,
+      "p99": 11.215699999999998,
+      "max": 11.215699999999998
+    },
+    "/api/sessions/release-load/join": {
+      "count": 255,
+      "p50": 89.16890000000001,
+      "p95": 108.1986,
+      "p99": 110.12939999999999,
+      "max": 110.48540000000001
+    },
+    "/api/calibrations": {
+      "count": 1,
+      "p50": 11.744199999999182,
+      "p95": 11.744199999999182,
+      "p99": 11.744199999999182,
+      "max": 11.744199999999182
+    },
+    "/api/assets/03600195-4698-4f66-afa8-031607b2f003": {
+      "count": 250,
+      "p50": 160.19689999999537,
+      "p95": 274.388300000006,
+      "p99": 276.6241000000009,
+      "max": 277.14400000000023
+    },
+    "/api/calibrations/0a7ed37c-8d1c-42be-8e36-9fae7bf06ea7/arm": {
+      "count": 1,
+      "p50": 22.772000000011758,
+      "p95": 22.772000000011758,
+      "p99": 22.772000000011758,
+      "max": 22.772000000011758
+    },
+    "/api/transport": {
+      "count": 3,
+      "p50": 8.182300000000396,
+      "p95": 9.58980000000156,
+      "p99": 9.58980000000156,
+      "max": 9.58980000000156
+    },
+    "/api/assignments/prepare": {
+      "count": 1,
+      "p50": 3.303199999994831,
+      "p95": 3.303199999994831,
+      "p99": 3.303199999994831,
+      "max": 3.303199999994831
+    },
+    "/api/assignments": {
+      "count": 2,
+      "p50": 16.02629999999772,
+      "p95": 16.02629999999772,
+      "p99": 16.02629999999772,
+      "max": 16.02629999999772
+    },
+    "/api/mix": {
+      "count": 2,
+      "p50": 11.589999999996508,
+      "p95": 11.589999999996508,
+      "p99": 11.589999999996508,
+      "max": 11.589999999996508
+    }
+  },
+  "errors": [],
+  "httpReadRetries": 0,
+  "savedShowUnchanged": true,
+  "performance": {
+    "readyAtPlay": 245,
+    "playStart": 1793251851932.2036,
+    "minimumDeliveryMarginMs": 3732.2138671875,
+    "ackRecoveries": 25,
+    "assignmentAckRecoveries": 25,
+    "assignmentStart": 1793251863142.3057,
+    "mixStart": 1793251863174.222,
+    "injectedOperatorDelayMs": 3000,
+    "timestampsSent": false
+  },
+  "mediaAttempts": 280,
+  "injectedMediaFailures": 30,
+  "reservedMediaBytes": 512022000,
+  "socketClosures": [
+    {
+      "index": 25,
+      "code": 1000,
+      "reason": ""
+    },
+    {
+      "index": 26,
+      "code": 1000,
+      "reason": ""
+    },
+    {
+      "index": 27,
+      "code": 1000,
+      "reason": ""
+    },
+    {
+      "index": 28,
+      "code": 1000,
+      "reason": ""
+    },
+    {
+      "index": 29,
+      "code": 1000,
+      "reason": ""
+    }
+  ],
+  "diagnosticsBefore": {
+    "devices": 0,
+    "connectedDevices": 0,
+    "revision": 0,
+    "eventLoopLagMs": {
+      "count": 1,
+      "p50": 2.251100000000008,
+      "p95": 2.251100000000008,
+      "p99": 2.251100000000008,
+      "max": 2.251100000000008
+    }
+  },
+  "diagnosticsAfter": {
+    "devices": 250,
+    "connectedDevices": 250,
+    "revision": 56643,
+    "eventLoopLagMs": {
+      "count": 1051,
+      "p50": 8.343700000000354,
+      "p95": 10.352599999998347,
+      "p99": 19.12200000000007,
+      "max": 95.91410000000906
+    }
+  },
+  "limitations": "One load generator/public WAN path; injected timers, not independent Wi-Fi radios; original tone when show is empty; verifies media bytes and scheduling, not decode/audio/optical performance. Test device IDs remain allocated."
+}

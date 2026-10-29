@@ -1,0 +1,191 @@
+{
+  "date": "2026-10-29T05:34:51.641Z",
+  "target": "https://htnlive.nicholasching.ca",
+  "clients": 8,
+  "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114",
+  "injection": "245 eligible clients (at 250 total): 80/135/190/245 ms each way; 5 deliberate exclusions: 450 ms each way; 0..30 ms shared pair jitter, 0..8 ms per-probe jitter; 4% +300 ms uplink pair spikes; 2% +1000 ms downlink spikes",
+  "eligibleCount": 7,
+  "deliberatelyExcluded": 1,
+  "transientExclusionsAtArm": 0,
+  "seed": 20261028,
+  "recoveryCount": 7,
+  "reconnectCount": 0,
+  "readyAtArm": 7,
+  "armsReceived": 7,
+  "armsAccepted": 7,
+  "cueMarginMs": {
+    "count": 7,
+    "p50": 4819.19140625,
+    "p95": 4873.768798828125,
+    "p99": 4873.768798828125,
+    "max": 4873.768798828125
+  },
+  "minimumCueMarginMs": 4694.67138671875,
+  "patternsCompleted": 7,
+  "patternsInterrupted": 0,
+  "totalSeconds": 83.98868530000001,
+  "operatorDelayAndResponseMs": 3092.9981000000043,
+  "downloadsActiveAtArmResponse": 8,
+  "serverChosenStart": 1793252051488.9731,
+  "bytesDownloaded": 16384704,
+  "downloads": 16,
+  "maxConcurrentDownloads": 8,
+  "downloadMs": {
+    "count": 16,
+    "p50": 31571.167899999997,
+    "p95": 31788.006199999996,
+    "p99": 31788.006199999996,
+    "max": 31788.006199999996
+  },
+  "uncertaintyMs": {
+    "count": 8,
+    "p50": 223.98583984375,
+    "p95": 490.651611328125,
+    "p99": 490.651611328125,
+    "max": 490.651611328125
+  },
+  "eligibleUncertaintyMs": {
+    "count": 7,
+    "p50": 171.385009765625,
+    "p95": 277.2110595703125,
+    "p99": 277.2110595703125,
+    "max": 277.2110595703125
+  },
+  "ineligibleUncertaintyMs": {
+    "count": 1,
+    "p50": 490.651611328125,
+    "p95": 490.651611328125,
+    "p99": 490.651611328125,
+    "max": 490.651611328125
+  },
+  "probes": 2176,
+  "httpResponseHeadersMs": {
+    "/api/session": {
+      "count": 1,
+      "p50": 101.2645,
+      "p95": 101.2645,
+      "p99": 101.2645,
+      "max": 101.2645
+    },
+    "/api/sessions/prod-session/snapshot": {
+      "count": 54,
+      "p50": 59.92239999999583,
+      "p95": 74.08750000000873,
+      "p99": 96.94509999999718,
+      "max": 96.94509999999718
+    },
+    "/api/foundation": {
+      "count": 2,
+      "p50": 54.54849999999999,
+      "p95": 54.54849999999999,
+      "p99": 54.54849999999999,
+      "max": 54.54849999999999
+    },
+    "/api/assets": {
+      "count": 1,
+      "p50": 202.76150000000007,
+      "p95": 202.76150000000007,
+      "p99": 202.76150000000007,
+      "max": 202.76150000000007
+    },
+    "/api/sessions/prod-session/join": {
+      "count": 8,
+      "p50": 124.49419999999998,
+      "p95": 126.2342000000001,
+      "p99": 126.2342000000001,
+      "max": 126.2342000000001
+    },
+    "/api/calibrations": {
+      "count": 1,
+      "p50": 56.82639999999992,
+      "p95": 56.82639999999992,
+      "p99": 56.82639999999992,
+      "max": 56.82639999999992
+    },
+    "/api/assets/ebf0494b-5470-4c3a-a349-6202ffcd2780": {
+      "count": 8,
+      "p50": 66.93699999999808,
+      "p95": 94.68600000000151,
+      "p99": 94.68600000000151,
+      "max": 94.68600000000151
+    },
+    "/api/calibrations/df1ab046-c9e2-4347-bc68-67ffb115b278/arm": {
+      "count": 1,
+      "p50": 53.65610000000015,
+      "p95": 53.65610000000015,
+      "p99": 53.65610000000015,
+      "max": 53.65610000000015
+    },
+    "/api/transport": {
+      "count": 3,
+      "p50": 53.16570000000502,
+      "p95": 53.343699999997625,
+      "p99": 53.343699999997625,
+      "max": 53.343699999997625
+    },
+    "/api/assignments/prepare": {
+      "count": 1,
+      "p50": 53.848500000007334,
+      "p95": 53.848500000007334,
+      "p99": 53.848500000007334,
+      "max": 53.848500000007334
+    },
+    "/api/assignments": {
+      "count": 2,
+      "p50": 64.19860000000335,
+      "p95": 64.19860000000335,
+      "p99": 64.19860000000335,
+      "max": 64.19860000000335
+    },
+    "/api/mix": {
+      "count": 2,
+      "p50": 51.61960000000545,
+      "p95": 51.61960000000545,
+      "p99": 51.61960000000545,
+      "max": 51.61960000000545
+    }
+  },
+  "errors": [],
+  "httpReadRetries": 0,
+  "savedShowUnchanged": true,
+  "performance": {
+    "readyAtPlay": 7,
+    "playStart": 1793252074189.924,
+    "minimumDeliveryMarginMs": 3748.203857421875,
+    "ackRecoveries": 7,
+    "assignmentAckRecoveries": 7,
+    "assignmentStart": 1793252085509.924,
+    "mixStart": 1793252085601.299,
+    "injectedOperatorDelayMs": 3000,
+    "timestampsSent": false
+  },
+  "mediaAttempts": 16,
+  "injectedMediaFailures": 8,
+  "reservedMediaBytes": 16384704,
+  "socketClosures": [],
+  "diagnosticsBefore": {
+    "devices": 1520,
+    "connectedDevices": 0,
+    "revision": 87606,
+    "eventLoopLagMs": {
+      "count": 10000,
+      "p50": 0.1460969999898225,
+      "p95": 1.1809050000156276,
+      "p99": 1.6930629999842495,
+      "max": 74.7071350000333
+    }
+  },
+  "diagnosticsAfter": {
+    "devices": 1528,
+    "connectedDevices": 8,
+    "revision": 88993,
+    "eventLoopLagMs": {
+      "count": 10000,
+      "p50": 0.14462299994193017,
+      "p95": 1.1979419998824596,
+      "p99": 1.7888619999866933,
+      "max": 74.7071350000333
+    }
+  },
+  "limitations": "One load generator/public WAN path; injected timers, not independent Wi-Fi radios; original tone when show is empty; verifies media bytes and scheduling, not decode/audio/optical performance. Test device IDs remain allocated."
+}

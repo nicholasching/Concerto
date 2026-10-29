@@ -1,0 +1,176 @@
+{
+  "commit": "84b4edd25c94b8997e753effda74514db31270aa",
+  "deploymentId": "5158285a-bf3e-405c-99b2-5fe38058ae44",
+  "target": "https://htnlive.nicholasching.ca",
+  "result": "failed",
+  "phase": "clock eligibility and deliberate exclusions",
+  "clients": 250,
+  "modeledEligible": 245,
+  "deliberatelyExcluded": 5,
+  "clockReady": 208,
+  "exitCode": 1,
+  "serverEventLoopP99Ms": 1.6859830000030342,
+  "cleanupVerified": true,
+  "transportAtCleanup": "stopped",
+  "connectedAtCleanup": 0,
+  "calibrationAtCleanup": false,
+  "pendingAtCleanup": 0,
+  "diagnostics": {
+    "waitingFor": "clock eligibility and deliberate exclusions",
+    "clockReady": 208,
+    "preparations": [],
+    "slowClients": [
+      {
+        "index": 2,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": 230.7237548828125,
+          "sampleAgeMs": 90486.63720703125
+        },
+        "stats": {
+          "probeGroupsStarted": 269,
+          "pairsPure": 1,
+          "pairsImpure": 3,
+          "measurements": 1,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 3,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": null,
+          "sampleAgeMs": null
+        },
+        "stats": {
+          "probeGroupsStarted": 194,
+          "pairsPure": 0,
+          "pairsImpure": 3,
+          "measurements": 0,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 4,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": null,
+          "sampleAgeMs": null
+        },
+        "stats": {
+          "probeGroupsStarted": 333,
+          "pairsPure": 0,
+          "pairsImpure": 3,
+          "measurements": 0,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 7,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": 383.513427734375,
+          "sampleAgeMs": 89313.60620117188
+        },
+        "stats": {
+          "probeGroupsStarted": 224,
+          "pairsPure": 1,
+          "pairsImpure": 2,
+          "measurements": 1,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 8,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": 130.285888671875,
+          "sampleAgeMs": 90519.96875
+        },
+        "stats": {
+          "probeGroupsStarted": 335,
+          "pairsPure": 1,
+          "pairsImpure": 2,
+          "measurements": 1,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 18,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": null,
+          "sampleAgeMs": null
+        },
+        "stats": {
+          "probeGroupsStarted": 326,
+          "pairsPure": 0,
+          "pairsImpure": 0,
+          "measurements": 0,
+          "serverEpoch": null
+        }
+      },
+      {
+        "index": 33,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": 233.5814208984375,
+          "sampleAgeMs": 89613.7392578125
+        },
+        "stats": {
+          "probeGroupsStarted": 270,
+          "pairsPure": 1,
+          "pairsImpure": 5,
+          "measurements": 1,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 56,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": 124.3489990234375,
+          "sampleAgeMs": 90549.38208007812
+        },
+        "stats": {
+          "probeGroupsStarted": 335,
+          "pairsPure": 1,
+          "pairsImpure": 2,
+          "measurements": 1,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 57,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": 218.41015625,
+          "sampleAgeMs": 89475.7265625
+        },
+        "stats": {
+          "probeGroupsStarted": 269,
+          "pairsPure": 1,
+          "pairsImpure": 4,
+          "measurements": 1,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      },
+      {
+        "index": 64,
+        "quality": {
+          "ready": false,
+          "uncertaintyMs": null,
+          "sampleAgeMs": null
+        },
+        "stats": {
+          "probeGroupsStarted": 193,
+          "pairsPure": 0,
+          "pairsImpure": 1,
+          "measurements": 0,
+          "serverEpoch": "5487158f-0430-421c-af31-9f13a8d60114"
+        }
+      }
+    ]
+  },
+  "limitations": "Socket close/receive counters were not recorded; no root cause is established. No calibration or playback was started."
+}

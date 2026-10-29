@@ -5,7 +5,8 @@ import { ClockSync } from "../../packages/sync/src";
 import { CalibrationSession } from "../../client-frontend/src/lib/calibration";
 import { FlashRenderer } from "../../client-frontend/src/lib/flash-renderer";
 import { ShowControl } from "../../client-frontend/src/lib/show-control";
-import { DecodedBudget, preloadTracks, type LoadedTrack, type TrackData } from "../../packages/audio/src/assets";
+import { AssetError, cancelPreloads, DecodedBudget, preloadTracks, type LoadedTrack, type TrackData } from "../../packages/audio/src/assets";
+import { pacedBody } from "./paced-body";
 import { summarize } from "./metrics";
 
 // Public-origin control/media test, using actual clock + calibration client implementations.
@@ -23,10 +24,11 @@ assert(Number.isInteger(count) && count >= 2 && count <= 250, "2..250 clients re
 const runKey = `stage-load-${Date.now()}`;
 const httpMs: Record<string, number[]> = {};
 let httpReadRetries = 0;
-async function request(path: string, init?: RequestInit, operator = false) {
+async function request(path: string, init?: RequestInit, operator = false, mediaBytes?: number) {
   const start = performance.now();
   let response: Response | undefined;
   for (let attempt = 0; attempt < 3; attempt++) {
+    if (mediaBytes !== undefined) reserveMedia(mediaBytes);
     try {
       response = await fetch((operator ? control : base) + path, { ...init, signal: AbortSignal.timeout(120000),
         headers: { ...(operator ? { "x-operator-secret": secret! } : {}), ...init?.headers } });
@@ -67,6 +69,12 @@ let deadlineAt = 0;
 let performanceTouched = false;
 let performanceReport: Record<string, unknown> | null = null;
 let mediaAttempts = 0, injectedMediaFailures = 0;
+let reservedMediaBytes = 0;
+const socketClosures: { index: number; code: number; reason: string }[] = [];
+function reserveMedia(bytes: number) {
+  if (reservedMediaBytes + bytes > 600_000_000) throw new AssetError("budget", "Test's 600 MB network-transfer budget exhausted");
+  reservedMediaBytes += bytes;
+}
 
 class Phone {
   socket: WebSocket | null = null;
@@ -83,6 +91,8 @@ class Phone {
   readonly budget = new DecodedBudget();
   transportMargins: number[] = [];
   assignmentPreparationsReceived = 0;
+  clockReplies = 0;
+  lastReplyAt = 0;
   readonly playback = new ShowControl({
     identity: () => ({ sessionId: info.sessionId, serverEpoch: info.serverEpoch, deviceId: this.id }),
     send: message => this.delayedSend(message), now: () => this.clock.quality().ready ? this.clock.nowServerMs() : null,
@@ -120,6 +130,7 @@ class Phone {
       const timeout = setTimeout(() => reject(new Error("Socket connect timed out")), 20000);
       socket.onopen = () => { clearTimeout(timeout); resolve(); };
       socket.onerror = () => { clearTimeout(timeout); reject(new Error("Socket connect failed")); };
+      socket.onclose = event => { if (this.socket === socket) socketClosures.push({index:this.index,code:event.code,reason:event.reason}); };
       socket.onmessage = event => {
         const raw = String(event.data);
         const at = Math.max(this.lastDown, performance.now() + this.oneWayMs + random() * 30
@@ -159,7 +170,7 @@ class Phone {
   private receive(raw: string) {
     let message: ServerMessageData;
     try { message = ServerMessage.parse(JSON.parse(raw)); } catch { errors.push("Invalid server message"); return; }
-    if (message.type === "clock.reply") this.clock.accept({ ...message.payload, serverEpoch: message.serverEpoch });
+    if (message.type === "clock.reply") { this.clockReplies++; this.lastReplyAt=performance.now(); this.clock.accept({ ...message.payload, serverEpoch: message.serverEpoch }); }
     if (performanceChecks) {
       if (message.type === "assignment.prepare") this.assignmentPreparationsReceived++;
       if (message.type === "state.snapshot" && message.payload.role === "participant") { this.snapshot = message.payload; this.playback.applySnapshot(message.payload); }
@@ -188,7 +199,10 @@ class Phone {
         this.renderer.start();
       }
     }
-    if (message.type === "error") errors.push(message.payload.error.code);
+    if (message.type === "error") {
+      errors.push(message.payload.error.code);
+      console.log(JSON.stringify({clientError:this.index,error:message.payload.error}));
+    }
   }
   disconnect() {
     this.renderer?.stop();
@@ -196,7 +210,7 @@ class Phone {
     this.playback.disconnected();
     if (this.statusTimer) clearInterval(this.statusTimer);
     this.statusTimer = null;
-    this.socket?.close(); this.socket = null;
+    const socket = this.socket; this.socket = null; socket?.close();
     for (const timer of this.timers) clearTimeout(timer);
     this.timers.clear(); this.lastUp = 0; this.lastDown = 0;
     this.calibration.abort("disconnected");
@@ -210,13 +224,15 @@ async function waitFor(check: () => Promise<boolean>, timeoutMs = 90000, label =
   const current = await snapshot();
   console.log(JSON.stringify({ waitingFor: label, clockReady: clients.filter(c => c.clock.quality().ready).length,
     preparations: current.preparations.map((p: { readyIds: number[]; excluded: unknown[] }) => ({ ready: p.readyIds.length, excluded: p.excluded.length })),
-    slowClients: clients.filter(c => !c.clock.quality().ready).slice(0, 10).map(c => ({ index: c.index, quality: c.clock.quality(), stats: c.clock.estimator.stats() })) }));
+    serverConnected: current.devices.filter((device:{connected:boolean})=>device.connected).length, socketClosures, errors,
+    slowClients: clients.filter(c => !c.clock.quality().ready).slice(0, 10).map(c => ({ index: c.index, socketState:c.socket?.readyState,
+      clockReplies:c.clockReplies,lastReplyAgeMs:performance.now()-c.lastReplyAt,quality: c.clock.quality(), stats: c.clock.estimator.stats() })) }));
   throw new Error(`Timed out waiting for ${label}`);
 }
 async function download(url: string, hash: string, expectedSize: number): Promise<void> {
   const started = performance.now(); activeDownloads++; maxConcurrentDownloads = Math.max(maxConcurrentDownloads, activeDownloads);
   try {
-    const response = await request(url, { cache: "no-store" });
+    const response = await request(url, { cache: "no-store" }, false, expectedSize);
     const reader = response.body!.getReader(), hasher = new Bun.CryptoHasher("sha256");
     let size = 0;
     while (true) {
@@ -242,24 +258,14 @@ async function preload(client: Phone, tracks: TrackData[]) {
       injectedMediaFailures++;
       return new Response(new ReadableStream()); // Real 30-second idle timeout, then bounded retry.
     }
+    reserveMedia(tracks.find(track => new URL(track.url,base).toString() === url)!.byteSize);
     const started = performance.now(); activeDownloads++; maxConcurrentDownloads = Math.max(maxConcurrentDownloads, activeDownloads);
     try {
       const response = await fetch(url, { ...init, cache: "no-store" });
       if (!response.ok || !response.body) { activeDownloads--; return response; }
-      const reader = response.body.getReader();
       let closed = false;
       const finish = () => { if (!closed) { closed = true; activeDownloads--; downloadMs.push(performance.now() - started); } };
-      const stream = new ReadableStream<Uint8Array>({
-        async pull(controller) {
-          try {
-            const chunk = await reader.read();
-            if (chunk.done) { finish(); controller.close(); return; }
-            await Bun.sleep(chunk.value.byteLength / 32768 * 1000);
-            bytesDownloaded += chunk.value.byteLength; controller.enqueue(chunk.value);
-          } catch (error) { finish(); controller.error(error); }
-        },
-        async cancel() { finish(); await reader.cancel(); },
-      });
+      const stream = pacedBody(response.body,{onEnd:finish,onBytes:bytes=>{bytesDownloaded+=bytes;}});
       return new Response(stream, { status: response.status, headers: response.headers });
     } catch (error) { activeDownloads--; throw error; }
   };
@@ -304,7 +310,9 @@ async function checkPerformance() {
   for (const phone of recovering) { phone.forceUnready = false; phone.status(); }
   await waitFor(async () => await ready("assignment") === recovering.length, 90000, "automatic assignment ACK recovery");
   assert(recovering.every(phone => phone.assignmentPreparationsReceived >= 2), "Assignment preparation was not replayed");
-  const assigned = await operator("/api/assignments", { ...assignment, preparationId: selection.preparationId });
+  // Let duplicate ACKs already in the delayed link drain before replacing the barrier.
+  // The server correctly rejects old ACKs after commit; this is the successful-cue path.
+  const assigned = await operator("/api/assignments", { ...assignment, preparationId: selection.preparationId }, 3000);
   assert.equal(assigned.ready, recovering.length);
   const mixed = await operator("/api/mix", { expectedRevision: playingSnapshot.mix.mixRevision, masterGain: 0.5, channels: playingSnapshot.show.channels });
   await waitFor(async () => (await snapshot()).mix.masterGain === 0.5, 15000, "server-timed mix");
@@ -405,6 +413,7 @@ try {
   assert(ineligible.every(client => !client.clock.quality().ready && client.receivedArms === 0), "Ineligible phones must remain excluded");
   assert(clients.filter(client => excludedIds.has(client.id)).every(client => client.receivedArms === 0), "A withdrawn phone received an arm");
   assert.equal(errors.length, 0, `Server/client errors: ${errors.slice(0, 5)}`);
+  assert.equal(socketClosures.length, 0, "Unexpected socket closure during the run");
   const report = { date: new Date().toISOString(), target: base, clients: count, serverEpoch: info.serverEpoch,
     injection: "245 eligible clients (at 250 total): 80/135/190/245 ms each way; 5 deliberate exclusions: 450 ms each way; 0..30 ms shared pair jitter, 0..8 ms per-probe jitter; 4% +300 ms uplink pair spikes; 2% +1000 ms downlink spikes",
     eligibleCount, deliberatelyExcluded: ineligibleCount,
@@ -422,6 +431,7 @@ try {
     httpResponseHeadersMs: Object.fromEntries(Object.entries(httpMs).map(([path, times]) => [path, summarize(times)])),
     errors, httpReadRetries, savedShowUnchanged: true,
     performance: performanceReport, mediaAttempts, injectedMediaFailures,
+    reservedMediaBytes, socketClosures,
     diagnosticsBefore: diagnosticsBefore.diagnostics, diagnosticsAfter: diagnosticsAfter.diagnostics,
     limitations: "One load generator/public WAN path; injected timers, not independent Wi-Fi radios; original tone when show is empty; verifies media bytes and scheduling, not decode/audio/optical performance. Test device IDs remain allocated." };
   await mkdir("runtime", { recursive: true });
@@ -429,7 +439,7 @@ try {
   console.log(JSON.stringify(report, null, 2));
 } finally {
   try { await restorePerformance(); } catch (error) { console.error("Performance cleanup failed:", String(error)); }
-  for (const client of clients) client.disconnect();
+  for (const client of clients) { cancelPreloads(client.cache); client.disconnect(); }
   await Promise.allSettled(downloads);
   if (ownedRunId) {
     const current = await snapshot();
